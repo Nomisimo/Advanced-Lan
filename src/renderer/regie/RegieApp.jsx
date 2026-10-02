@@ -5,14 +5,14 @@ import Kopf from "../Kopf.jsx";
 import { SPIELE, SPIEL_BY_ID } from "../../core/spiele.js";
 import LiveTab from "./LiveTab.jsx";
 import PcsTab from "./PcsTab.jsx";
-import CuesTab from "./CuesTab.jsx";
+import SignaleTab from "./SignaleTab.jsx";
 import ZieleTab from "./ZieleTab.jsx";
 import SimTab from "./SimTab.jsx";
 import SessionTab from "./SessionTab.jsx";
 import AnleitungTab from "./AnleitungTab.jsx";
 import { Activity, Monitor, ListChecks, Send, FlaskConical, BookOpen, Power, Radio, KeyRound, TriangleAlert } from "lucide-react";
 
-const TABS = [["live", "Live", Activity], ["pcs", "PCs", Monitor], ["cues", "Cues", ListChecks], ["ziele", "Ziele", Send], ["sim", "Simulator", FlaskConical], ["session", "Session", KeyRound], ["hilfe", "Anleitung", BookOpen]];
+const TABS = [["live", "Live", Activity], ["pcs", "PCs", Monitor], ["signale", "Signale", ListChecks], ["ziele", "Ziele", Send], ["sim", "Simulator", FlaskConical], ["session", "Session", KeyRound], ["hilfe", "Anleitung", BookOpen]];
 const LOG_MAX = 300;
 
 export default function RegieApp({ cfg: alles, mutate: mutateAlles, status: st, jetzt, notify, version, modusWechseln }) {
@@ -20,7 +20,7 @@ export default function RegieApp({ cfg: alles, mutate: mutateAlles, status: st, 
   const status = st.regie;
   const mutate = useCallback((fn) => mutateAlles((d) => fn(d.regie)), [mutateAlles]);
   const [log, setLog] = useState([]);
-  const [tab, setTab] = useState(() => { try { return localStorage.getItem("lanregie_tab") || "live"; } catch { return "live"; } });
+  const [tab, setTab] = useState(() => { try { const t = localStorage.getItem("lanregie_tab"); return t && t !== "cues" ? t : "live"; } catch { return "live"; } });
   useEffect(() => { try { localStorage.setItem("lanregie_tab", tab); } catch {} }, [tab]);
   useEffect(() => {
     api.regieLog().then(setLog);
@@ -44,7 +44,7 @@ export default function RegieApp({ cfg: alles, mutate: mutateAlles, status: st, 
         <span> · <b style={{ color: verbunden.length ? OK : MUTED }}>{verbunden.length}</b> PCs verbunden, {imSpiel} im aktiven Spiel</span>
         {status.spielAufRegie && <span style={{ color: ERR }}> · <TriangleAlert size={12} /> Auf diesem PC läuft {status.spielAufRegie}</span>}
       </>}>
-        <div style={{ display: "flex", gap: 3, background: "#14121a", border: `1px solid ${LINE}`, borderRadius: 8, padding: 3 }} title="Aktives Spiel: nur dessen Ereignisse erzeugen OSC">
+        <div style={{ display: "flex", gap: 3, background: "#14121a", border: `1px solid ${LINE}`, borderRadius: 8, padding: 3 }} title="Aktives Spiel: nur dessen Ereignisse werden gesendet">
           {SPIELE.map((s) => {
             const an = s.id === cfg.aktivesSpiel;
             return (
@@ -57,7 +57,7 @@ export default function RegieApp({ cfg: alles, mutate: mutateAlles, status: st, 
           })}
         </div>
         <button onClick={() => mutate((d) => { d.armed = !d.armed; })}
-          title={scharf ? "Ausgabe stoppen: Ereignisse werden nur noch angezeigt" : "Ausgabe scharf schalten: Cues gehen per OSC an MA3 und Playout"}
+          title={scharf ? "Ausgabe stoppen: Ereignisse werden nur noch angezeigt" : "Ausgabe scharf schalten: Signale gehen per OSC an alle Ziele"}
           style={{ ...S.primaryBtn, padding: "9px 16px", letterSpacing: 0.5, background: scharf ? ERR : "transparent", border: `1px solid ${scharf ? ERR : ACCENT}`, color: scharf ? "#fff" : "#e6dbff", boxShadow: scharf ? undefined : GLOW_STARK, animation: scharf ? "puls 1.6s ease-in-out infinite" : "none" }}>
           <Power size={15} /> {scharf ? "AUSGABE SCHARF" : "AUSGABE AUS"}
         </button>
@@ -76,7 +76,7 @@ export default function RegieApp({ cfg: alles, mutate: mutateAlles, status: st, 
           <div style={{ animation: "npFade .18s ease" }}>
             {tab === "live" && <LiveTab {...shared} />}
             {tab === "pcs" && <PcsTab {...shared} />}
-            {tab === "cues" && <CuesTab {...shared} />}
+            {tab === "signale" && <SignaleTab {...shared} />}
             {tab === "ziele" && <ZieleTab {...shared} />}
             {tab === "sim" && <SimTab {...shared} />}
             {tab === "session" && <SessionTab {...shared} />}

@@ -1,6 +1,6 @@
 # LAN-Regie (Advanced LAN-Party)
 
-Eine App für die LAN-Party: Spielereignisse aus den Game-PCs lösen Licht (grandMA3) und Playout per OSC aus. Design und Aufbau wie [Netzwerkplaner](https://github.com/Nomisimo/Netzwerkplaner) und Stromplaner, Akzentfarbe Lila.
+Eine App für die LAN-Party: Die Game-PCs melden Spielereignisse, die Regie sendet daraus neutrale OSC-Signale ins Netz. Was ein Empfänger (Lichtpult, Playout, …) damit macht, entscheidet er selbst. Design und Aufbau wie [Netzwerkplaner](https://github.com/Nomisimo/Netzwerkplaner) und Stromplaner, Akzentfarbe Lila.
 
 Gebaut mit **Overwolf Electron** (`@overwolf/ow-electron`), React 18 und esbuild. Die Oberfläche wird zu einer einzelnen Datei `dist-app/index.html` gebündelt.
 
@@ -8,8 +8,8 @@ Gebaut mit **Overwolf Electron** (`@overwolf/ow-electron`), React 18 und esbuild
 
 | Modus | Läuft auf | Aufgabe |
 |---|---|---|
-| **Game-PC** | jedem PC, auf dem gespielt wird | liest das Spiel mit, erkennt Ereignisse, schickt sie mit PC-ID und Spiel an die Regie |
-| **Regie** | dem Regie-PC (ohne Spiel) | öffnet die Session, wählt das aktive Spiel, schickt Cues per OSC an MA3 und Playout |
+| **Game-PC** | jedem PC, auf dem gespielt wird | liest jedes Spiel mit, das die App kennt, und schickt alle Ereignisse mit PC-ID und Spiel an die Regie. Keine Spielauswahl. |
+| **Regie** | dem Regie-PC (ohne Spiel) | öffnet die Session, wählt das aktive Spiel und entscheidet allein, was mit den Daten passiert |
 
 Der Modus wird beim ersten Start gewählt und lässt sich oben rechts wechseln.
 
@@ -29,7 +29,14 @@ Valorant und Rocket League sind als Spiele schon wählbar, ihre Datenquellen feh
 
 ## OSC
 
-Cues gelten je Spiel: Ereignis (optional Team und PC-ID) → Ziel, OSC-Adresse, Wert. Platzhalter wie `{team}`, `{player}`, `{pc}`, `{spiel}` werden ersetzt. Für grandMA3 schickt `/gma3/cmd` mit einem Text wie `Go+ Sequence 101` einen Befehl (In & Out → OSC: Prefix `gma3`, Receive und Receive Command an).
+Die App sagt nur, **was passiert ist**, nicht was ein Empfänger tun soll. Jedes Signal geht an alle eingetragenen Ziele (IP und Port, beliebig viele).
+
+| Adresse | Wann |
+|---|---|
+| `/lan/<spiel>/<event>` | Ereignisse des ganzen Spiels, z. B. `/lan/cs2/round_end`, `/lan/cs2/bomb_planted` |
+| `/lan/<spiel>/<pc>/<event>` | Ereignisse eines Spielers, z. B. `/lan/cs2/pc03/kill` (PC-ID klein, ohne Leer- und Sonderzeichen) |
+
+Argumente immer in dieser Reihenfolge: `team` (s), `spieler` (s), `pc` (s), `runde` (i). Bei Ereignissen des ganzen Spiels bleiben `spieler` und `pc` leer. Einzelne Ereignisse lassen sich im Tab „Signale“ sperren. „Test“ in „Ziele“ schickt `/lan/test`.
 
 ## Entwickeln
 
@@ -44,6 +51,6 @@ npm run dist:win   # Windows-Installer mit ow-electron-builder
 
 | Ordner | Inhalt |
 |---|---|
-| `src/core` | Logik ohne Electron: Ereigniserkennung CS2, Regie, Cues, Simulator, Protokoll |
+| `src/core` | Logik ohne Electron: Ereigniserkennung CS2, Regie, Signale, Simulator, Protokoll |
 | `src/main` | Hauptprozess: Session-Server, Game-PC-Verbindung, GSI-Empfang, OSC |
 | `src/renderer` | Oberfläche (React): Modus-Wahl, `regie/`, `gamepc/` |

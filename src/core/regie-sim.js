@@ -26,7 +26,7 @@ class RegieSim {
   }
 
   start(modus) {
-    for (const p of this.pcs) this.regie.pcVerbunden(p.pcId, { spiel: "cs2", remote: "Simulator", sim: true });
+    for (const p of this.pcs) this.regie.pcVerbunden(p.pcId, { spiele: ["cs2"], remote: "Simulator", sim: true });
     this.runner.start(modus);
   }
   stop() { this.runner.stop(); }

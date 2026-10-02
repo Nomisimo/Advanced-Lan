@@ -6,10 +6,10 @@
 // Verbinden: WebSocket zur Regie (Port aus dem Dienst, Standard 47801). Anmeldung mit Challenge-Response,
 // das Passwort geht nie im Klartext übers Netz:
 //   Regie → PC   { t: "hallo", session, nonce, aktivesSpiel }
-//   PC → Regie   { t: "anmelden", pcId, spiel, version, beweis }   beweis = HMAC-SHA256(passwort, nonce) als Hex
+//   PC → Regie   { t: "anmelden", pcId, spiele, version, beweis }  spiele = alle Spiele, die der PC erkennt   beweis = HMAC-SHA256(passwort, nonce) als Hex
 //   Regie → PC   { t: "ok", aktivesSpiel } oder { t: "abgelehnt", grund }
 // Danach:
-//   PC → Regie   { t: "event", spiel, ev }            ein erkanntes Spielereignis
+//   PC → Regie   { t: "event", spiel, ev }            ein erkanntes Spielereignis (immer, egal welches Spiel die Regie nutzt)
 //   PC → Regie   { t: "status", spiel, status, stand } Spieler und Spielstand (gedrosselt)
 //   Regie → PC   { t: "aktivesSpiel", spiel }           wenn die Regie das Spiel wechselt
 //   Regie → PC   { t: "quittung", n, verworfen }        Rückmeldung zu einem Ereignis

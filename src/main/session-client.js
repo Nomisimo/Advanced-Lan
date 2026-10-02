@@ -42,7 +42,7 @@ class SessionClient {
     this.onChange = onChange || (() => {});
     this.onAntwort = onAntwort || (() => {});
     this.ws = null;
-    this.ziel = null; // { host, port, passwort, pcId, spiel }
+    this.ziel = null; // { host, port, passwort, pcId, spiele }
     this.zustand = 'getrennt'; // getrennt | verbinde | verbunden | abgelehnt
     this.grund = '';
     this.session = '';
@@ -73,7 +73,7 @@ class SessionClient {
       if (m.t === 'hallo') {
         this.session = m.session || '';
         this.aktivesSpiel = m.aktivesSpiel || '';
-        ws.send(JSON.stringify({ t: 'anmelden', pcId: this.ziel.pcId, spiel: this.ziel.spiel, version: PROTOKOLL_VERSION, beweis: beweis(this.ziel.passwort, m.nonce) }));
+        ws.send(JSON.stringify({ t: 'anmelden', pcId: this.ziel.pcId, spiele: this.ziel.spiele, version: PROTOKOLL_VERSION, beweis: beweis(this.ziel.passwort, m.nonce) }));
       } else if (m.t === 'ok') {
         this.aktivesSpiel = m.aktivesSpiel || this.aktivesSpiel;
         this.setze('verbunden', '');

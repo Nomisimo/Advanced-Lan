@@ -19,7 +19,7 @@ contextBridge.exposeInMainWorld('regieAPI', {
   sessionSchliessen: call('session-schliessen'),
   pcTrennen:       call('pc-trennen'),
   eventAusloesen:  call('event-ausloesen'),
-  regelTesten:     call('regel-testen'),
+  signalTesten:    call('signal-testen'),
   zielTesten:      call('ziel-testen'),
   simStart:        call('sim-start'),
   simStop:         call('sim-stop'),

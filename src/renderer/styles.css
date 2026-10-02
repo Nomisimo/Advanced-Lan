@@ -1,4 +1,4 @@
-/* ── LAN-Regie – Global CSS (Designsprache wie Stromplaner/Netzwerkplaner, Akzent Lila) ── */
+/* ── Advanced LAN – Global CSS (Designsprache wie Stromplaner/Netzwerkplaner, Akzent Lila) ── */
 :root { --accent: #9d5cff; --line: #3a3647; --bg: #131118; }
 *, *::before, *::after { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; background: var(--bg); color: #ece9f2; height: 100%; overflow: hidden; }
@@ -20,3 +20,5 @@ select option { background: #1a1820; }
 @keyframes puls { 0%, 100% { box-shadow: 0 0 10px rgba(255,93,93,.45); } 50% { box-shadow: 0 0 22px rgba(255,93,93,.85); } }
 @keyframes blitz { from { background: rgba(157,92,255,.28); } to { background: transparent; } }
 .neu { animation: blitz 1.2s ease-out; }
+@keyframes drehen { to { transform: rotate(360deg); } }
+.suche { animation: drehen 2.4s linear infinite; }

@@ -19,23 +19,23 @@ export default function SimTab({ status, cfg, goTab }) {
 
   return (
     <>
-      <Section title="CS2-Match simulieren" subtitle={`10 virtuelle Game-PCs (5 gegen 5) treten der Regie bei und spielen CS2, mit derselben Ereigniserkennung wie echte Game-PCs. ${cfg.aktivesSpiel !== "cs2" ? "Gerade ist ein anderes Spiel aktiv, die Ereignisse werden also verworfen. " : ""}Ob OSC rausgeht, entscheidet der Schalter „Ausgabe“.`}>
+      <Section title="CS2-Match simulieren">
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <button style={S.primaryBtn} disabled={sim.laeuft} onClick={() => { api.simStart("runde"); goTab("live"); }}><Play size={15} /> Eine Runde</button>
-          <button style={S.secondaryBtn} disabled={sim.laeuft} onClick={() => { api.simStart("match"); goTab("live"); }}><FastForward size={15} /> Ganzes Match</button>
+          <button style={S.primaryBtn} disabled={sim.laeuft} onClick={() => { api.simStart("runde"); goTab("control"); }}><Play size={15} /> Eine Runde</button>
+          <button style={S.secondaryBtn} disabled={sim.laeuft} onClick={() => { api.simStart("match"); goTab("control"); }}><FastForward size={15} /> Ganzes Match</button>
           <button style={S.secondaryBtn} disabled={!sim.laeuft} onClick={() => api.simStop()}><Square size={14} /> Stopp</button>
-          <button style={{ ...S.ghostBtn }} onClick={() => api.simNeu()}><RotateCcw size={14} /> Neues Match (virtuelle PCs entfernen)</button>
+          <button style={{ ...S.ghostBtn }} onClick={() => api.simNeu()}><RotateCcw size={14} /> Zurücksetzen</button>
           <span style={{ fontSize: 13, color: SUB, marginLeft: 8 }}>
             {sim.laeuft ? <b style={{ color: ACCENT_HI }}>läuft ({sim.modus === "match" ? "Match" : "Runde"}) · </b> : null}
             Simulation: <b style={{ color: CT }}>{sim.ct}</b> : <b style={{ color: TT }}>{sim.t}</b> nach {sim.runde} Runden
           </span>
         </div>
       </Section>
-      <Section title={`Ereignis direkt auslösen · ${spiel?.name}`} subtitle="Erzeugt ein Ereignis des aktiven Spiels, als käme es von einem PC. Gut zum Programmieren der Empfänger."
+      <Section title={`Event auslösen · ${spiel?.name}`}
         right={<div style={{ display: "flex", gap: 4 }}>{["CT", "T"].map((t) => (
           <button key={t} onClick={() => setTeam(t)} style={{ ...S.smallBtn, padding: "5px 12px", background: team === t ? (t === "CT" ? CT : TT) : "transparent", color: team === t ? "#111" : SUB, fontWeight: 700 }}>{t}</button>
         ))}</div>}>
-        {!EVENT_TYPES.length && <div style={S.empty}>Für {spiel?.name} gibt es noch keine Ereignisse.</div>}
+        {!EVENT_TYPES.length && <div style={S.empty}>Keine Events.</div>}
         {GRUPPEN.map((g) => (
           <div key={g} style={{ marginBottom: 14 }}>
             <div className="sp-section-label">{g}</div>

@@ -1,8 +1,8 @@
 {
-  "name": "lan-regie",
+  "name": "advanced-lan",
   "version": "0.1.0",
   "private": true,
-  "description": "Regie-App für die Advanced LAN-Party: CS2-Spielereignisse per OSC an grandMA3 und Playout",
+  "description": "Advanced LAN: Game-PCs melden Spielereignisse, die Regie sendet neutrale OSC-Signale",
   "author": "Momo",
   "license": "UNLICENSED",
   "main": "src/main/main.js",
@@ -19,8 +19,8 @@
     "dist:win": "npm run build && ow-electron-builder --win"
   },
   "build": {
-    "appId": "dev.lanregie",
-    "productName": "LAN-Regie",
+    "appId": "dev.advancedlan",
+    "productName": "Advanced LAN",
     "icon": "assets/app-icon/icon.png",
     "files": [
       "src/main/**",

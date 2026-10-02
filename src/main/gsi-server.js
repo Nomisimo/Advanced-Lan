@@ -45,7 +45,7 @@ class GsiServer {
   handle(req, res) {
     if (req.method !== 'POST') {
       res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
-      res.end('LAN-Regie: CS2-Empfang läuft. CS2 schickt hierher per POST.\n');
+      res.end('Advanced LAN: CS2-Empfang läuft. CS2 schickt hierher per POST.\n');
       return;
     }
     const chunks = [];

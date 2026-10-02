@@ -4,7 +4,7 @@ const WebSocket = require('ws');
 const { leseNachricht, MDNS_TYP, PROTOKOLL_VERSION } = require('../core/protokoll');
 const { beweis } = require('./session-server');
 
-// Sucht Sessions per mDNS (_lanregie._tcp). Abgemeldete oder abgelaufene Dienste fallen aus der Liste.
+// Sucht Sessions per mDNS (_advancedlan._tcp). Abgemeldete oder abgelaufene Dienste fallen aus der Liste.
 class Discovery {
   constructor({ onChange }) {
     this.onChange = onChange || (() => {});
@@ -31,7 +31,7 @@ class Discovery {
     return this.browser.services.map((d) => {
       const ip = (d.addresses || []).find((a) => /^\d+\.\d+\.\d+\.\d+$/.test(a)) || d.referer?.address || d.host;
       const txt = d.txt || {};
-      return { session: String(txt.session || d.name), host: String(d.host || '').replace(/\.local\.?$/, ''), ip, port: d.port, aktivesSpiel: String(txt.spiel || ''), v: Number(txt.v) || 0 };
+      return { id: String(d.name || ''), session: String(txt.session || d.name), host: String(d.host || '').replace(/\.local\.?$/, ''), ip, port: d.port, aktivesSpiel: String(txt.spiel || ''), v: Number(txt.v) || 0 };
     }).filter((s) => s.ip && s.port);
   }
 }

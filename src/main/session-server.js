@@ -1,35 +1,21 @@
-// Regie: öffnet die Session im LAN. Ruft sie per UDP-Broadcast aus und nimmt Game-PCs per WebSocket an.
+// Regie: öffnet die Session im LAN. Veröffentlicht sie per mDNS und nimmt Game-PCs per WebSocket an.
 const crypto = require('crypto');
-const dgram = require('dgram');
 const os = require('os');
 const { WebSocketServer } = require('ws');
-const { beacon, leseNachricht, PROTOKOLL_VERSION } = require('../core/protokoll');
-const { PORTS } = require('../core/defaults');
+const { Bonjour } = require('bonjour-service');
+const { mdnsTxt, leseNachricht, MDNS_TYP, PROTOKOLL_VERSION } = require('../core/protokoll');
 
 const beweis = (passwort, nonce) => crypto.createHmac('sha256', String(passwort)).update(nonce).digest('hex');
 const gleich = (a, b) => { const x = Buffer.from(String(a)), y = Buffer.from(String(b)); return x.length === y.length && crypto.timingSafeEqual(x, y); };
 
-// Broadcast-Adressen aller IPv4-Netze (192.168.1.255 …), dazu 255.255.255.255
-function broadcastAdressen() {
-  const out = new Set(['255.255.255.255']);
-  for (const list of Object.values(os.networkInterfaces()))
-    for (const a of list || []) {
-      if (a.family !== 'IPv4' || a.internal || !a.netmask) continue;
-      const ip = a.address.split('.').map(Number), m = a.netmask.split('.').map(Number);
-      out.add(ip.map((o, i) => (o & m[i]) | (~m[i] & 255)).join('.'));
-    }
-  return [...out];
-}
-
 class SessionServer {
-  constructor({ regie, getConfig, onChange, discoveryPort = PORTS.discovery }) {
+  constructor({ regie, getConfig, onChange }) {
     this.regie = regie;
     this.getConfig = getConfig; // → Regie-Einstellungen
     this.onChange = onChange || (() => {});
-    this.discoveryPort = discoveryPort;
     this.wss = null;
-    this.udp = null;
-    this.timer = null;
+    this.mdns = null;
+    this.dienst = null;
     this.verbindungen = new Map(); // pcId → ws
     this.fehler = '';
     this.port = null;
@@ -51,19 +37,15 @@ class SessionServer {
     this.wss = wss;
     this.port = Number(s.port);
     wss.on('connection', (ws, req) => this.verbindung(ws, (req.socket.remoteAddress || '').replace(/^::ffff:/, '')));
-    this.udp = dgram.createSocket({ type: 'udp4', reuseAddr: true });
-    this.udp.on('error', () => {});
-    this.udp.bind(() => { try { this.udp.setBroadcast(true); } catch {} });
-    this.timer = setInterval(() => this.ausrufen(), 1000);
+    this.mdns = new Bonjour({}, (e) => { this.fehler = `mDNS: ${e.message}`; this.onChange(); });
     this.ausrufen();
     this.onChange();
     return true;
   }
 
   async schliessen() {
-    clearInterval(this.timer);
-    this.timer = null;
-    if (this.udp) { try { this.udp.close(); } catch {} this.udp = null; }
+    await this.dienstStoppen();
+    if (this.mdns) { try { this.mdns.destroy(); } catch {} this.mdns = null; }
     for (const [pcId, ws] of this.verbindungen) { try { ws.close(4000, 'Session geschlossen'); } catch {} this.regie.pcGetrennt(pcId); }
     this.verbindungen.clear();
     const wss = this.wss;
@@ -72,11 +54,27 @@ class SessionServer {
     this.onChange();
   }
 
+  // Session per mDNS veröffentlichen. TXT-Einträge lassen sich nicht ändern, deshalb bei Spiel- oder Namenswechsel neu veröffentlichen.
   ausrufen() {
-    if (!this.udp) return;
+    this.kette = (this.kette || Promise.resolve()).then(() => this.veroeffentlichen()); // nacheinander, nie zwei Dienste gleichzeitig
+    return this.kette;
+  }
+
+  async veroeffentlichen() {
+    if (!this.mdns) return;
     const s = this.getConfig().session;
-    const msg = Buffer.from(beacon({ session: s.name, port: this.port, host: os.hostname(), aktivesSpiel: this.getConfig().aktivesSpiel, pcs: this.verbindungen.size }));
-    for (const ziel of broadcastAdressen()) this.udp.send(msg, this.discoveryPort, ziel, () => {});
+    const txt = mdnsTxt({ session: s.name, aktivesSpiel: this.getConfig().aktivesSpiel });
+    if (this.dienst && JSON.stringify(this.dienst.txt) === JSON.stringify(txt)) return;
+    await this.dienstStoppen();
+    if (!this.mdns) return;
+    this.dienst = this.mdns.publish({ name: `${s.name} (${os.hostname()})`.slice(0, 63), type: MDNS_TYP, port: this.port, txt, probe: false, disableIPv6: true });
+    this.dienst.on('error', (e) => { this.fehler = `mDNS: ${e.message}`; this.onChange(); });
+  }
+
+  dienstStoppen() {
+    const d = this.dienst;
+    this.dienst = null;
+    return d ? new Promise((r) => { try { d.stop(r); } catch { r(); } setTimeout(r, 500); }) : Promise.resolve();
   }
 
   verbindung(ws, remote) {

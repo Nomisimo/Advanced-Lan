@@ -26,14 +26,16 @@ test("Game-PC meldet sich mit Passwort an, Ereignisse werden zu OSC", async () =
   cfg.targets = [{ id: "ma3", name: "MA3", host: "127.0.0.1", port: oscPort }, { id: "playout", name: "Playout", host: "127.0.0.1", port: oscPort }];
   const osc = new OscSender();
   const regie = new Regie({ getConfig: () => cfg, send: (s) => osc.send(s) });
-  const server = new SessionServer({ regie, getConfig: () => cfg, discoveryPort: 47910 });
-  const disco = new Discovery({ port: 47910 });
+  const server = new SessionServer({ regie, getConfig: () => cfg });
+  const disco = new Discovery({});
   disco.start();
   assert.equal(await server.oeffnen(), true);
 
-  // Discovery: Session wird per Broadcast gefunden (auf manchen Systemen ohne Broadcast-Route nicht prüfbar)
-  await warte(() => disco.liste().length > 0, 2500).catch(() => {});
-  if (disco.liste().length) assert.equal(disco.liste()[0].session, "Test-LAN");
+  // Discovery: Session wird per mDNS gefunden
+  await warte(() => disco.liste().some((s) => s.port === 47911), 5000);
+  const gefunden = disco.liste().find((s) => s.port === 47911);
+  assert.equal(gefunden.session, "Test-LAN");
+  assert.equal(gefunden.aktivesSpiel, "cs2");
 
   // Falsches Passwort
   const falsch = new SessionClient({});
@@ -65,6 +67,7 @@ test("Game-PC meldet sich mit Passwort an, Ereignisse werden zu OSC", async () =
   cfg.aktivesSpiel = "rl";
   server.spielGewechselt();
   await warte(() => pc.aktivesSpiel === "rl");
+  await warte(() => disco.liste().find((s) => s.port === 47911)?.aktivesSpiel === "rl", 5000); // mDNS veröffentlicht neu
   pc.event("cs2", { type: "round_end", team: "CT" });
   await warte(() => regie.snapshot().zaehler.verworfen === 1);
   await new Promise((r) => setTimeout(r, 100));

@@ -62,7 +62,7 @@ export default function GamePcApp({ cfg: alles, mutate: mutateAlles, status: st,
               {aktivVerbunden && <p style={S.hint}>Zum Ändern zuerst trennen.</p>}
             </Section>
 
-            <Section title="Regie" subtitle="Sessions im Netz erscheinen automatisch."
+            <Section title="Regie" subtitle="Sessions im Netz erscheinen automatisch (mDNS)."
               right={aktivVerbunden
                 ? <button style={{ ...S.secondaryBtn, borderColor: ERR, color: ERR }} onClick={() => api.trennen()}><Unplug size={14} /> Trennen</button>
                 : <button style={S.primaryBtn} disabled={!bereit} onClick={verbinden}><Plug size={15} /> Verbinden</button>}>
@@ -78,7 +78,7 @@ export default function GamePcApp({ cfg: alles, mutate: mutateAlles, status: st,
                       <Dot color={OK} glow />
                       <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: 700, fontSize: 14 }}>{s.session}</div>
-                        <div style={{ fontSize: 11, color: SUB }}>{s.host} · {s.ip}:{s.port} · {s.pcs} PCs verbunden</div>
+                        <div style={{ fontSize: 11, color: SUB }}>{s.host} · {s.ip}:{s.port}</div>
                       </div>
                       {sp && <span style={{ ...S.badge, background: sp.farbe + "22", color: sp.farbe, border: `1px solid ${sp.farbe}66` }}>aktiv: {sp.kurz}</span>}
                     </button>

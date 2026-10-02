@@ -1,45 +1,39 @@
-// Game-PC: findet Sessions im LAN (UDP-Broadcast) und verbindet sich per WebSocket mit der Regie.
-const dgram = require('dgram');
+// Game-PC: findet Sessions im LAN (mDNS) und verbindet sich per WebSocket mit der Regie.
+const { Bonjour } = require('bonjour-service');
 const WebSocket = require('ws');
-const { leseBeacon, leseNachricht, PROTOKOLL_VERSION } = require('../core/protokoll');
-const { PORTS } = require('../core/defaults');
+const { leseNachricht, MDNS_TYP, PROTOKOLL_VERSION } = require('../core/protokoll');
 const { beweis } = require('./session-server');
 
-// Hört auf die Ausrufe der Regie-Apps. Sessions, die 5 s nicht mehr rufen, fallen aus der Liste.
+// Sucht Sessions per mDNS (_lanregie._tcp). Abgemeldete oder abgelaufene Dienste fallen aus der Liste.
 class Discovery {
-  constructor({ onChange, port = PORTS.discovery }) {
+  constructor({ onChange }) {
     this.onChange = onChange || (() => {});
-    this.port = port;
-    this.sessions = new Map(); // "ip:port" → { session, host, ip, port, aktivesSpiel, pcs, t }
-    this.sock = null;
+    this.mdns = null;
+    this.browser = null;
     this.timer = null;
     this.fehler = '';
   }
   start() {
-    if (this.sock) return;
-    const sock = dgram.createSocket({ type: 'udp4', reuseAddr: true });
-    sock.on('error', (e) => { this.fehler = e.message; this.onChange(); });
-    sock.on('message', (msg, rinfo) => {
-      const b = leseBeacon(msg);
-      if (!b) return;
-      const key = `${rinfo.address}:${b.port}`;
-      const neu = !this.sessions.has(key);
-      this.sessions.set(key, { session: b.session, host: b.host, ip: rinfo.address, port: b.port, aktivesSpiel: b.aktivesSpiel, pcs: b.pcs, t: Date.now() });
-      if (neu) this.onChange();
-    });
-    sock.bind(this.port);
-    this.sock = sock;
-    this.timer = setInterval(() => {
-      let weg = false;
-      for (const [k, s] of this.sessions) if (Date.now() - s.t > 5000) { this.sessions.delete(k); weg = true; }
-      if (weg) this.onChange();
-    }, 1000);
+    if (this.mdns) return;
+    this.mdns = new Bonjour({}, (e) => { this.fehler = e.message; this.onChange(); });
+    this.browser = this.mdns.find({ type: MDNS_TYP });
+    for (const ev of ['up', 'down', 'txt-update', 'srv-update']) this.browser.on(ev, () => this.onChange());
+    // Regelmäßig neu fragen: neue Regie sofort sehen, verschwundene nach Ablauf der TTL
+    this.timer = setInterval(() => { try { this.browser.update(); this.browser.expire(); } catch {} }, 3000);
   }
   stop() {
     clearInterval(this.timer);
-    if (this.sock) { try { this.sock.close(); } catch {} this.sock = null; }
+    if (this.browser) { try { this.browser.stop(); } catch {} this.browser = null; }
+    if (this.mdns) { try { this.mdns.destroy(); } catch {} this.mdns = null; }
   }
-  liste() { return [...this.sessions.values()]; }
+  liste() {
+    if (!this.browser) return [];
+    return this.browser.services.map((d) => {
+      const ip = (d.addresses || []).find((a) => /^\d+\.\d+\.\d+\.\d+$/.test(a)) || d.referer?.address || d.host;
+      const txt = d.txt || {};
+      return { session: String(txt.session || d.name), host: String(d.host || '').replace(/\.local\.?$/, ''), ip, port: d.port, aktivesSpiel: String(txt.spiel || ''), v: Number(txt.v) || 0 };
+    }).filter((s) => s.ip && s.port);
+  }
 }
 
 // Verbindung zur Regie. Verbindet sich nach Abbruch selbst neu, solange nicht bewusst getrennt wurde.

@@ -158,6 +158,7 @@ ipcMain.handle('config-set', async (_, neu) => {
   speichereKonfig();
   if (cfg.modus === 'regie') {
     if (cfg.regie.aktivesSpiel !== alt.regie.aktivesSpiel) session.spielGewechselt();
+    else if (session.offen && cfg.regie.session.name !== alt.regie.session.name) session.ausrufen();
     if (session.offen && (cfg.regie.session.port !== alt.regie.session.port || cfg.regie.session.passwort !== alt.regie.session.passwort)) await session.oeffnen();
   }
   if (cfg.modus === 'gamepc' && cfg.gamepc.gsiPort !== alt.gamepc.gsiPort) await gsi.start(Number(cfg.gamepc.gsiPort));

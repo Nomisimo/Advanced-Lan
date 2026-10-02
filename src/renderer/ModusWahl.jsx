@@ -21,11 +21,11 @@ export default function ModusWahl({ onWahl, version }) {
       <div style={{ color: SUB, fontSize: 14, margin: "6px 0 30px" }}>Wofür ist dieser PC da?</div>
       <div style={{ display: "flex", gap: 22, flexWrap: "wrap", justifyContent: "center", width: "100%" }}>
         <Karte icon={Gamepad2} titel="Game-PC" onClick={() => onWahl("gamepc")}
-          text="Auf diesem PC wird gespielt. Die App liest das Spiel mit und schickt die Ereignisse an die Regie."
-          punkte={["PC-ID und Spiel einstellen", "Session der Regie im Netz wählen, Passwort eingeben", "Für CS2 einmal die cfg-Datei installieren"]} />
+          text="Auf diesem PC wird gespielt. Die App liest jedes Spiel mit, das sie kennt, und schickt die Ereignisse an die Regie."
+          punkte={["PC-ID einstellen", "Session der Regie im Netz wählen, Passwort eingeben", "Schickt alle erkannten Spiele automatisch"]} />
         <Karte icon={Clapperboard} titel="Regie" onClick={() => onWahl("regie")}
-          text="Der Regie-PC öffnet die Session und steuert Licht und Playout. Auf ihm läuft kein Spiel."
-          punkte={["Session mit Name und Passwort öffnen", "Ein Spiel aktiv schalten, nur das erzeugt OSC", "Cues an grandMA3 und Playout senden"]} />
+          text="Der Regie-PC öffnet die Session und entscheidet, was mit den Ereignissen passiert. Auf ihm läuft kein Spiel."
+          punkte={["Session mit Name und Passwort öffnen", "Ein Spiel aktiv schalten, nur das erzeugt OSC", "Signale per OSC an beliebige Ziele senden"]} />
       </div>
       <div style={{ color: MUTED, fontSize: 11, marginTop: 28 }}>Der Modus lässt sich später oben rechts wechseln{version ? ` · v${version}` : ""}</div>
     </div>

@@ -1,9 +1,9 @@
 "use strict";
-// Regie: nimmt Ereignisse der Game-PCs an, lässt nur das aktive Spiel durch, entdoppelt und löst Cues aus.
+// Regie: nimmt Ereignisse der Game-PCs an, lässt nur das aktive Spiel durch, entdoppelt und sendet OSC-Signale an alle Ziele.
 // Ohne Netzwerk: Senden und Melden kommen von außen (Main-Prozess oder Browser-Vorschau).
 
-const { Dedupe } = require("./events");
-const { Router, nachricht } = require("./router");
+const { Dedupe, EVENT_BY_ID } = require("./events");
+const { oscAdresse, oscArgs, freigegeben } = require("./signal");
 
 const LOG_MAX = 300;
 
@@ -13,20 +13,19 @@ class Regie {
     this.send = send; // ({ ziel, address, args }) → Promise
     this.emit = emit || (() => {}); // (typ, daten)
     this.now = now;
-    this.pcs = new Map(); // pcId → { pcId, spiel, verbunden, remote, sim, t, status, stand }
+    this.pcs = new Map(); // pcId → { pcId, spiele, spiel (zuletzt gemeldet), verbunden, remote, sim, t, status, stand }
     this.stand = null; // letzter Spielstand des aktiven Spiels
     this.log = [];
     this.dedupe = new Dedupe();
-    this.router = new Router();
     this.zaehler = { ereignisse: 0, verworfen: 0, gesendet: 0, fehler: 0 };
     this.nr = 0;
   }
 
   aktiv() { return this.getConfig().aktivesSpiel; }
 
-  pcVerbunden(pcId, { spiel, remote = "", sim = false } = {}) {
+  pcVerbunden(pcId, { spiele = [], remote = "", sim = false } = {}) {
     const alt = this.pcs.get(pcId) || {};
-    this.pcs.set(pcId, { ...alt, pcId, spiel, remote, sim, verbunden: true, t: this.now() });
+    this.pcs.set(pcId, { ...alt, pcId, spiele, remote, sim, verbunden: true, t: this.now() });
     this.emit("status");
   }
 
@@ -46,22 +45,24 @@ class Regie {
     this.emit("status");
   }
 
-  // Ereignis eines Game-PCs. Nur das aktive Spiel erzeugt Cues, alles andere wird verworfen.
+  // Ereignis eines Game-PCs. Nur das aktive Spiel erzeugt Signale, alles andere wird verworfen.
   pcEvent(pcId, spiel, ev) {
     const p = this.pcs.get(pcId);
-    if (p) p.t = this.now();
+    if (p) { p.t = this.now(); p.spiel = spiel; }
     if (spiel !== this.aktiv()) { this.zaehler.verworfen++; this.emit("status"); return null; }
     const e = { ...ev, spiel, pc: pcId, pcId };
     if (!this.dedupe.accept(e, this.now())) return null; // mehrere PCs melden dieselbe Runde
     return this.fire(e, p?.sim ? "sim" : "pc");
   }
 
+  // Neutrales Signal an alle Ziele. Gesperrte Ereignisse (Tab „Signale“) werden nur angezeigt.
   fire(ev, quelle = "pc") {
     const cfg = this.getConfig(), now = this.now();
     this.zaehler.ereignisse++;
-    const ergebnisse = this.router.route(cfg, ev, now);
-    const eintrag = { id: ++this.nr, t: now, ev, quelle, scharf: !!cfg.armed, sends: ergebnisse.map(kurz) };
-    if (cfg.armed) ergebnisse.forEach((s, i) => this.ausgeben(s, eintrag.sends[i]));
+    const an = freigegeben(cfg, ev.spiel, ev.type);
+    const s = this.signal(ev);
+    const eintrag = { id: ++this.nr, t: now, ev, quelle, scharf: !!cfg.armed, gesperrt: !an, address: s.address, args: s.args.map((a) => a.value), ziele: (cfg.targets || []).length, fehler: [] };
+    if (cfg.armed && an) this.ausgeben(s, eintrag);
     this.log.unshift(eintrag);
     if (this.log.length > LOG_MAX) this.log.length = LOG_MAX;
     this.emit("event", eintrag);
@@ -69,32 +70,33 @@ class Regie {
     return eintrag;
   }
 
-  // Einzelne Regel sofort senden (Test-Knopf), unabhängig von „scharf“, Filter und Cooldown
-  testeRegel(regelId) {
-    const cfg = this.getConfig();
-    const r = cfg.rules.find((x) => x.id === regelId);
-    if (!r) return null;
-    const s = nachricht(cfg, r, { type: r.event, spiel: r.spiel, team: r.team || "CT", player: "Testspieler", pc: "Regie", round: 1, map: "de_test", kills: 1 });
-    const k = kurz(s);
+  signal(ev) {
+    const spieler = !!EVENT_BY_ID[ev.type]?.spieler;
+    return { address: oscAdresse(ev, spieler), args: oscArgs(ev, spieler) };
+  }
+
+  // Test-Knopf: sendet sofort, unabhängig von „scharf“ und Freigabe
+  testeSignal(spiel, type) {
+    const s = this.signal({ type, spiel, team: "CT", player: "Testspieler", pc: "Regie", pcId: "test", round: 1 });
+    const k = { address: s.address, args: s.args.map((a) => a.value), fehler: [] };
     this.ausgeben(s, k);
     return k;
   }
 
   ausgeben(s, k) {
-    if (!s.ziel) return;
-    this.zaehler.gesendet++;
-    Promise.resolve(this.send(s)).catch((e) => {
-      this.zaehler.fehler++;
-      k.fehler = e.message;
-      this.emit("fehler", `${s.ziel.name}: ${e.message}`);
-    });
+    for (const ziel of this.getConfig().targets || []) {
+      this.zaehler.gesendet++;
+      Promise.resolve(this.send({ ziel, address: s.address, args: s.args })).catch((e) => {
+        this.zaehler.fehler++;
+        k.fehler.push(`${ziel.host}:${ziel.port}: ${e.message}`);
+        this.emit("fehler", `${ziel.name || ziel.host}: ${e.message}`);
+      });
+    }
   }
 
   snapshot() {
     return { pcs: [...this.pcs.values()], stand: this.stand, zaehler: { ...this.zaehler }, aktivesSpiel: this.aktiv() };
   }
 }
-
-const kurz = (s) => (s.ziel ? { regel: s.regel, ziel: s.ziel.name, zielId: s.ziel.id, an: `${s.ziel.host}:${s.ziel.port}`, address: s.address, args: s.args.map((a) => a.value) } : { ...s });
 
 module.exports = { Regie };

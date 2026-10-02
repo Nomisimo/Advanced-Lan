@@ -68,7 +68,8 @@ function pruefeSpielProzesse() {
   });
 }
 
-/* ── Modus Game-PC: CS2 (GSI) → Ereignisse → Regie ────────────────────── */
+/* ── Modus Game-PC: alle bekannten Spiele → Ereignisse → Regie ─────────── */
+const QUELLEN = ['cs2']; // Spiele mit Datenquelle auf dem Game-PC
 let quelle = new CsQuelle();
 const gp = { letzte: 0, status: null, stand: null, fremd: 0, log: [], nr: 0, statusGesendet: 0 };
 const client = new SessionClient({ onChange: statusMelden, onAntwort: statusMelden });
@@ -80,8 +81,7 @@ function gamePcPayload(body) {
   if (body?.auth?.token !== cfg.gamepc.gsiToken) { gp.fremd++; return statusMelden(); }
   const r = quelle.ingest(body);
   Object.assign(gp, { letzte: Date.now(), status: r.status, stand: r.stand });
-  const spiel = cfg.gamepc.spiel;
-  if (spiel !== 'cs2') return statusMelden(); // CS2 sendet, aber dieser PC ist auf ein anderes Spiel eingestellt
+  const spiel = 'cs2'; // Game-PC sendet immer alles, was er erkennt. Was davon genutzt wird, entscheidet die Regie.
   for (const ev of r.events) {
     const ok = client.event(spiel, ev);
     const e = { id: ++gp.nr, t: Date.now(), ev, gesendet: ok };
@@ -96,7 +96,7 @@ function gamePcPayload(body) {
 function gamePcVerbinden() {
   const g = cfg.gamepc;
   if (!g.pcId || !g.regie.host || !g.passwort) return { fehler: 'PC-ID, Regie und Passwort angeben' };
-  client.verbinden({ host: g.regie.host, port: g.regie.port, passwort: g.passwort, pcId: g.pcId, spiel: g.spiel });
+  client.verbinden({ host: g.regie.host, port: g.regie.port, passwort: g.passwort, pcId: g.pcId, spiele: QUELLEN });
   return { ok: true };
 }
 
@@ -184,12 +184,12 @@ ipcMain.handle('regie-log', () => regie.log);
 ipcMain.handle('session-oeffnen', async () => { const ok = await session.oeffnen(); cfg.regie.session.offen = ok; speichereKonfig(); return gesamtStatus(); });
 ipcMain.handle('session-schliessen', async () => { await session.schliessen(); cfg.regie.session.offen = false; speichereKonfig(); return gesamtStatus(); });
 ipcMain.handle('pc-trennen', (_, pcId) => { session.trennen(pcId); });
-ipcMain.handle('event-ausloesen', (_, ev) => regie.fire({ round: regie.stand?.runde, map: regie.stand?.map, ...ev, spiel: cfg.regie.aktivesSpiel, pc: 'Regie', pcId: '' }, 'manuell'));
-ipcMain.handle('regel-testen', (_, id) => regie.testeRegel(id));
+ipcMain.handle('event-ausloesen', (_, ev) => regie.fire({ round: regie.stand?.runde, map: regie.stand?.map, ...ev, spiel: cfg.regie.aktivesSpiel, pc: 'Regie', pcId: 'regie' }, 'manuell'));
+ipcMain.handle('signal-testen', (_, spiel, type) => regie.testeSignal(spiel, type));
 ipcMain.handle('ziel-testen', async (_, zielId) => {
   const ziel = cfg.regie.targets.find((t) => t.id === zielId);
   if (!ziel) return { fehler: 'Ziel nicht gefunden' };
-  try { await osc.send({ ziel, address: '/lanparty/test', args: [{ type: 's', value: 'LAN-Regie Test' }] }); return { ok: true }; }
+  try { await osc.send({ ziel, address: '/lan/test', args: [{ type: 's', value: 'LAN-Regie' }] }); return { ok: true }; }
   catch (e) { return { fehler: e.message }; }
 });
 ipcMain.handle('sim-start', (_, modus) => { regieSim.start(modus); return regieSim.status(); });
@@ -216,7 +216,7 @@ ipcMain.handle('cfg-speichern', async () => {
 });
 ipcMain.handle('test-event', (_, type) => {
   const ev = { type, team: 'CT', player: cfg.gamepc.pcId, kills: 1, round: gp.stand?.runde ?? 0, map: gp.stand?.map || '', test: true };
-  const ok = client.event(cfg.gamepc.spiel, ev);
+  const ok = client.event('cs2', ev);
   const e = { id: ++gp.nr, t: Date.now(), ev, gesendet: ok };
   gp.log.unshift(e);
   an('gamepc-event', e);

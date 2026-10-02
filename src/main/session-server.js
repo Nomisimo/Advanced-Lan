@@ -98,14 +98,14 @@ class SessionServer {
         clearTimeout(anmeldeFrist);
         pcId = id;
         this.verbindungen.set(id, ws);
-        this.regie.pcVerbunden(id, { spiel: String(m.spiel || ''), remote });
+        this.regie.pcVerbunden(id, { spiele: Array.isArray(m.spiele) ? m.spiele.map(String).slice(0, 20) : [], remote });
         senden({ t: 'ok', aktivesSpiel: this.getConfig().aktivesSpiel });
         this.onChange();
         return;
       }
       if (m.t === 'event' && m.ev && typeof m.ev.type === 'string') {
-        const e = this.regie.pcEvent(pcId, String(m.spiel || ''), m.ev);
-        senden({ t: 'quittung', n: m.n, verworfen: String(m.spiel) !== this.getConfig().aktivesSpiel, cues: e ? e.sends.filter((s) => s.address).length : 0 });
+        this.regie.pcEvent(pcId, String(m.spiel || ''), m.ev);
+        senden({ t: 'quittung', n: m.n, verworfen: String(m.spiel) !== this.getConfig().aktivesSpiel });
       } else if (m.t === 'status') {
         this.regie.pcStatus(pcId, { spiel: String(m.spiel || ''), status: m.status, stand: m.stand });
       }

@@ -31,7 +31,7 @@ export default function SimTab({ status, cfg, goTab }) {
           </span>
         </div>
       </Section>
-      <Section title={`Ereignis direkt auslösen · ${spiel?.name}`} subtitle="Feuert die passenden Cues des aktiven Spiels, ohne dass ein PC spielt. Gut zum Programmieren der Lichtshow."
+      <Section title={`Ereignis direkt auslösen · ${spiel?.name}`} subtitle="Erzeugt ein Ereignis des aktiven Spiels, als käme es von einem PC. Gut zum Programmieren der Empfänger."
         right={<div style={{ display: "flex", gap: 4 }}>{["CT", "T"].map((t) => (
           <button key={t} onClick={() => setTeam(t)} style={{ ...S.smallBtn, padding: "5px 12px", background: team === t ? (t === "CT" ? CT : TT) : "transparent", color: team === t ? "#111" : SUB, fontWeight: 700 }}>{t}</button>
         ))}</div>}>

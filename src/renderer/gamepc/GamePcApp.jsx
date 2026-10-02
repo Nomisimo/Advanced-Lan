@@ -26,8 +26,6 @@ export default function GamePcApp({ cfg: alles, mutate: mutateAlles, status: st,
   const c = g.client;
   const [zText, zFarbe] = ZUSTAND[c.zustand] || ZUSTAND.getrennt;
   const aktivVerbunden = c.zustand === "verbunden" || c.zustand === "verbinde";
-  const spiel = SPIEL_BY_ID[cfg.spiel];
-  const passt = !c.aktivesSpiel || c.aktivesSpiel === cfg.spiel;
   const bereit = cfg.pcId.trim() && cfg.regie.host && cfg.passwort;
   const cs2Aktiv = g.letzte && jetzt - g.letzte < 15000;
   const verbinden = async () => { const r = await api.verbinden(); if (r?.fehler) notify(r.fehler, "err"); };
@@ -36,7 +34,7 @@ export default function GamePcApp({ cfg: alles, mutate: mutateAlles, status: st,
   return (
     <div style={S.app}>
       <Kopf modus="GAME-PC" version={version} modusWechseln={modusWechseln} meta={<>
-        <b style={{ color: "#fff" }}>{cfg.pcId || "ohne PC-ID"}</b> · {spiel?.name}
+        <b style={{ color: "#fff" }}>{cfg.pcId || "ohne PC-ID"}</b>
         <span style={{ color: zFarbe }}> · {zText}{c.zustand === "verbunden" && c.session ? ` mit „${c.session}“` : ""}</span>
       </>} />
       <div style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
@@ -46,19 +44,21 @@ export default function GamePcApp({ cfg: alles, mutate: mutateAlles, status: st,
               <Field label="PC-ID">
                 <input style={{ ...S.input, fontSize: 18, fontWeight: 700 }} value={cfg.pcId} disabled={aktivVerbunden} placeholder="z. B. PC 01" onChange={(e) => mutate((d) => { d.pcId = e.target.value; })} />
               </Field>
-              <div style={{ ...S.fieldLabel, margin: "14px 0 6px" }}>Spiel auf diesem PC</div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <div style={{ ...S.fieldLabel, margin: "14px 0 6px" }}>Spiele, die dieser PC meldet</div>
+              <div style={{ border: `1px solid ${LINE}`, borderRadius: 8, overflow: "hidden" }}>
                 {SPIELE.map((s) => {
-                  const an = s.id === cfg.spiel;
+                  const live = s.id === "cs2" && cs2Aktiv;
                   return (
-                    <button key={s.id} disabled={aktivVerbunden && !an} onClick={() => mutate((d) => { d.spiel = s.id; })}
-                      style={{ ...S.secondaryBtn, padding: "10px 14px", fontWeight: 700, background: an ? s.farbe + "22" : "#1e1c26", borderColor: an ? s.farbe : LINE, color: an ? s.farbe : SUB, boxShadow: an ? `0 0 12px ${s.farbe}55` : "none" }}>
-                      {s.name}
-                    </button>
+                    <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderBottom: `1px solid ${LINE}`, fontSize: 13 }}>
+                      <Dot color={live ? OK : s.quelle ? "#4d475c" : "#2f2c3a"} glow={live} />
+                      <b style={{ color: s.farbe, minWidth: 40 }}>{s.kurz}</b>
+                      <span style={{ flex: 1 }}>{s.name}</span>
+                      <span style={{ fontSize: 11, color: live ? OK : SUB }}>{!s.quelle ? "noch keine Datenquelle" : live ? "Daten kommen" : "wartet auf das Spiel"}</span>
+                    </div>
                   );
                 })}
               </div>
-              {!spiel?.quelle && <p style={{ ...S.hint, color: WARN }}>Für {spiel?.name} gibt es noch keine Datenquelle. Der PC kann beitreten, schickt aber noch keine Spielereignisse.</p>}
+              <p style={S.hint}>Läuft eines dieser Spiele, gehen seine Ereignisse automatisch an die Regie. Was damit passiert, entscheidet nur die Regie.</p>
               {aktivVerbunden && <p style={S.hint}>Zum Ändern zuerst trennen.</p>}
             </Section>
 
@@ -106,17 +106,15 @@ export default function GamePcApp({ cfg: alles, mutate: mutateAlles, status: st,
                 <span style={{ flex: 1 }} />
                 <Toggle checked={cfg.autoVerbinden} onChange={(v) => mutate((d) => { d.autoVerbinden = v; })} label="Beim Start automatisch verbinden" />
               </div>
-              {c.zustand === "verbunden" && (
-                <div style={{ marginTop: 12, padding: "10px 12px", borderRadius: 8, fontSize: 13, background: passt ? OK + "14" : ERR + "14", border: `1px solid ${passt ? OK : ERR}55` }}>
-                  {passt ? <>Die Regie streamt gerade <b>{SPIEL_BY_ID[c.aktivesSpiel]?.name}</b>. Deine Ereignisse lösen Licht und Ton aus.</>
-                    : <>Die Regie streamt gerade <b>{SPIEL_BY_ID[c.aktivesSpiel]?.name || c.aktivesSpiel}</b>. Ereignisse aus {spiel?.name} werden dort verworfen.</>}
+              {c.zustand === "verbunden" && c.aktivesSpiel && (
+                <div style={{ marginTop: 12, padding: "10px 12px", borderRadius: 8, fontSize: 13, background: ACCENT + "14", border: `1px solid ${ACCENT}55` }}>
+                  Die Regie nutzt gerade <b>{SPIEL_BY_ID[c.aktivesSpiel]?.name || c.aktivesSpiel}</b>. Dieser PC schickt trotzdem alles, was er erkennt.
                 </div>
               )}
             </Section>
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1.3fr", gap: 20, alignItems: "start" }}>
-            {cfg.spiel === "cs2" ? (
               <Section title="CS2 einrichten" subtitle="CS2 schickt seinen Spielstand an diese App (Valve Game State Integration). Dafür muss einmal eine cfg-Datei in den CS2-Ordner.">
                 <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, marginBottom: 12 }}>
                   <Dot color={cs2Aktiv ? OK : g.gsi.fehler ? ERR : "#4d475c"} glow={cs2Aktiv} />
@@ -141,13 +139,10 @@ export default function GamePcApp({ cfg: alles, mutate: mutateAlles, status: st,
                   </div>
                 )}
               </Section>
-            ) : (
-              <Section title={`${spiel?.name} einrichten`}><div style={S.empty}>Für {spiel?.name} gibt es noch keine Datenquelle.</div></Section>
-            )}
 
             <Section title="An die Regie geschickt" subtitle="Ereignisse dieses PCs. Mit den Test-Knöpfen lässt sich die Verbindung prüfen, ohne zu spielen."
               right={<div style={{ display: "flex", gap: 6 }}>{TESTS.map((t) => (
-                <button key={t} style={S.smallBtn} disabled={c.zustand !== "verbunden" || cfg.spiel !== "cs2"} onClick={() => api.testEvent(t)} title={`Test: ${eventLabel(t)} an die Regie`}><Send size={11} /> {eventLabel(t)}</button>
+                <button key={t} style={S.smallBtn} disabled={c.zustand !== "verbunden"} onClick={() => api.testEvent(t)} title={`Test: CS2 ${eventLabel(t)} an die Regie`}><Send size={11} /> {eventLabel(t)}</button>
               ))}</div>}>
               <div style={{ maxHeight: 340, minHeight: 160, overflowY: "auto", border: `1px solid ${LINE}`, borderRadius: 8, background: "#1a1820" }}>
                 {log.length === 0 ? <div style={{ ...S.empty, padding: 14 }}>Noch nichts geschickt.</div> : log.map((e, i) => (
@@ -163,7 +158,7 @@ export default function GamePcApp({ cfg: alles, mutate: mutateAlles, status: st,
                   </div>
                 ))}
               </div>
-              <p style={S.hint}>{c.gesendet} geschickt{c.verworfen ? `, davon ${c.verworfen} von der Regie verworfen (anderes Spiel aktiv)` : ""}.</p>
+              <p style={S.hint}>{c.gesendet} geschickt{c.verworfen ? `, davon ${c.verworfen} von der Regie nicht genutzt (anderes Spiel aktiv)` : ""}.</p>
             </Section>
           </div>
         </main>

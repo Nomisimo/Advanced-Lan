@@ -10,7 +10,7 @@ const RUNDEN = { freezetime: "Freezetime", live: "Runde läuft", over: "Runde vo
 const BOMBE = { planted: ["Bombe gelegt", ERR], defused: ["Bombe entschärft", CT], exploded: ["Bombe explodiert", TT] };
 
 function Scoreboard({ spiel }) {
-  if (!spiel) return <Leer>Noch keine Spieldaten. Sobald ein PC CS2 startet (oder der Simulator läuft), steht hier der Spielstand.</Leer>;
+  if (!spiel) return <Leer>Noch keine Spieldaten. Sobald auf einem PC CS2 läuft (oder der Simulator läuft), steht hier der Spielstand.</Leer>;
   const bombe = BOMBE[spiel.bombe];
   return (
     <div>
@@ -49,7 +49,7 @@ const Wert = ({ icon: Ic, title, farbe, children }) => (
 
 function PcKarte({ p, aktivesSpiel }) {
   const c = p.status || {};
-  const on = p.verbunden, imSpiel = p.spiel === aktivesSpiel;
+  const on = p.verbunden, imSpiel = !p.spiel || p.spiel === aktivesSpiel;
   const tot = c.health === 0;
   const farbe = c.team ? teamFarbe(c.team) : LINE;
   return (
@@ -94,12 +94,12 @@ export function EventZeile({ e, neu }) {
         <span style={{ flex: 1 }} />
         <span style={{ fontSize: 10, color: MUTED }}>{e.quelle === "manuell" ? "manuell" : e.ev.pc}</span>
       </div>
-      {e.sends.map((s, i) => (
-        <div key={i} style={{ ...S.mono, fontSize: 11, marginTop: 3, paddingLeft: 66, color: s.fehler ? ERR : s.uebersprungen ? MUTED : e.scharf ? "#d9c6ff" : MUTED }}>
-          {s.fehler ? `✕ ${s.fehler}` : s.uebersprungen ? `– ${s.uebersprungen}` : `→ ${s.ziel}  ${s.address}${s.args.length ? `  ${s.args.map((a) => JSON.stringify(a)).join(" ")}` : ""}`}
-          {!e.scharf && !s.uebersprungen && !s.fehler && <span style={{ color: WARN, marginLeft: 8 }}>nicht gesendet (Ausgabe aus)</span>}
-        </div>
-      ))}
+      <div style={{ ...S.mono, fontSize: 11, marginTop: 3, paddingLeft: 66, color: e.fehler?.length ? ERR : e.gesperrt || !e.scharf ? MUTED : "#d9c6ff" }}>
+        → {e.address}  {e.args.filter((a) => a !== "" && a !== 0).map((a) => JSON.stringify(a)).join(" ")}
+        {e.gesperrt ? <span style={{ color: MUTED, marginLeft: 8 }}>gesperrt (Tab „Signale“)</span>
+          : !e.scharf ? <span style={{ color: WARN, marginLeft: 8 }}>nicht gesendet (Ausgabe aus)</span>
+          : <span style={{ color: MUTED, marginLeft: 8 }}>an {e.ziele} Ziel{e.ziele === 1 ? "" : "e"}</span>}
+      </div>
     </div>
   );
 }
@@ -117,11 +117,11 @@ export default function LiveTab({ cfg, status, log, goTab }) {
             : <Leer>Für {spiel?.name} gibt es noch keine Datenquelle. Events dieses Spiels kommen erst, wenn die Game-PCs sie liefern.</Leer>}
         </Section>
         <Section title="Ausgabe" style={{ marginBottom: 20, borderColor: cfg.armed ? ERR : LINE, boxShadow: cfg.armed ? "0 0 16px rgba(255,93,93,.25)" : GLOW }}>
-          <p style={S.subtitle}>{cfg.armed ? "Scharf: Cues gehen per OSC an die Ziele." : "Aus: Ereignisse werden erkannt und angezeigt, aber nicht gesendet. Zum Proben und Einrichten."}</p>
+          <p style={S.subtitle}>{cfg.armed ? "Scharf: Signale gehen per OSC an alle Ziele." : "Aus: Ereignisse werden erkannt und angezeigt, aber nicht gesendet. Zum Proben und Einrichten."}</p>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
             <Kennzahl label="Ereignisse" wert={z.ereignisse || 0} farbe={ACCENT_HI} />
             <Kennzahl label="Verworfen (anderes Spiel)" wert={z.verworfen || 0} farbe={z.verworfen ? WARN : MUTED} />
-            <Kennzahl label="OSC gesendet" wert={z.gesendet || 0} farbe={OK} />
+            <Kennzahl label="OSC-Pakete gesendet" wert={z.gesendet || 0} farbe={OK} />
             <Kennzahl label="Fehler" wert={z.fehler || 0} farbe={z.fehler ? ERR : MUTED} />
           </div>
         </Section>
@@ -134,7 +134,7 @@ export default function LiveTab({ cfg, status, log, goTab }) {
             </div>
           )}
         </Section>
-        <Section title="Ereignisse" subtitle="Neueste oben. Darunter die OSC-Nachrichten, die der Cue ausgelöst hat."
+        <Section title="Ereignisse" subtitle="Neueste oben. Darunter das OSC-Signal, das dafür rausgeht."
           right={log.length > 0 && <span style={{ fontSize: 11, color: MUTED }}>{log.length}</span>}>
           <div style={{ maxHeight: "calc(100vh - 470px)", minHeight: 260, overflowY: "auto", border: `1px solid ${LINE}`, borderRadius: 8, background: "#1a1820" }}>
             {log.length === 0 ? <div style={{ ...S.empty, padding: 14 }}>Noch keine Ereignisse. Im Tab „Simulator“ lässt sich eine Runde abspielen.</div>

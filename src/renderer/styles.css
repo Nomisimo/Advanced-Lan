@@ -1,0 +1,22 @@
+/* ── LAN-Regie – Global CSS (Designsprache wie Stromplaner/Netzwerkplaner, Akzent Lila) ── */
+:root { --accent: #9d5cff; --line: #3a3647; --bg: #131118; }
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--bg); color: #ece9f2; height: 100%; overflow: hidden; }
+#root { height: 100%; }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; box-shadow: 0 0 10px rgba(157,92,255,.35); }
+button:hover:not(:disabled) { filter: brightness(1.12); }
+button:active:not(:disabled) { filter: brightness(0.95); }
+button:disabled { opacity: .45; cursor: default !important; }
+a { color: inherit; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #534d66; }
+select option { background: #1a1820; }
+.sp-section-label { font-size: 11px; color: #a39eb3; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; margin: 0 0 6px; }
+.glow-hover { transition: box-shadow .15s, border-color .15s; }
+.glow-hover:hover { border-color: #9d5cff !important; box-shadow: 0 0 12px rgba(157,92,255,.35); }
+@keyframes npFade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes puls { 0%, 100% { box-shadow: 0 0 10px rgba(255,93,93,.45); } 50% { box-shadow: 0 0 22px rgba(255,93,93,.85); } }
+@keyframes blitz { from { background: rgba(157,92,255,.28); } to { background: transparent; } }
+.neu { animation: blitz 1.2s ease-out; }

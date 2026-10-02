@@ -1,0 +1,49 @@
+# Beta-Release: baut die App und hängt sie an ein GitHub-Release (als Vorabversion markiert).
+# Start: Tag v* pushen (z. B. v0.1.0-beta.1) oder von Hand unter Actions → Release.
+# Bisher nur macOS Intel (x64). Apple Silicon und Windows kommen später als eigene Jobs dazu.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  mac-intel:
+    runs-on: macos-15-intel
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      # Unsigniert (Beta): kein Apple-Zertifikat, keine Overwolf-Signatur
+      - run: npx ow-electron-builder --mac --x64 --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - id: version
+        run: echo "tag=v$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Advanced LAN ${{ steps.version.outputs.tag }}
+          prerelease: true
+          files: |
+            dist/*.dmg
+            dist/*.zip
+          body: |
+            Beta von Advanced LAN, erstmal nur für macOS mit Intel-Prozessor.
+
+            **Installieren:** `.dmg` öffnen und Advanced LAN in den Programme-Ordner ziehen.
+            Die App ist noch nicht signiert. Beim ersten Start deshalb im Finder mit Rechtsklick → **Öffnen** starten
+            (oder Systemeinstellungen → Datenschutz & Sicherheit → „Trotzdem öffnen“).
+
+            **Neu:** Regie und Game-PC in einer App, Sessions per mDNS, neutrale OSC-Signale, CS2 (Game State Integration)
+            und Rocket League (Stats API), Simulator für beide Spiele.
+
+            Apple Silicon und Windows folgen.

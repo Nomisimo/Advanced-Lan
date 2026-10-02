@@ -101,4 +101,4 @@ class SimMatch {
   }
 }
 
-module.exports = { SimMatch };
+module.exports = { SimMatch, zufall };

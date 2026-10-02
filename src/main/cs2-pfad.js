@@ -37,4 +37,26 @@ async function findeCs2CfgOrdner() {
   return null;
 }
 
-module.exports = { findeCs2CfgOrdner };
+// Rocket League: Epic Games (Manifeste des Launchers) oder Steam. Gibt <RL>\TAGame\Config zurück.
+async function findeRlConfigOrdner() {
+  const kandidaten = [];
+  if (process.platform === 'win32') {
+    const manifeste = 'C:\\ProgramData\\Epic\\EpicGamesLauncher\\Data\\Manifests';
+    try {
+      for (const f of fs.readdirSync(manifeste).filter((x) => x.endsWith('.item'))) {
+        try { const m = JSON.parse(fs.readFileSync(path.join(manifeste, f), 'utf8')); if (/rocket league/i.test(m.DisplayName || '')) kandidaten.push(m.InstallLocation); } catch {}
+      }
+    } catch {}
+    kandidaten.push('C:\\Program Files\\Epic Games\\rocketleague');
+  }
+  const steams = [await steamPfadAusRegistry()];
+  if (process.platform === 'win32') steams.push('C:\\Program Files (x86)\\Steam');
+  for (const steam of steams.filter(Boolean)) for (const lib of bibliotheken(steam)) kandidaten.push(path.join(lib, 'steamapps', 'common', 'rocketleague'));
+  for (const k of kandidaten.filter(Boolean)) {
+    const p = path.join(k, 'TAGame', 'Config');
+    if (fs.existsSync(p)) return p;
+  }
+  return null;
+}
+
+module.exports = { findeCs2CfgOrdner, findeRlConfigOrdner };

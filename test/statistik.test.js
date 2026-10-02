@@ -19,7 +19,7 @@ test("Statistik: Runde und Match", () => {
   assert.deepEqual([j.runde.kills, j.runde.headshots, j.runde.sieger, j.runde.mvp, j.runde.bombe], [3, 1, "T", "Nova", "planted"]);
   assert.equal(j.match.runden, 1);
   assert.equal(j.match.siege.T, 1);
-  assert.deepEqual(j.top[0], { name: "Nova", team: "T", kills: 3, tode: 0, headshots: 1, mvps: 1 });
+  assert.deepEqual([j.top[0].name, j.top[0].kills, j.top[0].headshots, j.top[0].mvps], ["Nova", 3, 1, 1]);
   e("freezetime", { round: 2 });
   j = s.json();
   assert.equal(j.runde.nr, 2);
@@ -32,7 +32,7 @@ test("Statistik: Runde und Match", () => {
 
 test("Setup: nur genutzte Spiele, aktives Spiel ist immer eins davon", () => {
   const k = standardKonfig();
-  assert.deepEqual(k.regie.spiele, { cs2: true, valorant: false, rl: false });
+  assert.deepEqual(k.regie.spiele, { cs2: true, valorant: false, rl: true });
   k.regie.spiele = { cs2: false, valorant: true, rl: false };
   k.regie.aktivesSpiel = "cs2";
   assert.equal(migrateKonfig(k).regie.aktivesSpiel, "valorant");

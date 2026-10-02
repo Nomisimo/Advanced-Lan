@@ -1,39 +1,55 @@
 "use strict";
-// Simulator in der Regie: 10 virtuelle Game-PCs spielen CS2. Jeder hat seine eigene CsQuelle wie ein echter Game-PC
-// und meldet Ereignisse und Status an die Regie, als käme es über das Netzwerk.
+// Simulator in der Regie: virtuelle Game-PCs spielen das aktive Spiel. Jeder hat seine eigene Quelle wie ein echter Game-PC
+// und meldet Events und Status an die Regie, als käme es über das Netzwerk.
+// CS2: 10 PCs (5 gegen 5), jeder bekommt seine eigenen GSI-Daten. Rocket League: 6 PCs (3 gegen 3), alle bekommen dieselben Stats-API-Nachrichten.
 
 const { SimRunner } = require("./sim-runner");
+const { SimMatch } = require("./gsi-sim");
+const { RlSimMatch } = require("./rl-sim");
 const { CsQuelle } = require("./cs-quelle");
+const { RlQuelle } = require("./rl-quelle");
 
-const ANZAHL = 10;
 const simId = (i) => `SIM ${String(i + 1).padStart(2, "0")}`;
+const SPIELE = {
+  cs2: { anzahl: 10, quelle: () => new CsQuelle(), match: (pcs) => new SimMatch({ clients: pcs }) },
+  rl: { anzahl: 6, quelle: () => new RlQuelle(), match: () => new RlSimMatch() },
+};
 
 class RegieSim {
   constructor({ regie, onChange }) {
     this.regie = regie;
-    this.pcs = Array.from({ length: ANZAHL }, (_, i) => ({ pcId: simId(i), token: `sim${i}`, quelle: new CsQuelle() }));
+    this.onChange = onChange || (() => {});
+    this.spiel = "cs2";
+    this.pcs = [];
     this.runner = new SimRunner({
-      getClients: () => this.pcs,
-      onChange: () => onChange && onChange(),
+      neuesMatch: () => SPIELE[this.spiel].match(this.pcs),
+      onChange: () => this.onChange(),
       deliver: (payload) => {
-        const pc = this.pcs.find((p) => p.token === payload.auth?.token);
-        if (!pc) return;
-        const r = pc.quelle.ingest(payload, this.regie.now());
-        this.regie.pcStatus(pc.pcId, { spiel: "cs2", status: r.status, stand: r.stand });
-        for (const ev of r.events) this.regie.pcEvent(pc.pcId, "cs2", ev);
+        // CS2: Nachricht gehört zu genau einem PC (Token). Rocket League: alle PCs im Match bekommen sie.
+        const ziele = this.spiel === "cs2" ? this.pcs.filter((p) => p.token === payload.auth?.token) : this.pcs;
+        for (const pc of ziele) {
+          const r = pc.quelle.ingest(payload, this.regie.now());
+          if (r.status || r.stand) this.regie.pcStatus(pc.pcId, { spiel: this.spiel, status: r.status, stand: r.stand });
+          for (const ev of r.events) this.regie.pcEvent(pc.pcId, this.spiel, ev);
+        }
       },
     });
   }
 
-  start(modus) {
-    for (const p of this.pcs) this.regie.pcVerbunden(p.pcId, { spiele: ["cs2"], remote: "Simulator", sim: true });
+  // Unterstützt der Simulator dieses Spiel?
+  static kann(spiel) { return !!SPIELE[spiel]; }
+
+  start(modus, spiel = this.spiel) {
+    if (!SPIELE[spiel]) return;
+    if (spiel !== this.spiel || !this.pcs.length) { this.neu(); this.spiel = spiel; this.pcs = Array.from({ length: SPIELE[spiel].anzahl }, (_, i) => ({ pcId: simId(i), token: `sim${i}`, quelle: SPIELE[spiel].quelle() })); }
+    for (const p of this.pcs) this.regie.pcVerbunden(p.pcId, { spiele: ["cs2", "rl"], remote: "Simulator", sim: true });
     this.runner.start(modus);
   }
   stop() { this.runner.stop(); }
   // Neues Match: simulierte PCs verschwinden aus der Liste
-  neu() { this.runner.neu(); for (const p of this.pcs) p.quelle = new CsQuelle(); this.abmelden(); }
+  neu() { this.runner.neu(); this.abmelden(); this.pcs = []; }
   abmelden() { for (const p of this.pcs) this.regie.pcEntfernen(p.pcId); }
-  status() { return this.runner.status(); }
+  status() { return { ...this.runner.status(), spiel: this.spiel }; }
 }
 
 module.exports = { RegieSim };

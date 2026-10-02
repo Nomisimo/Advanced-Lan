@@ -14,7 +14,7 @@ const { migrateKonfig } = require('../core/defaults');
 const { gsiCfg, CFG_DATEI } = require('../core/cfg');
 
 const root = app.getAppPath();
-const KONFIG_DATEI = () => path.join(app.getPath('userData'), 'lan-regie.json');
+const KONFIG_DATEI = () => path.join(app.getPath('userData'), 'advanced-lan.json');
 let mainWin = null;
 
 /* ── Einstellungen ────────────────────────────────────────────────────── */
@@ -73,7 +73,7 @@ const QUELLEN = ['cs2']; // Spiele mit Datenquelle auf dem Game-PC
 let quelle = new CsQuelle();
 const gp = { letzte: 0, status: null, stand: null, fremd: 0, log: [], nr: 0, statusGesendet: 0 };
 const client = new SessionClient({ onChange: statusMelden, onAntwort: statusMelden });
-const discovery = new Discovery({ onChange: statusMelden });
+const discovery = new Discovery({ onChange: () => discoveryGeaendert() });
 const gsi = new GsiServer({ onPayload: (b) => gamePcPayload(b), onStatus: statusMelden });
 
 function gamePcPayload(body) {
@@ -84,7 +84,7 @@ function gamePcPayload(body) {
   const spiel = 'cs2'; // Game-PC sendet immer alles, was er erkennt. Was davon genutzt wird, entscheidet die Regie.
   for (const ev of r.events) {
     const ok = client.event(spiel, ev);
-    const e = { id: ++gp.nr, t: Date.now(), ev, gesendet: ok };
+    const e = { id: ++gp.nr, t: Date.now(), spiel, ev, gesendet: ok };
     gp.log.unshift(e);
     if (gp.log.length > 200) gp.log.length = 200;
     an('gamepc-event', e);
@@ -93,11 +93,51 @@ function gamePcPayload(body) {
   statusMelden();
 }
 
+// Verbinden mit der gewählten Session. Adresse und Port kommen immer aus mDNS, nie von Hand.
+let autoWartet = false;
 function gamePcVerbinden() {
   const g = cfg.gamepc;
-  if (!g.pcId || !g.regie.host || !g.passwort) return { fehler: 'PC-ID, Regie und Passwort angeben' };
-  client.verbinden({ host: g.regie.host, port: g.regie.port, passwort: g.passwort, pcId: g.pcId, spiele: QUELLEN });
+  const s = discovery.liste().find((x) => x.id === g.regie.id) || discovery.liste().find((x) => x.session === g.regie.session);
+  if (!g.pcId.trim()) return { fehler: 'Zuerst eine PC-ID eintragen' };
+  if (!g.regie.id) return { fehler: 'Zuerst eine Session wählen' };
+  if (!g.passwort) return { fehler: 'Passwort fehlt' };
+  if (s) g.regie = { id: s.id, session: s.session, host: s.ip, port: s.port };
+  else if (!g.regie.host) return { fehler: 'Session gerade nicht im Netz' };
+  autoWartet = false;
+  client.verbinden({ host: g.regie.host, port: g.regie.port, passwort: g.passwort, pcId: g.pcId.trim(), spiele: QUELLEN });
+  speichereKonfig();
   return { ok: true };
+}
+function discoveryGeaendert() {
+  // Beim Start automatisch verbinden, sobald die gespeicherte Session im Netz auftaucht
+  if (autoWartet && discovery.liste().some((x) => x.id === cfg.gamepc.regie.id)) gamePcVerbinden();
+  statusMelden();
+}
+
+// „Ist korrekt aufgesetzt“-Check des Game-PCs
+async function setupCheck() {
+  const g = cfg.gamepc, c = client.info(), gs = gsi.status();
+  const ordner = await findeCs2CfgOrdner();
+  const datei = ordner ? path.join(ordner, CFG_DATEI) : '';
+  let inhalt = null;
+  try { if (datei) inhalt = fs.readFileSync(datei, 'utf8'); } catch {}
+  const norm = (x) => String(x).replace(/\r\n/g, '\n').trim();
+  const passt = inhalt != null && norm(inhalt) === norm(gsiCfg({ port: g.gsiPort, token: g.gsiToken }));
+  const alter = gp.letzte ? Math.round((Date.now() - gp.letzte) / 1000) : null;
+  return {
+    allgemein: [
+      { id: 'pcid', label: 'PC-ID eingetragen', ok: !!g.pcId.trim(), detail: g.pcId.trim() || 'fehlt' },
+      { id: 'session', label: 'Mit einer Session verbunden', ok: c.zustand === 'verbunden', detail: c.zustand === 'verbunden' ? c.session : c.grund || 'nicht verbunden' },
+    ],
+    cs2: [
+      { id: 'installiert', label: 'CS2 gefunden', ok: !!ordner, detail: ordner || 'nicht in den Steam-Bibliotheken' },
+      { id: 'cfg', label: 'cfg-Datei installiert', ok: inhalt != null, detail: inhalt != null ? CFG_DATEI : 'fehlt' },
+      { id: 'aktuell', label: 'cfg-Datei passt zu dieser App', ok: passt, detail: inhalt == null ? '–' : passt ? 'Port und Token stimmen' : 'veraltet, neu installieren' },
+      { id: 'empfang', label: 'Empfang bereit', ok: !!gs.laeuft, detail: gs.fehler || `127.0.0.1:${gs.port}` },
+      { id: 'daten', label: 'CS2 sendet Daten', ok: alter != null && alter < 15, detail: alter == null ? 'noch nichts empfangen, CS2 starten' : `zuletzt vor ${alter} s` },
+      ...(gp.fremd ? [{ id: 'token', label: 'Kein fremder Token', ok: false, detail: `${gp.fremd} Nachrichten mit falschem Token` }] : []),
+    ],
+  };
 }
 
 /* ── Modus wechseln ───────────────────────────────────────────────────── */
@@ -117,7 +157,7 @@ async function modusStarten() {
     quelle = new CsQuelle();
     await gsi.start(Number(cfg.gamepc.gsiPort));
     discovery.start();
-    if (cfg.gamepc.autoVerbinden) gamePcVerbinden();
+    autoWartet = !!(cfg.gamepc.autoVerbinden && cfg.gamepc.regie.id && cfg.gamepc.passwort && cfg.gamepc.pcId);
   }
   statusMelden();
 }
@@ -134,7 +174,7 @@ function createWindow() {
   const iconPath = path.join(root, 'assets', 'app-icon', 'icon.png');
   mainWin = new BrowserWindow({
     width: 1480, height: 940, minWidth: 1100, minHeight: 680,
-    title: 'LAN-Regie', show: false, backgroundColor: '#131118',
+    title: 'Advanced LAN', show: false, backgroundColor: '#131118',
     icon: fs.existsSync(iconPath) ? iconPath : undefined,
     webPreferences: { contextIsolation: true, nodeIntegration: false, preload: path.join(root, 'src', 'preload', 'preload.js') },
   });
@@ -155,6 +195,7 @@ ipcMain.handle('config-set', async (_, neu) => {
   cfg = { ...migrateKonfig(neu), modus: alt.modus };
   cfg.regie.armed = !!neu.regie?.armed;
   cfg.regie.session.offen = alt.regie.session.offen; // offen/zu steuern nur die Session-Knöpfe
+  if (client.zustand !== 'getrennt' && client.zustand !== 'abgelehnt') cfg.gamepc.pcId = alt.gamepc.pcId; // PC-ID nur ohne aktive Session änderbar
   speichereKonfig();
   if (cfg.modus === 'regie') {
     if (cfg.regie.aktivesSpiel !== alt.regie.aktivesSpiel) session.spielGewechselt();
@@ -189,7 +230,7 @@ ipcMain.handle('signal-testen', (_, spiel, type) => regie.testeSignal(spiel, typ
 ipcMain.handle('ziel-testen', async (_, zielId) => {
   const ziel = cfg.regie.targets.find((t) => t.id === zielId);
   if (!ziel) return { fehler: 'Ziel nicht gefunden' };
-  try { await osc.send({ ziel, address: '/lan/test', args: [{ type: 's', value: 'LAN-Regie' }] }); return { ok: true }; }
+  try { await osc.send({ ziel, address: '/lan/test', args: [{ type: 's', value: 'Advanced LAN' }] }); return { ok: true }; }
   catch (e) { return { fehler: e.message }; }
 });
 ipcMain.handle('sim-start', (_, modus) => { regieSim.start(modus); return regieSim.status(); });
@@ -199,8 +240,9 @@ ipcMain.handle('sim-neu', () => { regieSim.neu(); return regieSim.status(); });
 // Game-PC
 ipcMain.handle('gamepc-log', () => gp.log);
 ipcMain.handle('verbinden', () => gamePcVerbinden());
-ipcMain.handle('trennen', () => { client.trennen(); });
+ipcMain.handle('trennen', () => { autoWartet = false; client.trennen(); });
 ipcMain.handle('cs2-ordner', () => findeCs2CfgOrdner());
+ipcMain.handle('setup-check', () => setupCheck());
 ipcMain.handle('cfg-installieren', async () => {
   const ordner = await findeCs2CfgOrdner();
   if (!ordner) return { fehler: 'CS2-Ordner nicht gefunden. Bitte „cfg speichern unter …“ nehmen.' };
@@ -217,7 +259,7 @@ ipcMain.handle('cfg-speichern', async () => {
 ipcMain.handle('test-event', (_, type) => {
   const ev = { type, team: 'CT', player: cfg.gamepc.pcId, kills: 1, round: gp.stand?.runde ?? 0, map: gp.stand?.map || '', test: true };
   const ok = client.event('cs2', ev);
-  const e = { id: ++gp.nr, t: Date.now(), ev, gesendet: ok };
+  const e = { id: ++gp.nr, t: Date.now(), spiel: 'cs2', ev, gesendet: ok };
   gp.log.unshift(e);
   an('gamepc-event', e);
   return { ok };

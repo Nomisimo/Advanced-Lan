@@ -25,7 +25,7 @@ async function build() {
     `<meta name="viewport" content="width=device-width,initial-scale=1">` +
     `<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data: blob:; img-src 'self' data: blob:">` +
     `<link rel="icon" href="data:image/svg+xml;base64,${fs.readFileSync(path.join(ROOT, "assets", "app-icon", "icon.svg")).toString("base64")}">` +
-    `<title>LAN-Regie</title><style>${css}</style></head>` +
+    `<title>Advanced LAN</title><style>${css}</style></head>` +
     `<body><div id="root"></div><script>\n${result.outputFiles[0].text.replace(/<\/script/gi, "<\\/script")}</script></body></html>`;
   fs.mkdirSync(OUT_DIR, { recursive: true });
   fs.writeFileSync(path.join(OUT_DIR, "index.html"), html);

@@ -19,6 +19,7 @@ class SessionServer {
     this.verbindungen = new Map(); // pcId → ws
     this.fehler = '';
     this.port = null;
+    this.pingStart = new WeakMap();
   }
 
   get offen() { return !!this.wss; }
@@ -28,22 +29,43 @@ class SessionServer {
     const s = this.getConfig().session;
     this.fehler = '';
     if (!s.passwort) { this.fehler = 'Ohne Passwort lässt sich keine Session öffnen.'; this.onChange(); return false; }
-    const wss = new WebSocketServer({ port: Number(s.port), maxPayload: 256 * 1024 });
-    const ok = await new Promise((resolve) => {
-      wss.once('listening', () => resolve(true));
-      wss.once('error', (e) => { this.fehler = e.code === 'EADDRINUSE' ? `Port ${s.port} ist schon belegt` : e.message; resolve(false); });
-    });
-    if (!ok) { wss.close(); this.onChange(); return false; }
+    // Standardport, sonst einen freien: die Game-PCs erfahren den Port ohnehin per mDNS
+    let wss = await this.lauschen(Number(s.port));
+    if (!wss && this.fehlerCode === 'EADDRINUSE') wss = await this.lauschen(0);
+    if (!wss) { this.onChange(); return false; }
+    this.fehler = '';
     this.wss = wss;
-    this.port = Number(s.port);
+    this.port = wss.address().port;
     wss.on('connection', (ws, req) => this.verbindung(ws, (req.socket.remoteAddress || '').replace(/^::ffff:/, '')));
     this.mdns = new Bonjour({}, (e) => { this.fehler = `mDNS: ${e.message}`; this.onChange(); });
     this.ausrufen();
+    // Verbindungscheck: alle 3 s ein Ping an jeden PC, die Antwortzeit sieht die Regie im Tab „Control“
+    this.pingTimer = setInterval(() => {
+      for (const [pcId, ws] of this.verbindungen) {
+        if (ws.readyState !== 1) continue;
+        this.pingStart.set(ws, Date.now());
+        try { ws.ping(); } catch {}
+      }
+    }, 3000);
     this.onChange();
     return true;
   }
 
+  lauschen(port) {
+    return new Promise((resolve) => {
+      const wss = new WebSocketServer({ port, maxPayload: 256 * 1024 });
+      wss.once('listening', () => resolve(wss));
+      wss.once('error', (e) => {
+        this.fehlerCode = e.code;
+        this.fehler = e.code === 'EADDRINUSE' ? `Port ${port} ist schon belegt` : e.message;
+        try { wss.close(); } catch {}
+        resolve(null);
+      });
+    });
+  }
+
   async schliessen() {
+    clearInterval(this.pingTimer);
     await this.dienstStoppen();
     if (this.mdns) { try { this.mdns.destroy(); } catch {} this.mdns = null; }
     for (const [pcId, ws] of this.verbindungen) { try { ws.close(4000, 'Session geschlossen'); } catch {} this.regie.pcGetrennt(pcId); }
@@ -110,6 +132,7 @@ class SessionServer {
         this.regie.pcStatus(pcId, { spiel: String(m.spiel || ''), status: m.status, stand: m.stand });
       }
     });
+    ws.on('pong', () => { const t0 = this.pingStart.get(ws); if (pcId && t0) this.regie.pcPing(pcId, Date.now() - t0); });
     ws.on('close', () => {
       clearTimeout(anmeldeFrist);
       if (pcId && this.verbindungen.get(pcId) === ws) { this.verbindungen.delete(pcId); this.regie.pcGetrennt(pcId); this.onChange(); }

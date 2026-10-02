@@ -30,6 +30,7 @@ contextBridge.exposeInMainWorld('regieAPI', {
   verbinden:       call('verbinden'),
   trennen:         call('trennen'),
   cs2Ordner:       call('cs2-ordner'),
+  setupCheck:      call('setup-check'),
   cfgInstallieren: call('cfg-installieren'),
   cfgSpeichern:    call('cfg-speichern'),
   testEvent:       call('test-event'),

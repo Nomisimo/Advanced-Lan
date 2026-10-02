@@ -4,6 +4,7 @@
 
 const { Dedupe, EVENT_BY_ID } = require("./events");
 const { oscAdresse, oscArgs, freigegeben } = require("./signal");
+const { Statistik } = require("./statistik");
 
 const LOG_MAX = 300;
 
@@ -19,6 +20,7 @@ class Regie {
     this.dedupe = new Dedupe();
     this.zaehler = { ereignisse: 0, verworfen: 0, gesendet: 0, fehler: 0 };
     this.nr = 0;
+    this.statistik = new Statistik();
   }
 
   aktiv() { return this.getConfig().aktivesSpiel; }
@@ -32,6 +34,11 @@ class Regie {
   pcGetrennt(pcId) {
     const p = this.pcs.get(pcId);
     if (p) { p.verbunden = false; this.emit("status"); }
+  }
+
+  pcPing(pcId, ms) {
+    const p = this.pcs.get(pcId);
+    if (p) { p.ping = ms; p.pingT = this.now(); }
   }
 
   pcEntfernen(pcId) { this.pcs.delete(pcId); this.emit("status"); }
@@ -63,6 +70,7 @@ class Regie {
     const s = this.signal(ev);
     const eintrag = { id: ++this.nr, t: now, ev, quelle, scharf: !!cfg.armed, gesperrt: !an, address: s.address, args: s.args.map((a) => a.value), ziele: (cfg.targets || []).length, fehler: [] };
     if (cfg.armed && an) this.ausgeben(s, eintrag);
+    if (ev.spiel === this.aktiv()) this.statistik.add(ev);
     this.log.unshift(eintrag);
     if (this.log.length > LOG_MAX) this.log.length = LOG_MAX;
     this.emit("event", eintrag);
@@ -95,7 +103,7 @@ class Regie {
   }
 
   snapshot() {
-    return { pcs: [...this.pcs.values()], stand: this.stand, zaehler: { ...this.zaehler }, aktivesSpiel: this.aktiv() };
+    return { pcs: [...this.pcs.values()], stand: this.stand, zaehler: { ...this.zaehler }, aktivesSpiel: this.aktiv(), statistik: this.statistik.json() };
   }
 }
 

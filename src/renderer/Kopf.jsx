@@ -9,7 +9,7 @@ export default function Kopf({ modus, version, meta, children, modusWechseln }) 
   return (
     <header style={S.header}>
       <div style={{ ...S.logo, display: "flex", alignItems: "center", gap: 9 }}>
-        <img src={APP_ICON} alt="" style={{ width: 28, height: 28, display: "block", filter: "drop-shadow(0 0 6px rgba(157,92,255,.7))" }} />LAN-REGIE
+        <img src={APP_ICON} alt="" style={{ width: 28, height: 28, display: "block", filter: "drop-shadow(0 0 6px rgba(157,92,255,.7))" }} />ADVANCED LAN
       </div>
       <span style={{ ...S.badge, fontSize: 11, padding: "2px 8px", background: "#9d5cff22", color: "#c39bff", border: "1px solid #9d5cff66" }}>{modus}</span>
       {version && <span style={{ border: `1px solid ${LINE}`, borderRadius: 10, color: SUB, fontSize: 11, padding: "1px 8px" }}>v{version}</span>}

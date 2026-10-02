@@ -7,7 +7,7 @@ import { gsiCfg, CFG_DATEI } from "../core/cfg.js";
 export const isElectron = typeof window !== "undefined" && !!window.regieAPI;
 
 function browserApi() {
-  const KEY = "lanregie_konfig";
+  const KEY = "advancedlan_konfig";
   let cfg;
   try { cfg = migrateKonfig(JSON.parse(localStorage.getItem(KEY))); } catch { cfg = migrateKonfig(null); }
   const speichern = () => { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch {} };
@@ -15,12 +15,17 @@ function browserApi() {
   const melde = (k, d) => hoerer[k].forEach((cb) => cb(d));
   let sessionOffen = false;
   const gp = { zustand: "getrennt", log: [], nr: 0 };
+  // Vorschau: zwei Regien im Netz
+  const SESSIONS = [
+    { id: "LAN-Party (REGIE-PC)", session: "LAN-Party", host: "REGIE-PC", ip: "192.168.1.20", port: 47801, aktivesSpiel: "cs2" },
+    { id: "Bühne 2 (REGIE-2)", session: "Bühne 2", host: "REGIE-2", ip: "192.168.1.21", port: 47801, aktivesSpiel: "rl" },
+  ];
   const status = () => {
     const s = { modus: cfg.modus, jetzt: Date.now(), vorschau: true };
     if (cfg.modus === "regie") s.regie = { ...regie.snapshot(), session: { offen: sessionOffen, port: cfg.regie.session.port, fehler: "", verbunden: 0 }, sim: sim.status(), armed: cfg.regie.armed, spielAufRegie: "" };
     if (cfg.modus === "gamepc") s.gamepc = {
       client: { zustand: gp.zustand, grund: "", session: gp.zustand === "verbunden" ? cfg.gamepc.regie.session : "", aktivesSpiel: "cs2", ziel: null, gesendet: gp.log.filter((e) => e.gesendet).length, verworfen: 0 },
-      sessions: [{ session: "LAN-Party", host: "REGIE-PC", ip: "192.168.1.20", port: 47801, aktivesSpiel: "cs2" }],
+      sessions: SESSIONS,
       discoveryFehler: "", gsi: { laeuft: true, port: cfg.gamepc.gsiPort, fehler: "" }, letzte: 0, status: null, stand: null, fremd: 0,
     };
     return s;
@@ -37,7 +42,13 @@ function browserApi() {
   return {
     appVersion: async () => __APP_VERSION__,
     getConfig: async () => cfg,
-    setConfig: async (neu) => { cfg = { ...neu, modus: cfg.modus }; speichern(); return status(); },
+    setConfig: async (neu) => {
+      const pcId = cfg.gamepc.pcId;
+      cfg = { ...migrateKonfig(neu), modus: cfg.modus };
+      cfg.regie.armed = !!neu.regie?.armed;
+      if (gp.zustand === "verbunden") cfg.gamepc.pcId = pcId; // PC-ID nur ohne aktive Session
+      speichern(); return status();
+    },
     setModus: async (m) => { cfg.modus = m; speichern(); sim.neu(); return status(); },
     status: async () => status(),
     netzAdressen: async () => [{ name: "Vorschau", ip: "192.168.1.20" }],
@@ -56,13 +67,32 @@ function browserApi() {
     simNeu: async () => { sim.neu(); return sim.status(); },
     onRegieEvent: abo("regieEvent"),
     gamePcLog: async () => [...gp.log],
-    verbinden: async () => { gp.zustand = "verbunden"; statusMelden(); return { ok: true }; },
+    verbinden: async () => {
+      const g = cfg.gamepc;
+      if (!g.pcId.trim()) return { fehler: "Zuerst eine PC-ID eintragen" };
+      if (!g.regie.id) return { fehler: "Zuerst eine Session wählen" };
+      if (!g.passwort) return { fehler: "Passwort fehlt" };
+      gp.zustand = "verbunden"; statusMelden(); return { ok: true };
+    },
+    setupCheck: async () => ({
+      allgemein: [
+        { id: "pcid", label: "PC-ID eingetragen", ok: !!cfg.gamepc.pcId.trim(), detail: cfg.gamepc.pcId.trim() || "fehlt" },
+        { id: "session", label: "Mit einer Session verbunden", ok: gp.zustand === "verbunden", detail: gp.zustand === "verbunden" ? cfg.gamepc.regie.session : "nicht verbunden" },
+      ],
+      cs2: [
+        { id: "installiert", label: "CS2 gefunden", ok: true, detail: "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Counter-Strike Global Offensive\\game\\csgo\\cfg" },
+        { id: "cfg", label: "cfg-Datei installiert", ok: true, detail: CFG_DATEI },
+        { id: "aktuell", label: "cfg-Datei passt zu dieser App", ok: true, detail: "Port und Token stimmen" },
+        { id: "empfang", label: "Empfang bereit", ok: true, detail: `127.0.0.1:${cfg.gamepc.gsiPort}` },
+        { id: "daten", label: "CS2 sendet Daten", ok: false, detail: "In der Vorschau kein CS2" },
+      ],
+    }),
     trennen: async () => { gp.zustand = "getrennt"; statusMelden(); },
     cs2Ordner: async () => null,
     cfgInstallieren: async () => ({ fehler: "In der Browser-Vorschau nicht möglich." }),
     cfgSpeichern: async () => { download(CFG_DATEI, gsiCfg({ port: cfg.gamepc.gsiPort, token: cfg.gamepc.gsiToken })); return { ok: true, pfad: CFG_DATEI }; },
     testEvent: async (type) => {
-      const e = { id: ++gp.nr, t: Date.now(), ev: { type, team: "CT", player: cfg.gamepc.pcId, test: true }, gesendet: gp.zustand === "verbunden" };
+      const e = { id: ++gp.nr, t: Date.now(), spiel: "cs2", ev: { type, team: "CT", player: cfg.gamepc.pcId, test: true }, gesendet: gp.zustand === "verbunden" };
       gp.log.unshift(e); melde("gamePcEvent", e); statusMelden(); return { ok: e.gesendet };
     },
     onGamePcEvent: abo("gamePcEvent"),

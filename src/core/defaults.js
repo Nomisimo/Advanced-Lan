@@ -15,6 +15,7 @@ function standardRegie() {
   return {
     armed: false,
     aktivesSpiel: "cs2",
+    spiele: { cs2: true, valorant: false, rl: false }, // Tab „Setup“: nur genutzte Spiele erscheinen in Control und Signale
     session: { name: "LAN-Party", passwort: "", port: PORTS.session, offen: false },
     // Wohin die Signale gehen, ist der App egal: jedes Ziel bekommt alle freigegebenen Signale
     targets: [{ id: uid(), name: "", host: "127.0.0.1", port: 8000 }],
@@ -25,7 +26,7 @@ function standardRegie() {
 function standardGamePc() {
   return {
     pcId: "",
-    regie: { host: "", port: PORTS.session, session: "" },
+    regie: { id: "", session: "", host: "", port: 0 }, // gewählte Session aus mDNS, nie von Hand eingegeben
     passwort: "",
     autoVerbinden: false,
     gsiPort: PORTS.gsi,
@@ -34,15 +35,22 @@ function standardGamePc() {
 }
 
 function standardKonfig() {
-  return { format: "lan-regie", version: 3, modus: null, regie: standardRegie(), gamepc: standardGamePc() };
+  return { format: "advanced-lan", version: 4, modus: null, regie: standardRegie(), gamepc: standardGamePc() };
+}
+
+function genutzteSpiele(s, std) {
+  const out = { ...std };
+  if (s && typeof s === "object") for (const k of Object.keys(std)) if (typeof s[k] === "boolean") out[k] = s[k];
+  if (!Object.values(out).some(Boolean)) out.cs2 = true; // mindestens ein Spiel
+  return out;
 }
 
 // Gespeicherte Einstellungen einlesen, fehlende Felder ergänzen
 function migrateKonfig(k) {
   const d = standardKonfig();
-  if (!k || typeof k !== "object" || k.version !== 3) return d;
+  if (!k || typeof k !== "object" || (k.version !== 3 && k.version !== 4)) return d;
   const r = k.regie || {}, g = k.gamepc || {};
-  return {
+  const m = {
     ...d,
     modus: k.modus === "regie" || k.modus === "gamepc" ? k.modus : null,
     regie: {
@@ -52,9 +60,14 @@ function migrateKonfig(k) {
       session: { ...d.regie.session, ...(r.session || {}) },
       targets: Array.isArray(r.targets) ? r.targets.map((t) => ({ id: t.id || uid(), name: t.name || "", host: t.host || "", port: Number(t.port) || 0 })) : d.regie.targets,
       signale: r.signale && typeof r.signale === "object" ? r.signale : {},
+      spiele: genutzteSpiele(r.spiele, d.regie.spiele),
     },
     gamepc: { ...d.gamepc, ...g, regie: { ...d.gamepc.regie, ...(g.regie || {}) }, gsiToken: g.gsiToken || d.gamepc.gsiToken },
   };
+  delete m.gamepc.spiel;
+  // Das aktive Spiel muss ein genutztes Spiel sein
+  if (!m.regie.spiele[m.regie.aktivesSpiel]) m.regie.aktivesSpiel = Object.keys(m.regie.spiele).find((k) => m.regie.spiele[k]);
+  return m;
 }
 
-module.exports = { standardKonfig, migrateKonfig, standardRegie, standardGamePc, neuerToken, uid, PORTS };
+module.exports = { standardKonfig, migrateKonfig, genutzteSpiele, standardRegie, standardGamePc, neuerToken, uid, PORTS };

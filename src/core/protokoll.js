@@ -1,9 +1,9 @@
 "use strict";
 // Netzwerkprotokoll zwischen Game-PC und Regie.
 //
-// Finden: Die Regie veröffentlicht ihre Session per mDNS (DNS-SD, Multicast 224.0.0.251:5353) als Dienst „_lanregie._tcp“.
+// Finden: Die Regie veröffentlicht ihre Session per mDNS (DNS-SD, Multicast 224.0.0.251:5353) als Dienst „_advancedlan._tcp“.
 //   TXT-Einträge: session (Name), v (Protokollversion), spiel (aktives Spiel).
-// Verbinden: WebSocket zur Regie (Port aus dem Dienst, Standard 47801). Anmeldung mit Challenge-Response,
+// Verbinden: WebSocket zur Regie (Port aus dem Dienst: 47801, falls belegt ein freier). Anmeldung mit Challenge-Response,
 // das Passwort geht nie im Klartext übers Netz:
 //   Regie → PC   { t: "hallo", session, nonce, aktivesSpiel }
 //   PC → Regie   { t: "anmelden", pcId, spiele, version, beweis }  spiele = alle Spiele, die der PC erkennt   beweis = HMAC-SHA256(passwort, nonce) als Hex
@@ -14,7 +14,7 @@
 //   Regie → PC   { t: "aktivesSpiel", spiel }           wenn die Regie das Spiel wechselt
 //   Regie → PC   { t: "quittung", n, verworfen }        Rückmeldung zu einem Ereignis
 
-const MDNS_TYP = "lanregie"; // → _lanregie._tcp.local
+const MDNS_TYP = "advancedlan"; // → _advancedlan._tcp.local
 const PROTOKOLL_VERSION = 1;
 
 const mdnsTxt = ({ session, aktivesSpiel }) => ({ session, v: String(PROTOKOLL_VERSION), spiel: aktivesSpiel || "" });

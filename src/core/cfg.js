@@ -1,13 +1,13 @@
 "use strict";
 // Erzeugt die gamestate_integration-Datei, die CS2 auf dem Game-PC lädt.
-// CS2 schickt den Spielstand an die LAN-Regie-App auf demselben PC (127.0.0.1).
+// CS2 schickt den Spielstand an die Advanced-LAN-App auf demselben PC (127.0.0.1).
 
 const CFG_ORDNER = "Steam\\steamapps\\common\\Counter-Strike Global Offensive\\game\\csgo\\cfg";
-const CFG_DATEI = "gamestate_integration_lanregie.cfg";
+const CFG_DATEI = "gamestate_integration_advancedlan.cfg";
 
 function gsiCfg({ port, token }) {
   return [
-    '"LAN-Regie"',
+    '"Advanced LAN"',
     "{",
     `\t"uri"\t\t"http://127.0.0.1:${port}/gsi"`,
     '\t"timeout"\t"1.1"',

@@ -1,7 +1,8 @@
 import React from "react";
-import { S, ACCENT, LINE, SUB, MUTED, teamFarbe } from "./theme.js";
-import { Trophy, Timer, Bomb, Crosshair, Skull, Zap, Crown, Eye } from "lucide-react";
+import { S, ACCENT, LINE, SUB, MUTED, OK, WARN, ERR, teamFarbe } from "./theme.js";
+import { Trophy, Timer, Bomb, Crosshair, Skull, Zap, Crown, Eye, CircleCheck, CircleX } from "lucide-react";
 import { EVENT_BY_ID } from "../core/events.js";
+import { SPIEL_BY_ID } from "../core/spiele.js";
 
 export function Section({ title, subtitle, right, children, style }) {
   return (
@@ -59,3 +60,21 @@ export const th = (extra) => ({ ...S.th, ...extra });
 export const td = (extra) => ({ ...S.td, ...extra });
 export const Leer = ({ children }) => <div style={S.empty}>{children}</div>;
 export const Kbd = ({ children }) => <code style={{ ...S.mono, background: "#1a1820", border: `1px solid ${LINE}`, borderRadius: 4, padding: "1px 5px", color: SUB }}>{children}</code>;
+
+// Ein Prüfpunkt: grüner Haken oder rotes Kreuz, dazu Detail
+export function Check({ ok, label, detail, warn }) {
+  const farbe = ok ? OK : warn ? WARN : ERR;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderBottom: `1px solid ${LINE}`, fontSize: 13 }}>
+      <span style={{ color: farbe, display: "inline-flex", filter: ok ? `drop-shadow(0 0 4px ${OK})` : "none" }}>{ok ? <CircleCheck size={16} /> : <CircleX size={16} />}</span>
+      <span style={{ fontWeight: 600, minWidth: 220 }}>{label}</span>
+      <span style={{ flex: 1, color: ok ? SUB : farbe, fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={detail}>{detail}</span>
+    </div>
+  );
+}
+
+export const SpielChip = ({ spiel, aktiv = true }) => {
+  const s = SPIEL_BY_ID[spiel];
+  if (!s) return <span style={{ color: MUTED }}>{spiel || "–"}</span>;
+  return <span style={{ ...S.badge, background: s.farbe + (aktiv ? "33" : "11"), color: aktiv ? s.farbe : MUTED, border: `1px solid ${s.farbe}${aktiv ? "88" : "33"}` }}>{s.kurz}</span>;
+};

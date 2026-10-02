@@ -35,6 +35,7 @@ test("Game-PC meldet sich mit Passwort an, Ereignisse werden zu OSC", async () =
   await warte(() => disco.liste().some((s) => s.port === 47911), 5000);
   const gefunden = disco.liste().find((s) => s.port === 47911);
   assert.equal(gefunden.session, "Test-LAN");
+  assert.ok(gefunden.id.startsWith("Test-LAN"), "Session hat eine eindeutige Kennung für die Auswahl");
   assert.equal(gefunden.aktivesSpiel, "cs2");
 
   // Falsches Passwort
@@ -62,6 +63,8 @@ test("Game-PC meldet sich mit Passwort an, Ereignisse werden zu OSC", async () =
   assert.equal(pakete.filter((p) => p.startsWith("/lan/cs2/bomb_planted\0")).length, 2, "Bombe gelegt, an beide Ziele");
   assert.ok(pakete.every((p) => p.startsWith("/lan/cs2/")), "nur neutrale Signale");
   assert.deepEqual(regie.snapshot().pcs[0].spiele, ["cs2"]);
+  await warte(() => regie.snapshot().pcs[0].ping != null, 5000); // Verbindungscheck: Ping kommt an
+  assert.equal(regie.snapshot().statistik.match.runden, 1);
 
   // Regie wechselt das Spiel: CS2-Ereignisse werden verworfen, der PC erfährt es
   const vorher = pakete.length;
@@ -73,6 +76,14 @@ test("Game-PC meldet sich mit Passwort an, Ereignisse werden zu OSC", async () =
   await warte(() => regie.snapshot().zaehler.verworfen === 1);
   await new Promise((r) => setTimeout(r, 100));
   assert.equal(pakete.length, vorher);
+
+  // Zweite Regie auf demselben Port: weicht auf einen freien Port aus
+  const cfg2 = { ...standardRegie(), session: { name: "Bühne 2", passwort: "x", port: 47911, offen: true } };
+  const zweite = new SessionServer({ regie: new Regie({ getConfig: () => cfg2, send: () => {} }), getConfig: () => cfg2 });
+  assert.equal(await zweite.oeffnen(), true);
+  assert.notEqual(zweite.status().port, 47911);
+  await warte(() => disco.liste().some((s) => s.session === "Bühne 2" && s.port === zweite.status().port), 5000);
+  await zweite.schliessen();
 
   pc.trennen();
   await warte(() => regie.snapshot().pcs[0].verbunden === false);

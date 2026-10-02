@@ -26,7 +26,13 @@ CS2 liefert seine Daten über Valves offizielle [Game State Integration](https:/
 
 Erkannte Ereignisse: Match startet/vorbei, Freezetime, Runde läuft, Runde gewonnen (mit Team), Bombe gelegt/entschärft/explodiert, Kill, Headshot, 3 und 4 Kills, Ace, Tod, geblendet, Runden-MVP.
 
-Valorant und Rocket League sind als Spiele schon wählbar, ihre Datenquellen fehlen noch.
+## Rocket League
+
+Rocket League liefert seine Daten über die offizielle [Stats API](https://www.rocketleague.com/developer/stats-api) von Psyonix: `TAGame\Config\TAStatsAPI.ini` im Spielordner (Epic Games oder Steam) schaltet sie ein (`PacketSendRate=10`), dann schickt das Spiel `{ Event, Data }`-Nachrichten per WebSocket an die App auf demselben PC (`127.0.0.1:49124`). Der Game-PC schreibt die ini per Knopfdruck im Tab „Setup“.
+
+Erkannte Ereignisse: Match startet/vorbei, Anstoß, Verlängerung, Siegerehrung, Tor, Vorlage, Hattrick, Tor-Wiederholung, Torschuss, Parade, Glanzparade, Demolition, Latte, MVP. Teams heißen `BLUE` und `ORANGE`. Die Stats API meldet alle Spieler des Matches, deshalb tragen Rocket-League-Signale den Spieler als Argument, aber keine PC-ID in der Adresse (`/lan/rl/goal`).
+
+Valorant ist als Spiel schon wählbar, seine Datenquelle fehlt noch.
 
 ## OSC
 
@@ -46,7 +52,10 @@ npm install
 npm test           # Erkennung, Regie, Netzwerk (WebSocket, UDP, OSC)
 npm start          # baut die Oberfläche und startet ow-electron
 npm run dist:win   # Windows-Installer mit ow-electron-builder
+npm run dist:mac   # macOS Intel (dmg und zip), nur auf einem Mac
 ```
+
+**Beta-Releases:** Ein Tag `v*` (z. B. `v0.1.0-beta.1`) startet `.github/workflows/release.yml`: Build für macOS Intel auf einem GitHub-Mac, Ergebnis als Vorabversion unter Releases. Unsigniert, deshalb beim ersten Start Rechtsklick → Öffnen. Apple Silicon und Windows folgen.
 
 `dist-app/index.html` lässt sich auch direkt im Browser öffnen: Dann läuft eine Vorschau ohne Netzwerk, mit derselben Regie-Logik und dem Simulator.
 

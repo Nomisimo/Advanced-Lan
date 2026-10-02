@@ -2,7 +2,8 @@
 // Regie: nimmt Ereignisse der Game-PCs an, lässt nur das aktive Spiel durch, entdoppelt und sendet OSC-Signale an alle Ziele.
 // Ohne Netzwerk: Senden und Melden kommen von außen (Main-Prozess oder Browser-Vorschau).
 
-const { Dedupe, EVENT_BY_ID } = require("./events");
+const { Dedupe } = require("./events");
+const { eventInfo } = require("./spiele");
 const { oscAdresse, oscArgs, freigegeben } = require("./signal");
 const { Statistik } = require("./statistik");
 
@@ -48,7 +49,7 @@ class Regie {
     const p = this.pcs.get(pcId);
     if (!p) return;
     Object.assign(p, { spiel: spiel || p.spiel, status: status || p.status, t: this.now() });
-    if (stand) { p.stand = stand; if (p.spiel === this.aktiv()) this.stand = { ...stand, t: this.now() }; }
+    if (stand) { p.stand = stand; if (p.spiel === this.aktiv()) this.stand = { ...stand, spiel: p.spiel, t: this.now() }; }
     this.emit("status");
   }
 
@@ -79,7 +80,7 @@ class Regie {
   }
 
   signal(ev) {
-    const spieler = !!EVENT_BY_ID[ev.type]?.spieler;
+    const spieler = !!eventInfo(ev.spiel, ev.type)?.spieler;
     return { address: oscAdresse(ev, spieler), args: oscArgs(ev, spieler) };
   }
 

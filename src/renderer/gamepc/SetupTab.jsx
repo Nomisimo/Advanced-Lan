@@ -4,6 +4,7 @@ import { api } from "../api.js";
 import { Section, Check, TeamChip, SpielChip, Kbd } from "../ui.jsx";
 import { SPIELE } from "../../core/spiele.js";
 import { CFG_ORDNER, CFG_DATEI } from "../../core/cfg.js";
+import { RL_INI_DATEI, RL_INI_ORDNER } from "../../core/rl-ini.js";
 import { FileDown, Download, RefreshCw } from "lucide-react";
 
 const Liste = ({ punkte }) => <div style={{ border: `1px solid ${LINE}`, borderRadius: 8, overflow: "hidden" }}>{punkte.map((p) => <Check key={p.id} {...p} />)}</div>;
@@ -13,7 +14,7 @@ export default function SetupTab({ g, notify }) {
   const laden = () => api.setupCheck().then(setCheck);
   useEffect(() => { laden(); const t = setInterval(laden, 3000); return () => clearInterval(t); }, []);
   const fertig = async (r, text) => { if (r?.ok) notify(text); else if (r?.fehler) notify(r.fehler, "err"); laden(); };
-  const alle = check ? [...check.allgemein, ...check.cs2] : [];
+  const alle = check ? [...check.allgemein, ...check.cs2, ...check.rl] : [];
   const offen = alle.filter((p) => !p.ok).length;
 
   return (
@@ -25,7 +26,7 @@ export default function SetupTab({ g, notify }) {
         {check ? <Liste punkte={check.allgemein} /> : <div style={S.empty}>Prüfe …</div>}
       </Section>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 20, alignItems: "start" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, alignItems: "start" }}>
         <Section title={<span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>Counter-Strike 2 <SpielChip spiel="cs2" /></span>}
           right={<div style={{ display: "flex", gap: 8 }}>
             <button style={S.primaryBtn} onClick={async () => fertig(await api.cfgInstallieren(), "cfg installiert. CS2 neu starten.")}><Download size={15} /> cfg installieren</button>
@@ -43,9 +44,26 @@ export default function SetupTab({ g, notify }) {
           )}
         </Section>
 
+        <Section title={<span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>Rocket League <SpielChip spiel="rl" /></span>}
+          right={<div style={{ display: "flex", gap: 8 }}>
+            <button style={S.primaryBtn} onClick={async () => fertig(await api.rlIniInstallieren(), "Stats API eingeschaltet. Rocket League neu starten.")}><Download size={15} /> Stats API einschalten</button>
+            <button style={S.secondaryBtn} onClick={async () => fertig(await api.rlIniSpeichern(), "ini gespeichert.")}><FileDown size={14} /> Speichern unter …</button>
+          </div>}>
+          {check && <Liste punkte={check.rl} />}
+          {check && !check.rl[0]?.ok && <p style={S.hint}><Kbd>{RL_INI_DATEI}</Kbd> → <Kbd>{RL_INI_ORDNER}</Kbd></p>}
+          {g.rl?.stand && (
+            <div style={{ display: "flex", gap: 14, alignItems: "center", marginTop: 14, padding: "10px 12px", background: "#1a1820", border: `1px solid ${LINE}`, borderRadius: 8, fontSize: 13 }}>
+              <b>{g.rl.stand.arena || "Match"}</b>
+              <span style={{ color: SUB }}>{g.rl.stand.spieler} Spieler</span>
+              <span style={{ color: SUB, marginLeft: "auto" }}>{g.rl.stand.blau}:{g.rl.stand.orange}</span>
+            </div>
+          )}
+        </Section>
+      </div>
+      <div>
         <Section title="Weitere Spiele">
           <div style={{ border: `1px solid ${LINE}`, borderRadius: 8, overflow: "hidden" }}>
-            {SPIELE.filter((s) => s.id !== "cs2").map((s) => (
+            {SPIELE.filter((s) => s.id !== "cs2" && s.id !== "rl").map((s) => (
               <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderBottom: `1px solid ${LINE}`, fontSize: 13 }}>
                 <SpielChip spiel={s.id} aktiv={false} />
                 <span style={{ flex: 1, color: SUB }}>{s.name}</span>

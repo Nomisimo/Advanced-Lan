@@ -31,6 +31,8 @@ contextBridge.exposeInMainWorld('regieAPI', {
   trennen:         call('trennen'),
   cs2Ordner:       call('cs2-ordner'),
   setupCheck:      call('setup-check'),
+  rlIniInstallieren: call('rl-ini-installieren'),
+  rlIniSpeichern:  call('rl-ini-speichern'),
   cfgInstallieren: call('cfg-installieren'),
   cfgSpeichern:    call('cfg-speichern'),
   testEvent:       call('test-event'),

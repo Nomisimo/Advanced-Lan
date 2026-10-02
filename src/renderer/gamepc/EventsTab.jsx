@@ -19,8 +19,8 @@ export default function EventsTab({ g, log }) {
           <div key={e.id} className={i === 0 ? "neu" : ""} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", borderBottom: `1px solid ${LINE}`, fontSize: 13 }}>
             <span style={{ fontSize: 11, color: MUTED }}>{zeit(e.t)}</span>
             <SpielChip spiel={e.spiel || "cs2"} />
-            <span style={{ color: e.ev.team ? teamFarbe(e.ev.team) : ACCENT_HI, display: "inline-flex" }}><EventIcon type={e.ev.type} /></span>
-            <b>{eventLabel(e.ev.type)}</b>
+            <span style={{ color: e.ev.team ? teamFarbe(e.ev.team) : ACCENT_HI, display: "inline-flex" }}><EventIcon type={e.ev.type} spiel={e.spiel || "cs2"} /></span>
+            <b>{eventLabel(e.ev.type, e.spiel || "cs2")}</b>
             <TeamChip team={e.ev.team} />
             {e.ev.player && <span style={{ color: "#d4d0de" }}>{e.ev.player}</span>}
             {e.ev.test && <span style={{ ...S.badge, background: "#2f2c3a", color: SUB }}>Test</span>}

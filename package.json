@@ -1,6 +1,6 @@
 {
   "name": "advanced-lan",
-  "version": "0.1.0",
+  "version": "0.1.0-beta.1",
   "private": true,
   "description": "Advanced LAN: Game-PCs melden Spielereignisse, die Regie sendet neutrale OSC-Signale",
   "author": "Momo",
@@ -16,7 +16,8 @@
     "test": "node --test test/*.test.js",
     "pack": "npm run build && ow-electron-builder --dir",
     "dist": "npm run build && ow-electron-builder",
-    "dist:win": "npm run build && ow-electron-builder --win"
+    "dist:win": "npm run build && ow-electron-builder --win",
+    "dist:mac": "npm run build && ow-electron-builder --mac --x64"
   },
   "build": {
     "appId": "dev.advancedlan",
@@ -49,7 +50,25 @@
     "directories": {
       "output": "dist"
     },
-    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}"
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "public.app-category.utilities",
+      "identity": null
+    }
   },
   "devDependencies": {
     "@overwolf/ow-electron": "^42.11.4",

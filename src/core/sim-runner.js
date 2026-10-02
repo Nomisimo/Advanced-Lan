@@ -1,12 +1,11 @@
 "use strict";
 // Spielt simulierte Runden in Echtzeit ab. deliver(payload) schickt eine Nachricht an den Empfang.
 
-const { SimMatch } = require("./gsi-sim");
-
 class SimRunner {
-  constructor({ deliver, getClients, onChange = () => {} }) {
+  // neuesMatch(): ein Match mit naechsteRunde() und vorbei() (CS2: SimMatch, Rocket League: RlSimMatch)
+  constructor({ deliver, neuesMatch, onChange = () => {} }) {
     this.deliver = deliver;
-    this.getClients = getClients;
+    this.neuesMatch = neuesMatch;
     this.onChange = onChange;
     this.match = null;
     this.timer = null;
@@ -17,7 +16,7 @@ class SimRunner {
 
   start(modus = "runde") {
     this.stop();
-    if (!this.match || this.match.vorbei()) this.match = new SimMatch({ clients: this.getClients() });
+    if (!this.match || this.match.vorbei()) this.match = this.neuesMatch();
     this.modus = modus;
     this.onChange();
     this.spiele(this.match.naechsteRunde());
@@ -43,7 +42,10 @@ class SimRunner {
     if (this.modus) { this.modus = null; this.onChange(); }
   }
 
-  status() { return { laeuft: this.laeuft, modus: this.modus, runde: this.match?.runde ?? 0, ct: this.match?.score.CT ?? 0, t: this.match?.score.T ?? 0 }; }
+  status() {
+    const m = this.match;
+    return { laeuft: this.laeuft, modus: this.modus, runde: m?.runde ?? 0, ct: m?.score?.CT ?? 0, t: m?.score?.T ?? 0, blau: m?.blau ?? 0, orange: m?.orange ?? 0 };
+  }
 }
 
 module.exports = { SimRunner };

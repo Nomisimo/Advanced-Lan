@@ -1,5 +1,5 @@
 import React from "react";
-import { S, ACCENT, ACCENT_HI, LINE, SUB, MUTED, ERR, OK, WARN, CT, TT, GLOW, teamFarbe } from "../theme.js";
+import { S, ACCENT, ACCENT_HI, LINE, SUB, MUTED, ERR, OK, WARN, CT, TT, BLAU, ORANGE, GLOW, teamFarbe } from "../theme.js";
 import { Section, TeamChip, Dot, EventIcon, eventLabel, zeit, Leer, SpielChip, th, td } from "../ui.jsx";
 import { api } from "../api.js";
 import { SPIELE } from "../../core/spiele.js";
@@ -63,9 +63,10 @@ const Zahl = ({ label, wert, farbe }) => (
 
 function Statistik({ cfg, status }) {
   const st = status.statistik;
-  const stand = status.stand;
-  const daten = st && st.spiel === cfg.aktivesSpiel && (st.match.runden || st.runde.nr != null || st.runde.kills);
+  if (cfg.aktivesSpiel === "rl") return <RlStatistik status={status} />;
   if (cfg.aktivesSpiel !== "cs2") return <Section title="Statistik"><Leer>Keine Daten.</Leer></Section>;
+  const daten = st && st.spiel === "cs2" && (st.match.runden || st.runde.nr != null || st.runde.kills);
+  const stand = status.stand?.spiel === "cs2" ? status.stand : null;
   if (!daten && !stand) return <Section title="Statistik"><Leer>Noch keine Daten.</Leer></Section>;
   const r = st?.runde || {}, m = st?.match || { siege: {} };
   const bombe = BOMBE[stand?.bombe || r.bombe];
@@ -110,6 +111,59 @@ function Statistik({ cfg, status }) {
               <td style={td({ textAlign: "right", color: SUB })}>{p.tode}</td>
               <td style={td({ textAlign: "right", color: SUB })}>{p.headshots}</td>
               <td style={td({ textAlign: "right", color: SUB })}>{p.mvps}</td>
+            </tr>
+          ))}</tbody>
+        </table>
+      )}
+    </Section>
+  );
+}
+
+const uhr = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+
+function RlStatistik({ status }) {
+  const st = status.statistik?.spiel === "rl" ? status.statistik : null;
+  const stand = status.stand?.spiel === "rl" ? status.stand : null;
+  if (!st && !stand) return <Section title="Statistik"><Leer>Noch keine Daten.</Leer></Section>;
+  const m = st?.match || { tore: {} };
+  const ot = stand?.overtime || m.overtime;
+  return (
+    <Section title="Statistik" right={<span style={{ display: "flex", gap: 6 }}>
+      {stand?.arena && <span style={S.chip}>{stand.arena}</span>}
+      {m.vorbei ? <span style={S.chip}>Match vorbei</span> : ot ? <span style={{ ...S.chip, borderColor: ERR, color: ERR }}>Verlängerung</span> : null}
+    </span>}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 22, marginBottom: 14 }}>
+        <Team name="BLUE" score={stand?.blau ?? m.tore.BLUE} farbe={BLAU} sieger={m.sieger === "BLUE"} />
+        <div style={{ textAlign: "center", minWidth: 70 }}>
+          <div style={{ fontSize: 22, fontWeight: 800, color: ot ? ERR : "#fff", fontVariantNumeric: "tabular-nums" }}>{ot ? "+" : ""}{uhr(stand?.zeit ?? 0)}</div>
+          <div style={{ fontSize: 10, color: SUB }}>Spielzeit</div>
+        </div>
+        <Team name="ORANGE" score={stand?.orange ?? m.tore.ORANGE} farbe={ORANGE} sieger={m.sieger === "ORANGE"} />
+      </div>
+      {m.letztesTor && (
+        <div className="sp-section-label" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          Letztes Tor <span style={{ color: teamFarbe(m.letztesTor.team), textTransform: "none", fontSize: 13 }}>{m.letztesTor.spieler}</span>
+          {m.letztesTor.speed > 0 && <span style={{ ...S.chip, textTransform: "none" }}>{m.letztesTor.speed} km/h</span>}
+        </div>
+      )}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginBottom: 14 }}>
+        <Zahl label="Torschüsse" wert={m.schuesse || 0} />
+        <Zahl label="Paraden" wert={m.paraden || 0} />
+        <Zahl label="Demolitions" wert={m.demos || 0} />
+        <Zahl label="Anstöße" wert={m.anstoesse || 0} />
+      </div>
+      {st?.top?.length > 0 && (
+        <table style={{ ...S.table, marginTop: 0 }}>
+          <thead><tr><th style={th()}>Spieler</th><th style={th()}>Team</th><th style={th({ textAlign: "right" })}>Tore</th><th style={th({ textAlign: "right" })}>Vorl.</th><th style={th({ textAlign: "right" })}>Parad.</th><th style={th({ textAlign: "right" })}>Schüsse</th><th style={th({ textAlign: "right" })}>Demos</th></tr></thead>
+          <tbody>{st.top.map((p, i) => (
+            <tr key={p.name}>
+              <td style={td({ fontWeight: i === 0 ? 700 : 400 })}>{i === 0 && <Crown size={12} color={ACCENT_HI} style={{ marginRight: 5, verticalAlign: -1 }} />}{p.name}</td>
+              <td style={td()}><TeamChip team={p.team} /></td>
+              <td style={td({ textAlign: "right", fontWeight: 700 })}>{p.tore}</td>
+              <td style={td({ textAlign: "right", color: SUB })}>{p.vorlagen}</td>
+              <td style={td({ textAlign: "right", color: SUB })}>{p.paraden}</td>
+              <td style={td({ textAlign: "right", color: SUB })}>{p.schuesse}</td>
+              <td style={td({ textAlign: "right", color: SUB })}>{p.demos}</td>
             </tr>
           ))}</tbody>
         </table>
@@ -180,8 +234,8 @@ export function EventZeile({ e, neu }) {
     <div className={neu ? "neu" : ""} style={{ padding: "7px 10px", borderBottom: `1px solid ${LINE}` }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <span style={{ fontSize: 11, color: MUTED, fontVariantNumeric: "tabular-nums" }}>{zeit(e.t)}</span>
-        <span style={{ color: team ? teamFarbe(team) : ACCENT_HI, display: "inline-flex" }}><EventIcon type={e.ev.type} /></span>
-        <b style={{ fontSize: 13 }}>{eventLabel(e.ev.type)}</b>
+        <span style={{ color: team ? teamFarbe(team) : ACCENT_HI, display: "inline-flex" }}><EventIcon type={e.ev.type} spiel={e.ev.spiel} /></span>
+        <b style={{ fontSize: 13 }}>{eventLabel(e.ev.type, e.ev.spiel)}</b>
         <TeamChip team={team} />
         {e.ev.player && <span style={{ fontSize: 12, color: "#d4d0de" }}>{e.ev.player}{e.ev.kills > 1 && e.ev.type === "kill" ? ` (${e.ev.kills})` : ""}</span>}
         <span style={{ flex: 1 }} />

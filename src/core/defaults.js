@@ -1,7 +1,7 @@
 "use strict";
 // Einstellungen der App. Eine Datei für beide Modi: Regie und Game-PC.
 
-const PORTS = { session: 47801, gsi: 3000 };
+const PORTS = { session: 47801, gsi: 3000, rl: 49124 };
 
 function neuerToken() {
   const b = new Uint8Array(12);
@@ -15,7 +15,7 @@ function standardRegie() {
   return {
     armed: false,
     aktivesSpiel: "cs2",
-    spiele: { cs2: true, valorant: false, rl: false }, // Tab „Setup“: nur genutzte Spiele erscheinen in Control und Signale
+    spiele: { cs2: true, valorant: false, rl: true }, // Tab „Setup“: nur genutzte Spiele erscheinen in Control und Signale
     session: { name: "LAN-Party", passwort: "", port: PORTS.session, offen: false },
     // Wohin die Signale gehen, ist der App egal: jedes Ziel bekommt alle freigegebenen Signale
     targets: [{ id: uid(), name: "", host: "127.0.0.1", port: 8000 }],
@@ -30,6 +30,7 @@ function standardGamePc() {
     passwort: "",
     autoVerbinden: false,
     gsiPort: PORTS.gsi,
+    rlPort: PORTS.rl, // WebSocket der Rocket-League-Stats-API
     gsiToken: neuerToken(),
   };
 }

@@ -1,8 +1,7 @@
 import React from "react";
 import { S, ACCENT, LINE, SUB, MUTED, OK, WARN, ERR, teamFarbe } from "./theme.js";
-import { Trophy, Timer, Bomb, Crosshair, Skull, Zap, Crown, Eye, CircleCheck, CircleX } from "lucide-react";
-import { EVENT_BY_ID } from "../core/events.js";
-import { SPIEL_BY_ID } from "../core/spiele.js";
+import { Trophy, Timer, Bomb, Crosshair, Skull, Zap, Crown, Eye, CircleCheck, CircleX, Goal, Handshake, Shield, ShieldCheck, Target, CarFront, Flag, Play, Medal, Flame, Repeat } from "lucide-react";
+import { SPIEL_BY_ID, eventInfo } from "../core/spiele.js";
 
 export function Section({ title, subtitle, right, children, style }) {
   return (
@@ -48,12 +47,14 @@ export const TeamChip = ({ team }) => team ? (
 
 
 const ICONS = { Match: Trophy, Runde: Timer, Bombe: Bomb, Spieler: Crosshair };
-export function EventIcon({ type, size = 15 }) {
-  const e = EVENT_BY_ID[type];
+const RL_ICONS = { goal: Goal, assist: Handshake, hat_trick: Flame, save: Shield, epic_save: ShieldCheck, shot: Target, demolition: CarFront, crossbar: Flag, kickoff: Play, overtime: Timer, podium: Medal, mvp: Crown, replay_start: Repeat, replay_end: Repeat, match_start: Trophy, match_end: Trophy };
+export function EventIcon({ type, spiel = "cs2", size = 15 }) {
+  if (spiel === "rl" && RL_ICONS[type]) { const Ic = RL_ICONS[type]; return <Ic size={size} />; }
+  const e = eventInfo(spiel, type);
   const Ic = type === "death" ? Skull : type === "ace" || type.startsWith("multikill") ? Zap : type === "mvp" ? Crown : type === "flashed" ? Eye : ICONS[e?.gruppe] || Zap;
   return <Ic size={size} />;
 }
-export const eventLabel = (type) => EVENT_BY_ID[type]?.label || type;
+export const eventLabel = (type, spiel = "cs2") => eventInfo(spiel, type)?.label || type;
 
 export const zeit = (t) => new Date(t).toLocaleTimeString("de-DE");
 export const th = (extra) => ({ ...S.th, ...extra });

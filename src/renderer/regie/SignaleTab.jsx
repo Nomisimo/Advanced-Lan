@@ -29,7 +29,7 @@ function SpielSignale({ spiel, cfg, mutate, notify }) {
               return (
                 <tr key={e.id} style={{ opacity: an ? 1 : 0.5 }}>
                   <td style={td()}><Toggle checked={an} onChange={(v) => setzen(e.id, v)} /></td>
-                  <td style={td()}><span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}><span style={{ color: ACCENT, display: "inline-flex" }}><EventIcon type={e.id} /></span>{e.label}</span></td>
+                  <td style={td()}><span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}><span style={{ color: ACCENT, display: "inline-flex" }}><EventIcon type={e.id} spiel={spiel.id} /></span>{e.label}</span></td>
                   <td style={td({ ...S.mono, color: "#d9c6ff" })}>{oscAdresse({ type: e.id, spiel: spiel.id, pcId: "<pc>" }, e.spieler).replace("/pc/", "/<pc>/")}</td>
                   <td style={td({ textAlign: "right" })}><button style={S.smallBtn} title="Test an alle Ziele" onClick={() => testen(e.id)}><Send size={12} /> Test</button></td>
                 </tr>

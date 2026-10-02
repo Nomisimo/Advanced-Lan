@@ -6,10 +6,13 @@ const { GsiServer } = require('./gsi-server');
 const { OscSender } = require('./osc-out');
 const { SessionServer } = require('./session-server');
 const { Discovery, SessionClient } = require('./session-client');
-const { findeCs2CfgOrdner } = require('./cs2-pfad');
+const { findeCs2CfgOrdner, findeRlConfigOrdner } = require('./cs2-pfad');
+const { RlClient } = require('./rl-client');
 const { Regie } = require('../core/regie');
 const { RegieSim } = require('../core/regie-sim');
 const { CsQuelle } = require('../core/cs-quelle');
+const { RlQuelle } = require('../core/rl-quelle');
+const { rlIni, leseRlIni, RL_INI_DATEI } = require('../core/rl-ini');
 const { migrateKonfig } = require('../core/defaults');
 const { gsiCfg, CFG_DATEI } = require('../core/cfg');
 
@@ -69,9 +72,12 @@ function pruefeSpielProzesse() {
 }
 
 /* ── Modus Game-PC: alle bekannten Spiele → Ereignisse → Regie ─────────── */
-const QUELLEN = ['cs2']; // Spiele mit Datenquelle auf dem Game-PC
+const QUELLEN = ['cs2', 'rl']; // Spiele mit Datenquelle auf dem Game-PC
 let quelle = new CsQuelle();
 const gp = { letzte: 0, status: null, stand: null, fremd: 0, log: [], nr: 0, statusGesendet: 0 };
+let rlQuelle = new RlQuelle();
+const rl = { letzte: 0, stand: null, statusGesendet: 0 };
+const rlClient = new RlClient({ onNachricht: (m) => rlNachricht(m), onChange: statusMelden });
 const client = new SessionClient({ onChange: statusMelden, onAntwort: statusMelden });
 const discovery = new Discovery({ onChange: () => discoveryGeaendert() });
 const gsi = new GsiServer({ onPayload: (b) => gamePcPayload(b), onStatus: statusMelden });
@@ -95,6 +101,23 @@ function gamePcPayload(body) {
 
 // Verbinden mit der gewählten Session. Adresse und Port kommen immer aus mDNS, nie von Hand.
 let autoWartet = false;
+// Rocket League: Nachrichten der Stats API → Events an die Regie
+function rlNachricht(m) {
+  if (cfg.modus !== 'gamepc') return;
+  const r = rlQuelle.ingest(m);
+  rl.letzte = Date.now();
+  rl.stand = r.stand;
+  for (const ev of r.events) {
+    const ok = client.event('rl', ev);
+    const e = { id: ++gp.nr, t: Date.now(), spiel: 'rl', ev, gesendet: ok };
+    gp.log.unshift(e);
+    if (gp.log.length > 200) gp.log.length = 200;
+    an('gamepc-event', e);
+  }
+  if (r.events.length || Date.now() - rl.statusGesendet > 500) { client.status('rl', r.status, r.stand); rl.statusGesendet = Date.now(); }
+  statusMelden();
+}
+
 function gamePcVerbinden() {
   const g = cfg.gamepc;
   const s = discovery.liste().find((x) => x.id === g.regie.id) || discovery.liste().find((x) => x.session === g.regie.session);
@@ -112,6 +135,22 @@ function discoveryGeaendert() {
   // Beim Start automatisch verbinden, sobald die gespeicherte Session im Netz auftaucht
   if (autoWartet && discovery.liste().some((x) => x.id === cfg.gamepc.regie.id)) gamePcVerbinden();
   statusMelden();
+}
+
+async function rlCheck() {
+  const ordner = await findeRlConfigOrdner();
+  let ini = null;
+  try { if (ordner) ini = fs.readFileSync(path.join(ordner, RL_INI_DATEI), 'utf8'); } catch {}
+  const w = leseRlIni(ini);
+  const alter = rl.letzte ? Math.round((Date.now() - rl.letzte) / 1000) : null;
+  const port = Number(cfg.gamepc.rlPort);
+  return [
+    { id: 'rl-installiert', label: 'Rocket League gefunden', ok: !!ordner, detail: ordner || 'weder bei Epic Games noch bei Steam' },
+    { id: 'rl-ini', label: 'Stats API eingeschaltet', ok: ini != null && w.rate > 0, detail: ini == null ? `${RL_INI_DATEI} fehlt` : w.rate > 0 ? `${w.rate} Updates pro Sekunde` : 'PacketSendRate ist 0' },
+    { id: 'rl-port', label: 'Port passt zu dieser App', ok: ini != null && (w.webPort ?? 49124) === port, detail: ini == null ? '–' : `WebSocket ${w.webPort ?? 49124}` },
+    { id: 'rl-verbunden', label: 'Mit Rocket League verbunden', ok: rlClient.verbunden, detail: rlClient.verbunden ? `127.0.0.1:${port}` : 'Rocket League läuft nicht oder Stats API aus' },
+    { id: 'rl-daten', label: 'Rocket League sendet Daten', ok: alter != null && alter < 15, detail: alter == null ? 'noch nichts empfangen, ein Match starten' : `zuletzt vor ${alter} s` },
+  ];
 }
 
 // „Ist korrekt aufgesetzt“-Check des Game-PCs
@@ -137,6 +176,7 @@ async function setupCheck() {
       { id: 'daten', label: 'CS2 sendet Daten', ok: alter != null && alter < 15, detail: alter == null ? 'noch nichts empfangen, CS2 starten' : `zuletzt vor ${alter} s` },
       ...(gp.fremd ? [{ id: 'token', label: 'Kein fremder Token', ok: false, detail: `${gp.fremd} Nachrichten mit falschem Token` }] : []),
     ],
+    rl: await rlCheck(),
   };
 }
 
@@ -147,6 +187,7 @@ async function modusStarten() {
   clearInterval(spielCheck);
   client.trennen();
   discovery.stop();
+  rlClient.stop();
   await gsi.stop();
   if (cfg.modus === 'regie') {
     if (cfg.regie.session.offen && cfg.regie.session.passwort) await session.oeffnen();
@@ -156,6 +197,8 @@ async function modusStarten() {
   if (cfg.modus === 'gamepc') {
     quelle = new CsQuelle();
     await gsi.start(Number(cfg.gamepc.gsiPort));
+    rlQuelle = new RlQuelle();
+    rlClient.start(Number(cfg.gamepc.rlPort));
     discovery.start();
     autoWartet = !!(cfg.gamepc.autoVerbinden && cfg.gamepc.regie.id && cfg.gamepc.passwort && cfg.gamepc.pcId);
   }
@@ -165,7 +208,7 @@ async function modusStarten() {
 function gesamtStatus() {
   const s = { modus: cfg.modus, jetzt: Date.now() };
   if (cfg.modus === 'regie') s.regie = { ...regie.snapshot(), session: session.status(), sim: regieSim.status(), armed: cfg.regie.armed, spielAufRegie };
-  if (cfg.modus === 'gamepc') s.gamepc = { client: client.info(), sessions: discovery.liste(), discoveryFehler: discovery.fehler, gsi: gsi.status(), letzte: gp.letzte, status: gp.status, stand: gp.stand, fremd: gp.fremd };
+  if (cfg.modus === 'gamepc') s.gamepc = { client: client.info(), sessions: discovery.liste(), discoveryFehler: discovery.fehler, gsi: gsi.status(), letzte: gp.letzte, status: gp.status, stand: gp.stand, fremd: gp.fremd, rl: { ...rlClient.status(), letzte: rl.letzte, stand: rl.stand } };
   return s;
 }
 
@@ -233,7 +276,7 @@ ipcMain.handle('ziel-testen', async (_, zielId) => {
   try { await osc.send({ ziel, address: '/lan/test', args: [{ type: 's', value: 'Advanced LAN' }] }); return { ok: true }; }
   catch (e) { return { fehler: e.message }; }
 });
-ipcMain.handle('sim-start', (_, modus) => { regieSim.start(modus); return regieSim.status(); });
+ipcMain.handle('sim-start', (_, modus) => { regieSim.start(modus, cfg.regie.aktivesSpiel); return regieSim.status(); });
 ipcMain.handle('sim-stop', () => { regieSim.stop(); return regieSim.status(); });
 ipcMain.handle('sim-neu', () => { regieSim.neu(); return regieSim.status(); });
 
@@ -243,6 +286,19 @@ ipcMain.handle('verbinden', () => gamePcVerbinden());
 ipcMain.handle('trennen', () => { autoWartet = false; client.trennen(); });
 ipcMain.handle('cs2-ordner', () => findeCs2CfgOrdner());
 ipcMain.handle('setup-check', () => setupCheck());
+ipcMain.handle('rl-ini-installieren', async () => {
+  const ordner = await findeRlConfigOrdner();
+  if (!ordner) return { fehler: 'Rocket-League-Ordner nicht gefunden. Bitte „Speichern unter …“ nehmen.' };
+  try { fs.writeFileSync(path.join(ordner, RL_INI_DATEI), rlIni({ webPort: Number(cfg.gamepc.rlPort) })); }
+  catch (e) { return { fehler: e.message }; }
+  return { ok: true, pfad: path.join(ordner, RL_INI_DATEI) };
+});
+ipcMain.handle('rl-ini-speichern', async () => {
+  const r = await dialog.showSaveDialog(mainWin, { defaultPath: RL_INI_DATEI, filters: [{ name: 'Rocket League Stats API', extensions: ['ini'] }] });
+  if (r.canceled || !r.filePath) return { abgebrochen: true };
+  fs.writeFileSync(r.filePath, rlIni({ webPort: Number(cfg.gamepc.rlPort) }));
+  return { ok: true, pfad: r.filePath };
+});
 ipcMain.handle('cfg-installieren', async () => {
   const ordner = await findeCs2CfgOrdner();
   if (!ordner) return { fehler: 'CS2-Ordner nicht gefunden. Bitte „cfg speichern unter …“ nehmen.' };
@@ -279,6 +335,7 @@ else {
   app.on('window-all-closed', async () => {
     regieSim.stop();
     client.trennen();
+    rlClient.stop();
     discovery.stop();
     await Promise.allSettled([session.schliessen(), gsi.stop()]);
     osc.close();

@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import { S, SUB, MUTED, OK, ERR, WARN, ACCENT } from "../theme.js";
 import { Section, Field, Kbd } from "../ui.jsx";
 import { api } from "../api.js";
-import { PORTS } from "../../core/defaults.js";
 import { Lock, LockOpen, Eye, EyeOff } from "lucide-react";
 
 export default function SessionTab({ cfg, mutate, status, notify }) {
@@ -42,14 +41,14 @@ export default function SessionTab({ cfg, mutate, status, notify }) {
       </Section>
       <Section title="Netzwerk">
         <p style={{ fontSize: 13, lineHeight: 1.7, margin: 0, color: "#d4d0de" }}>
-          Die Regie ruft die Session jede Sekunde per UDP-Broadcast auf Port <Kbd>{PORTS.discovery}</Kbd> aus. Game-PCs verbinden sich per WebSocket auf
+          Die Regie veröffentlicht die Session per <b>mDNS</b> (Multicast <Kbd>224.0.0.251:5353</Kbd>, Dienst <Kbd>_lanregie._tcp</Kbd>). Game-PCs verbinden sich per WebSocket auf
           Port <Kbd>{cfg.session.port}</Kbd>. Das Passwort geht dabei nicht im Klartext übers Netz (Challenge-Response mit HMAC-SHA256).
         </p>
         <p style={{ fontSize: 13, lineHeight: 1.7, color: "#d4d0de" }}>
-          Findet ein Game-PC die Session nicht (anderes Subnetz, Broadcast gesperrt), trägt man dort die IP der Regie von Hand ein:
+          Findet ein Game-PC die Session nicht (anderes Subnetz, Multicast im Switch gesperrt), trägt man dort die IP der Regie von Hand ein:
           {adressen.length ? adressen.map((a) => <span key={a.ip}> <Kbd>{a.ip}</Kbd> <span style={{ color: MUTED }}>({a.name})</span></span>) : " –"}
         </p>
-        <p style={S.hint}>Windows-Firewall auf der Regie: eingehend TCP {cfg.session.port} erlauben. Auf den Game-PCs: eingehend UDP {PORTS.discovery}. Beim ersten Start fragt Windows meist selbst nach.</p>
+        <p style={S.hint}>Windows-Firewall auf der Regie: eingehend TCP {cfg.session.port} erlauben. Auf allen PCs: UDP 5353 (mDNS) erlauben. Beim ersten Start fragt Windows meist selbst nach.</p>
       </Section>
     </>
   );

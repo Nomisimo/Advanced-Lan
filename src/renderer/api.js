@@ -20,7 +20,7 @@ function browserApi() {
     if (cfg.modus === "regie") s.regie = { ...regie.snapshot(), session: { offen: sessionOffen, port: cfg.regie.session.port, fehler: "", verbunden: 0 }, sim: sim.status(), armed: cfg.regie.armed, spielAufRegie: "" };
     if (cfg.modus === "gamepc") s.gamepc = {
       client: { zustand: gp.zustand, grund: "", session: gp.zustand === "verbunden" ? cfg.gamepc.regie.session : "", aktivesSpiel: "cs2", ziel: null, gesendet: gp.log.filter((e) => e.gesendet).length, verworfen: 0 },
-      sessions: [{ session: "LAN-Party", host: "REGIE-PC", ip: "192.168.1.20", port: 47801, aktivesSpiel: "cs2", pcs: 3, t: Date.now() }],
+      sessions: [{ session: "LAN-Party", host: "REGIE-PC", ip: "192.168.1.20", port: 47801, aktivesSpiel: "cs2" }],
       discoveryFehler: "", gsi: { laeuft: true, port: cfg.gamepc.gsiPort, fehler: "" }, letzte: 0, status: null, stand: null, fremd: 0,
     };
     return s;

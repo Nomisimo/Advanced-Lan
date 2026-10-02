@@ -1,7 +1,7 @@
 "use strict";
 // Einstellungen der App. Eine Datei für beide Modi: Regie und Game-PC.
 
-const PORTS = { discovery: 47800, session: 47801, gsi: 3000 };
+const PORTS = { session: 47801, gsi: 3000 };
 
 function neuerToken() {
   const b = new Uint8Array(12);

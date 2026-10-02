@@ -13,7 +13,7 @@ Gebaut mit **Overwolf Electron** (`@overwolf/ow-electron`), React 18 und esbuild
 
 Der Modus wird beim ersten Start gewählt und lässt sich oben rechts wechseln.
 
-- Die Regie öffnet eine **Session mit Name und Passwort**. Game-PCs finden sie automatisch (UDP-Broadcast, Port 47800) und verbinden sich per WebSocket (Port 47801).
+- Die Regie öffnet eine **Session mit Name und Passwort**. Game-PCs finden sie automatisch per mDNS (Multicast, Dienst `_lanregie._tcp`) und verbinden sich per WebSocket (Port 47801).
 - Das Passwort geht nicht im Klartext übers Netz: Challenge-Response mit HMAC-SHA256.
 - In der Regie ist **genau ein Spiel aktiv** (CS2, Valorant, Rocket League). Ereignisse anderer Spiele werden verworfen, nur das aktive Spiel erzeugt OSC.
 - Mehrere PCs melden dieselbe Runde oder Bombe: die Regie wertet jedes Ereignis nur einmal aus.

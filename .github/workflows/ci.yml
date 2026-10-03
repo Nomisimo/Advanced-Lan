@@ -31,15 +31,6 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      # Vergleich (vorübergehend): derselbe Netzwerktest mit dem Stand von Beta 2 auf diesem Runner
-      - name: Netzwerktest Beta 2
-        continue-on-error: true
-        timeout-minutes: 3
-        run: |
-          git fetch --depth=1 origin tag v0.1.0-beta.2
-          mkdir -p /tmp/b2 && git archive v0.1.0-beta.2 src test | tar -x -C /tmp/b2
-          ln -s "$PWD/node_modules" /tmp/b2/node_modules
-          cd /tmp/b2 && node --test --test-timeout=30000 test/netz.test.js
       - run: npm test
         timeout-minutes: 5
       - run: npm run build

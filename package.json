@@ -2,7 +2,7 @@
   "name": "advanced-lan",
   "version": "0.1.0-beta.1",
   "private": true,
-  "description": "Advanced LAN: Game-PCs melden Spielereignisse, die Regie sendet neutrale OSC-Signale",
+  "description": "Advanced LAN: Game-PCs melden Spielereignisse, die Regie sendet OSC-Befehle an Licht, Audio und Video",
   "author": "Momo",
   "license": "UNLICENSED",
   "main": "src/main/main.js",

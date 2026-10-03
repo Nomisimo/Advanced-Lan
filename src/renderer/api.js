@@ -4,6 +4,7 @@ import { RegieSim } from "../core/regie-sim.js";
 import { migrateKonfig } from "../core/defaults.js";
 import { gsiCfg, CFG_DATEI } from "../core/cfg.js";
 import { rlIni, RL_INI_DATEI } from "../core/rl-ini.js";
+import { testNachricht, zeigeNachricht } from "../core/signal.js";
 
 export const isElectron = typeof window !== "undefined" && !!window.regieAPI;
 
@@ -62,8 +63,8 @@ function browserApi() {
     sessionSchliessen: async () => { sessionOffen = false; return status(); },
     pcTrennen: async () => {},
     eventAusloesen: async (ev) => regie.fire({ round: regie.stand?.runde, map: regie.stand?.map, ...ev, spiel: cfg.regie.aktivesSpiel, pc: "Regie", pcId: "regie" }, "manuell"),
-    signalTesten: async (spiel, type) => regie.testeSignal(spiel, type),
-    zielTesten: async () => ({ ok: true }),
+    signalTesten: async (spiel, type, z) => regie.testeZuweisung(spiel, type, z),
+    zielTesten: async (id) => { const z = cfg.regie.targets.find((t) => t.id === id); return z ? { ok: true, nachricht: zeigeNachricht(testNachricht(z)) } : { fehler: "Ziel nicht gefunden" }; },
     simStart: async (m) => { sim.start(m, cfg.regie.aktivesSpiel); return sim.status(); },
     simStop: async () => { sim.stop(); return sim.status(); },
     simNeu: async () => { sim.neu(); return sim.status(); },

@@ -23,9 +23,11 @@ test("Rocket League: Stats-API-Nachrichten werden zu Events", () => {
   assert.deepEqual(typen({ Event: "BallHit", Data: {} }), []);
 });
 
-test("Rocket League: neutrale Adressen ohne PC-ID, Spieler als Argument, mehrere PCs zählen einmal", () => {
+test("Rocket League: Tor an Reaper und MA3, mehrere PCs zählen einmal", () => {
   let t = 0;
-  const cfg = { ...standardRegie(), armed: true, aktivesSpiel: "rl" };
+  const cfg = { ...standardRegie(), armed: true, aktivesSpiel: "rl",
+    targets: [{ id: "r", typ: "reaper", name: "Reaper", host: "10.0.0.7", port: 8000 }, { id: "m", typ: "ma3", name: "MA3", host: "10.0.0.5", port: 8000 }],
+    signale: { rl: { goal: [{ id: "1", ziel: "r", befehl: "marker_play", werte: { marker: "4" } }, { id: "2", ziel: "m", befehl: "goto_cue", werte: { seq: "101", cue: "3" }, team: "ORANGE" }] } } };
   const gesendet = [];
   const regie = new Regie({ getConfig: () => cfg, send: (s) => gesendet.push(s), now: () => t });
   const tor = { type: "goal", team: "ORANGE", player: "Momo", steamid: "rl:Momo", round: 0 };
@@ -33,9 +35,9 @@ test("Rocket League: neutrale Adressen ohne PC-ID, Spieler als Argument, mehrere
   regie.pcVerbunden("PC 2", { spiele: ["cs2", "rl"] });
   regie.pcEvent("PC 1", "rl", tor);
   regie.pcEvent("PC 2", "rl", tor);
-  assert.equal(gesendet.length, 1);
-  assert.equal(gesendet[0].address, "/lan/rl/goal");
-  assert.deepEqual(gesendet[0].args.map((a) => a.value), ["ORANGE", "Momo", "", 0]);
+  assert.deepEqual(gesendet.map((s) => [s.ziel.id, s.address, s.args.map((a) => a.value)]), [
+    ["r", "/marker", [4]], ["r", "/play", []], ["m", "/gma3/cmd", ["Goto Sequence 101 Cue 3"]],
+  ]);
   assert.equal(regie.snapshot().statistik.match.tore.ORANGE, 1);
 });
 

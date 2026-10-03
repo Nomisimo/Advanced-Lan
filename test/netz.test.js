@@ -23,7 +23,8 @@ test("Game-PC meldet sich mit Passwort an, Ereignisse werden zu OSC", async () =
   const oscPort = empfang.address().port;
 
   const cfg = { ...standardRegie(), armed: true, session: { name: "Test-LAN", passwort: "geheim", port: 47911, offen: true } };
-  cfg.targets = [{ id: "a", name: "", host: "127.0.0.1", port: oscPort }, { id: "b", name: "zweites Gerät", host: "127.0.0.1", port: oscPort }];
+  cfg.targets = [{ id: "a", typ: "ma3", name: "MA3", host: "127.0.0.1", port: oscPort }, { id: "b", typ: "qlab", name: "QLab", host: "127.0.0.1", port: oscPort }];
+  cfg.signale = { cs2: { round_end: [{ id: "1", ziel: "a", befehl: "goto_cue", werte: { seq: "101", cue: "3" } }], bomb_planted: [{ id: "2", ziel: "a", befehl: "go", werte: { seq: "5" } }, { id: "3", ziel: "b", befehl: "start", werte: { cue: "bombe" } }] } };
   const osc = new OscSender();
   const regie = new Regie({ getConfig: () => cfg, send: (s) => osc.send(s) });
   const server = new SessionServer({ regie, getConfig: () => cfg });
@@ -59,9 +60,10 @@ test("Game-PC meldet sich mit Passwort an, Ereignisse werden zu OSC", async () =
   const zustand = (phase, extra = {}) => ({ provider: { steamid: "1" }, map: { name: "de_inferno", phase: "live", round: 4 }, round: { phase, ...extra }, player: { steamid: "1", name: "Blitz", team: "T", state: { health: 100 } } });
   for (const body of [zustand("live"), zustand("live", { bomb: "planted" }), zustand("over", { bomb: "exploded", win_team: "T" })])
     await fetch("http://127.0.0.1:47912/gsi", { method: "POST", body: JSON.stringify(body) });
-  await warte(() => pakete.filter((p) => p.startsWith("/lan/cs2/round_end\0")).length === 2);
-  assert.equal(pakete.filter((p) => p.startsWith("/lan/cs2/bomb_planted\0")).length, 2, "Bombe gelegt, an beide Ziele");
-  assert.ok(pakete.every((p) => p.startsWith("/lan/cs2/")), "nur neutrale Signale");
+  await warte(() => pakete.some((p) => p.includes("Goto Sequence 101 Cue 3")));
+  assert.ok(pakete.some((p) => p.startsWith("/gma3/cmd\0") && p.includes("Go+ Sequence 5")), "Bombe gelegt an MA3");
+  assert.ok(pakete.some((p) => p.startsWith("/cue/bombe/start\0")), "und an QLab");
+  assert.equal(pakete.length, 3, "nur eingestellte Befehle");
   assert.deepEqual(regie.snapshot().pcs[0].spiele, ["cs2"]);
   await warte(() => regie.snapshot().pcs[0].ping != null, 5000); // Verbindungscheck: Ping kommt an
   assert.equal(regie.snapshot().statistik.match.runden, 1);

@@ -241,10 +241,16 @@ export function EventZeile({ e, neu }) {
         <span style={{ flex: 1 }} />
         <span style={{ fontSize: 10, color: MUTED }}>{e.quelle === "manuell" ? "manuell" : e.ev.pc}</span>
       </div>
-      <div style={{ ...S.mono, fontSize: 11, marginTop: 2, paddingLeft: 66, color: e.fehler?.length ? ERR : e.gesperrt || !e.scharf ? MUTED : "#d9c6ff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-        {e.address}
-        <span style={{ marginLeft: 8, color: e.gesperrt ? MUTED : !e.scharf ? WARN : OK }}>{e.gesperrt ? "gesperrt" : !e.scharf ? "nicht gesendet" : `→ ${e.ziele}`}</span>
-      </div>
+      {e.gesperrt ? (
+        <div style={{ fontSize: 11, marginTop: 2, paddingLeft: 66, color: MUTED }}>kein Befehl</div>
+      ) : (e.befehle || []).map((b, i) => (
+        <div key={i} style={{ ...S.mono, fontSize: 11, marginTop: 2, paddingLeft: 66, color: b.fehler ? ERR : !e.scharf ? MUTED : "#d9c6ff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          <span style={{ color: b.fehler ? ERR : !e.scharf ? WARN : OK }}>{b.ziel}</span>
+          <span style={{ marginLeft: 8 }}>{b.fehler || b.nachrichten.join("  ·  ")}</span>
+          {!e.scharf && !b.fehler && <span style={{ marginLeft: 8, color: WARN }}>nicht gesendet</span>}
+        </div>
+      ))}
+      {e.fehler?.length > 0 && e.scharf && <div style={{ fontSize: 11, marginTop: 2, paddingLeft: 66, color: ERR }}>{e.fehler.join(", ")}</div>}
     </div>
   );
 }

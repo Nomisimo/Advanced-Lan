@@ -1,5 +1,6 @@
 import React from "react";
-import { S, ACCENT, LINE, SUB } from "./theme.js";
+import { S, ACCENT, ACCENT_HI, LINE, SUB } from "./theme.js";
+import { ZIEL_TYPEN, KATEGORIEN } from "../core/ziel-typen.js";
 import { Section, Kbd, th, td } from "./ui.jsx";
 import { CFG_DATEI, CFG_ORDNER } from "../core/cfg.js";
 import { RL_INI_DATEI, RL_INI_ORDNER, RL_RATE } from "../core/rl-ini.js";
@@ -31,7 +32,8 @@ const Ueberblick = () => (
       Events aller anderen Spiele werden verworfen.
     </P>
     <P>
-      Die Regie sagt nur, <b>was passiert ist</b>, zum Beispiel „Runde gewonnen“. Was ein Lichtpult, Playout oder anderes Gerät daraus macht, wird dort eingestellt.
+      Die Regie sagt den Geräten, <b>was passieren soll</b>. Im Tab <b>Ziele</b> werden die Geräte aus der Ziel-Datenbank angelegt, zum Beispiel Reaper und grandMA3.
+      Im Tab <b>Signale</b> wird je Event eingestellt, welcher Befehl an welches Ziel geht, zum Beispiel bei einem Tor „Audio ab Marker 4“ an Reaper und „Sequenz 101 Cue 3“ an die MA3.
     </P>
   </Section>
 );
@@ -45,11 +47,13 @@ const Regie = ({ goTab }) => (
     <Schritt n={2} titel="Session öffnen" onGo={goTab && (() => goTab("session"))} goLabel="Session">
       Name und Passwort festlegen, <b>Öffnen</b>. Die Session wird per mDNS im Netz angekündigt. Ändert man das Passwort, müssen alle PCs neu beitreten.
     </Schritt>
-    <Schritt n={3} titel="Ziele eintragen" onGo={goTab && (() => goTab("ziele"))} goLabel="Ziele">
-      IP und UDP-Port jedes Geräts, das die Signale empfangen soll. Jedes Signal geht an alle Ziele. <b>Test</b> schickt <Kbd>/lan/test</Kbd>.
+    <Schritt n={3} titel="Ziele anlegen" onGo={goTab && (() => goTab("ziele"))} goLabel="Ziele">
+      Unten in der <b>Ziel-Datenbank</b> die Software oder das Gerät wählen und <b>Anlegen</b>. Dann IP-Adresse eintragen; der Port ist auf den Standard des Geräts gesetzt.
+      Auf dem Gerät selbst muss OSC-Empfang eingeschaltet sein (siehe „Ziele einrichten“ unten). <b>Test</b> schickt eine harmlose Nachricht, bei QLab zum Beispiel <Kbd>/thump</Kbd>.
     </Schritt>
-    <Schritt n={4} titel="Signale prüfen" onGo={goTab && (() => goTab("signale"))} goLabel="Signale">
-      Ein Abschnitt je genutztem Spiel. Einzelne Events lassen sich abschalten, <b>Test</b> schickt das Signal sofort an alle Ziele, auch bei Ausgabe aus.
+    <Schritt n={4} titel="Signale belegen" onGo={goTab && (() => goTab("signale"))} goLabel="Signale">
+      Ein Abschnitt je genutztem Spiel, darin jedes Event. <b>+ Befehl</b> legt fest: Ziel, Befehl und Werte (zum Beispiel Sequenz und Cue). Ein Event kann beliebig viele Befehle an verschiedene Ziele senden.
+      Auswählbar sind nur Ziele aus dem Tab Ziele. <b>Test</b> sendet den Befehl sofort, auch bei Ausgabe aus.
     </Schritt>
     <Schritt n={5} titel="Proben" onGo={goTab && (() => goTab("sim"))} goLabel="Simulator">
       Der Simulator spielt das aktive Spiel mit virtuellen Game-PCs und derselben Erkennung wie echte PCs: CS2 mit 10 PCs (5 gegen 5), Rocket League mit 6 PCs (3 gegen 3).
@@ -65,7 +69,7 @@ const Regie = ({ goTab }) => (
         <li><b>Ausgabe</b>: Events, verworfene Events (anderes Spiel), gesendete OSC-Pakete, Fehler.</li>
         <li><b>Verbindungscheck</b> je PC: Verbindung steht, Daten kommen (in den letzten 15 s), Spiel passt zum aktiven Spiel, Ping. Ein PC ist ok, wenn alle drei grün sind.</li>
         <li><b>Statistik</b>: Spielstand, aktuelle Runde (Kills, Headshots, Bombe, Sieger, MVP) und Match (Runden, Kills, Headshot-Quote, Multikills, Aces, Top-Spieler). Beginnt bei jedem Matchstart neu.</li>
-        <li><b>Events</b>: neueste oben, darunter die OSC-Adresse. „nicht gesendet“ heißt Ausgabe aus, „gesperrt“ heißt im Tab Signale abgeschaltet, „→ 2“ heißt an 2 Ziele gesendet.</li>
+        <li><b>Events</b>: neueste oben, darunter jeder Befehl mit Ziel und OSC-Nachricht. „nicht gesendet“ heißt Ausgabe aus, „kein Befehl“ heißt im Tab Signale nicht belegt.</li>
       </L>
     </div>
   </Section>
@@ -122,16 +126,43 @@ const Rl = () => (
 );
 
 const Osc = () => (
-  <Section title="OSC-Signale">
-    <table style={{ ...S.table, marginTop: 0 }}>
-      <thead><tr><th style={th()}>Adresse</th><th style={th()}>Wann</th></tr></thead>
+  <Section title="Signale und Befehle">
+    <P>
+      Jeder Befehl im Tab Signale gilt für ein Event. Zwei Filter grenzen ihn ein: <b>PC</b> (nur bei Spieler-Events wie Kill oder Headshot, leer heißt alle PCs)
+      und <b>Team</b> (leer heißt beide Teams). So kann ein Kill von PC 03 einen eigenen Cue auslösen, ein Rundensieg von CT einen anderen als von T.
+    </P>
+    <P>In jedem Wert dürfen Platzhalter stehen, die beim Senden aus dem Event gefüllt werden:</P>
+    <table style={{ ...S.table, marginTop: 0, marginBottom: 12 }}>
       <tbody>
-        <tr><td style={td(S.mono)}>/lan/&lt;spiel&gt;/&lt;event&gt;</td><td style={td()}>Events des ganzen Spiels, z. B. <Kbd>/lan/cs2/round_end</Kbd>, und alle Rocket-League-Events, z. B. <Kbd>/lan/rl/goal</Kbd></td></tr>
-        <tr><td style={td(S.mono)}>/lan/&lt;spiel&gt;/&lt;pc&gt;/&lt;event&gt;</td><td style={td()}>Events eines Spielers, z. B. <Kbd>/lan/cs2/pc03/kill</Kbd> (PC-ID klein, ohne Leer- und Sonderzeichen)</td></tr>
-        <tr><td style={td(S.mono)}>/lan/test</td><td style={td()}>Test-Knopf im Tab Ziele</td></tr>
+        {[["{spieler}", "Spielername"], ["{team}", "CT, T, BLUE, ORANGE"], ["{pc}", "PC-ID des meldenden PCs"], ["{runde}", "Rundennummer (CS2)"], ["{spiel}", "cs2, rl"], ["{event}", "Event-ID, z. B. goal"]].map(([k, v]) => (
+          <tr key={k}><td style={td({ ...S.mono, width: 120 })}>{k}</td><td style={td()}>{v}</td></tr>
+        ))}
       </tbody>
     </table>
-    <P><br />Argumente immer in dieser Reihenfolge: Team <Kbd>s</Kbd>, Spieler <Kbd>s</Kbd>, PC-ID <Kbd>s</Kbd>, Runde <Kbd>i</Kbd>. Bei Events des ganzen Spiels bleiben Spieler und PC-ID leer.</P>
+    <P>
+      <b>Eigene OSC-Nachricht</b> gibt es bei jedem Ziel: Adresse frei, Argumente als Text mit Typ, zum Beispiel <Kbd>s:{"{spieler}"} i:3 f:0.5 T</Kbd>.
+      Ohne Typ wird geraten: ganze Zahl <Kbd>i</Kbd>, Kommazahl <Kbd>f</Kbd>, sonst Text <Kbd>s</Kbd>. Texte mit Leerzeichen in Anführungszeichen.
+    </P>
+  </Section>
+);
+
+const KAT_NAME = Object.fromEntries(KATEGORIEN.map((k) => [k.id, k.name]));
+const ZieleEinrichten = () => (
+  <Section title="Ziele einrichten">
+    <P>Alle Ziele empfangen per UDP. Auf dem Gerät muss OSC-Empfang an sein, und der Port muss zu dem im Tab Ziele passen.</P>
+    <table style={{ ...S.table, marginTop: 0 }}>
+      <thead><tr><th style={th()}>Ziel</th><th style={th()}>Port</th><th style={th()}>Auf dem Gerät</th><th style={th()}>Befehle</th></tr></thead>
+      <tbody>
+        {ZIEL_TYPEN.map((t) => (
+          <tr key={t.id}>
+            <td style={td({ verticalAlign: "top", width: 170 })}><b>{t.name}</b><div style={{ fontSize: 11, color: SUB }}>{KAT_NAME[t.kategorie]}{t.hersteller ? ` · ${t.hersteller}` : ""}</div></td>
+            <td style={td({ ...S.mono, verticalAlign: "top" })}>{t.port}</td>
+            <td style={td({ verticalAlign: "top", fontSize: 12, lineHeight: 1.6 })}>{t.einrichten}<div><a href={t.doku} target="_blank" rel="noreferrer" style={{ color: ACCENT_HI, fontSize: 11 }}>Dokumentation</a></div></td>
+            <td style={td({ verticalAlign: "top", fontSize: 12, color: SUB, lineHeight: 1.6 })}>{t.befehle.map((b) => b.label).join(", ") || "eigene Nachricht"}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   </Section>
 );
 
@@ -157,6 +188,7 @@ export default function AnleitungTab({ modus, goTab }) {
       <Cs2 />
       <Rl />
       <Osc />
+      <ZieleEinrichten />
       <Netz />
     </>
   );

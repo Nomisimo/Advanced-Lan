@@ -1,6 +1,6 @@
 # Advanced LAN
 
-Eine App für die LAN-Party: Die Game-PCs melden Spielereignisse, die Regie sendet daraus neutrale OSC-Signale ins Netz. Was ein Empfänger (Lichtpult, Playout, …) damit macht, entscheidet er selbst. Design und Aufbau wie [Netzwerkplaner](https://github.com/Nomisimo/Netzwerkplaner) und Stromplaner, Akzentfarbe Lila.
+Eine App für die LAN-Party: Die Game-PCs melden Spielereignisse, die Regie sendet daraus OSC-Befehle an Lichtpulte, Audio- und Videosoftware (z. B. grandMA3, QLab, Reaper, Resolume). Design und Aufbau wie [Netzwerkplaner](https://github.com/Nomisimo/Netzwerkplaner) und Stromplaner, Akzentfarbe Lila.
 
 Gebaut mit **Overwolf Electron** (`@overwolf/ow-electron`), React 18 und esbuild. Die Oberfläche wird zu einer einzelnen Datei `dist-app/index.html` gebündelt.
 
@@ -30,20 +30,21 @@ Erkannte Ereignisse: Match startet/vorbei, Freezetime, Runde läuft, Runde gewon
 
 Rocket League liefert seine Daten über die offizielle [Stats API](https://www.rocketleague.com/developer/stats-api) von Psyonix: `TAGame\Config\TAStatsAPI.ini` im Spielordner (Epic Games oder Steam) schaltet sie ein (`PacketSendRate=10`), dann schickt das Spiel `{ Event, Data }`-Nachrichten per WebSocket an die App auf demselben PC (`127.0.0.1:49124`). Der Game-PC schreibt die ini per Knopfdruck im Tab „Setup“.
 
-Erkannte Ereignisse: Match startet/vorbei, Anstoß, Verlängerung, Siegerehrung, Tor, Vorlage, Hattrick, Tor-Wiederholung, Torschuss, Parade, Glanzparade, Demolition, Latte, MVP. Teams heißen `BLUE` und `ORANGE`. Die Stats API meldet alle Spieler des Matches, deshalb tragen Rocket-League-Signale den Spieler als Argument, aber keine PC-ID in der Adresse (`/lan/rl/goal`).
+Erkannte Ereignisse: Match startet/vorbei, Anstoß, Verlängerung, Siegerehrung, Tor, Vorlage, Hattrick, Tor-Wiederholung, Torschuss, Parade, Glanzparade, Demolition, Latte, MVP. Teams heißen `BLUE` und `ORANGE`. Die Stats API meldet alle Spieler des Matches; deshalb gibt es bei Rocket League keinen PC-Filter, nur den Team-Filter.
 
 Valorant ist als Spiel schon wählbar, seine Datenquelle fehlt noch.
 
-## OSC
+## OSC: Ziele und Signale
 
-Die App sagt nur, **was passiert ist**, nicht was ein Empfänger tun soll. Jedes Signal geht an alle eingetragenen Ziele (IP und Port, beliebig viele).
+Die Regie sendet, **was passieren soll**.
 
-| Adresse | Wann |
-|---|---|
-| `/lan/<spiel>/<event>` | Ereignisse des ganzen Spiels, z. B. `/lan/cs2/round_end`, `/lan/cs2/bomb_planted` |
-| `/lan/<spiel>/<pc>/<event>` | Ereignisse eines Spielers, z. B. `/lan/cs2/pc03/kill` (PC-ID klein, ohne Leer- und Sonderzeichen) |
+- **Ziele**: Geräte werden aus der Ziel-Datenbank angelegt (`src/core/ziel-typen.js`), jedes mit IP, Port und ggf. Optionen (z. B. MA3-Prefix). Enthalten: QLab, grandMA3, ETC Eos, ChamSys MagicQ, REAPER, Ableton Live (AbletonOSC), Behringer X32/M32, Resolume, Millumin, TouchDesigner, Bitfocus Companion und ein allgemeines OSC-Gerät. Die Recherche dazu steht in [`docs/osc-ziele.md`](docs/osc-ziele.md).
+- **Signale**: je Spiel und Event beliebig viele Befehle `Ziel → Befehl → Werte`, optional gefiltert nach PC-ID (Spieler-Events) und Team. Beispiel Rocket League Tor: Reaper „Audio ab Marker 4“ (`/marker 4`, `/play`) und grandMA3 „Sequenz: Cue anfahren“ (`/gma3/cmd "Goto Sequence 101 Cue 3"`).
+- Werte dürfen Platzhalter enthalten: `{spieler}`, `{team}`, `{pc}`, `{runde}`, `{spiel}`, `{event}`.
+- Jedes Ziel kennt „Eigene OSC-Nachricht“ mit freier Adresse und Argumenten (`s:{spieler} i:3 f:0.5 T`).
+- Ein Event ohne Befehl erscheint nur im Log. „Test“ in „Signale“ sendet einen Befehl sofort, „Test“ in „Ziele“ eine harmlose Testnachricht.
 
-Argumente immer in dieser Reihenfolge: `team` (s), `spieler` (s), `pc` (s), `runde` (i). Bei Ereignissen des ganzen Spiels bleiben `spieler` und `pc` leer. Einzelne Ereignisse lassen sich im Tab „Signale“ sperren. „Test“ in „Ziele“ schickt `/lan/test`.
+Einstellungen aus Version 0.1.0-beta.1 (neutrale Signale) werden übernommen: Ziele werden „Allgemeines OSC-Gerät“, die alten An/Aus-Schalter entfallen.
 
 ## Entwickeln
 
@@ -61,6 +62,6 @@ npm run dist:mac   # macOS Intel (dmg und zip), nur auf einem Mac
 
 | Ordner | Inhalt |
 |---|---|
-| `src/core` | Logik ohne Electron: Ereigniserkennung CS2, Regie, Signale, Statistik, Simulator, Protokoll |
+| `src/core` | Logik ohne Electron: Ereigniserkennung CS2 und Rocket League, Regie, Ziel-Datenbank, Signale, Statistik, Simulator, Protokoll |
 | `src/main` | Hauptprozess: Session-Server, Game-PC-Verbindung, GSI-Empfang, OSC |
 | `src/renderer` | Oberfläche (React): Modus-Wahl, `regie/`, `gamepc/` |

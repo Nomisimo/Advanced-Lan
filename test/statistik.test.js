@@ -38,5 +38,5 @@ test("Setup: nur genutzte Spiele, aktives Spiel ist immer eins davon", () => {
   assert.equal(migrateKonfig(k).regie.aktivesSpiel, "valorant");
   k.regie.spiele = { cs2: false, valorant: false, rl: false };
   assert.equal(migrateKonfig(k).regie.spiele.cs2, true);
-  assert.equal(migrateKonfig({ ...k, version: 3 }).version, 4);
+  assert.equal(migrateKonfig({ ...k, version: 3 }).version, 5);
 });

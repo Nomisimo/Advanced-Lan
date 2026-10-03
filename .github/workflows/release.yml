@@ -43,7 +43,7 @@ jobs:
             Die App ist noch nicht signiert. Beim ersten Start deshalb im Finder mit Rechtsklick → **Öffnen** starten
             (oder Systemeinstellungen → Datenschutz & Sicherheit → „Trotzdem öffnen“).
 
-            **Neu:** Regie und Game-PC in einer App, Sessions per mDNS, neutrale OSC-Signale, CS2 (Game State Integration)
+            **Neu:** Regie und Game-PC in einer App, Sessions per mDNS, OSC-Befehle an Licht, Audio und Video (Ziel-Datenbank, Signale-Matrix), CS2 (Game State Integration)
             und Rocket League (Stats API), Simulator für beide Spiele.
 
             Apple Silicon und Windows folgen.

@@ -2,6 +2,7 @@ import React from "react";
 import { S, ACCENT, LINE, SUB, MUTED, OK, WARN, ERR, teamFarbe } from "./theme.js";
 import { Trophy, Timer, Bomb, Crosshair, Skull, Zap, Crown, Eye, CircleCheck, CircleX, Goal, Handshake, Shield, ShieldCheck, Target, CarFront, Flag, Play, Medal, Flame, Repeat } from "lucide-react";
 import { SPIEL_BY_ID, eventInfo } from "../core/spiele.js";
+import { zielTyp } from "../core/ziel-typen.js";
 
 export function Section({ title, subtitle, right, children, style }) {
   return (
@@ -78,4 +79,11 @@ export const SpielChip = ({ spiel, aktiv = true }) => {
   const s = SPIEL_BY_ID[spiel];
   if (!s) return <span style={{ color: MUTED }}>{spiel || "–"}</span>;
   return <span style={{ ...S.badge, background: s.farbe + (aktiv ? "33" : "11"), color: aktiv ? s.farbe : MUTED, border: `1px solid ${s.farbe}${aktiv ? "88" : "33"}` }}>{s.kurz}</span>;
+};
+
+// Farbe je Kategorie der Ziel-Datenbank
+export const KAT_FARBE = { show: "#c39bff", licht: "#f2b33d", audio: "#2ecc71", video: "#4ea1ff", steuerung: "#ff8a1f", allgemein: "#a39eb3" };
+export const ZielBadge = ({ typ }) => {
+  const t = zielTyp(typ), f = KAT_FARBE[t.kategorie] || SUB;
+  return <span style={{ ...S.badge, background: f + "22", color: f, border: `1px solid ${f}66`, whiteSpace: "nowrap" }}>{t.name}</span>;
 };

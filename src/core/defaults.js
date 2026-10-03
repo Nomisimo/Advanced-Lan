@@ -17,9 +17,10 @@ function standardRegie() {
     aktivesSpiel: "cs2",
     spiele: { cs2: true, valorant: false, rl: true }, // Tab „Setup“: nur genutzte Spiele erscheinen in Control und Signale
     session: { name: "LAN-Party", passwort: "", port: PORTS.session, offen: false },
-    // Wohin die Signale gehen, ist der App egal: jedes Ziel bekommt alle freigegebenen Signale
-    targets: [{ id: uid(), name: "", host: "127.0.0.1", port: 8000 }],
-    signale: {}, // { [spiel]: { [event]: false } } = gesperrt, alles andere wird gesendet
+    // Tab „Ziele“: angelegt aus der Ziel-Datenbank (ziel-typen.js)
+    targets: [], // [{ id, typ, name, host, port, optionen: {} }]
+    // Tab „Signale“: welches Event welchen Befehl an welches Ziel sendet
+    signale: {}, // { [spiel]: { [event]: [{ id, ziel, befehl, werte, pc, team }] } }
   };
 }
 
@@ -36,7 +37,7 @@ function standardGamePc() {
 }
 
 function standardKonfig() {
-  return { format: "advanced-lan", version: 4, modus: null, regie: standardRegie(), gamepc: standardGamePc() };
+  return { format: "advanced-lan", version: 5, modus: null, regie: standardRegie(), gamepc: standardGamePc() };
 }
 
 function genutzteSpiele(s, std) {
@@ -46,10 +47,27 @@ function genutzteSpiele(s, std) {
   return out;
 }
 
+// Ziele vor Version 5 hatten keinen Typ: allgemeines OSC-Gerät
+const migrateZiel = (t) => ({ id: t.id || uid(), typ: t.typ || "osc", name: t.name || "", host: t.host || "", port: Number(t.port) || 0, optionen: t.optionen && typeof t.optionen === "object" ? t.optionen : {} });
+
+// Vor Version 5 waren Signale nur an/aus (neutrales OSC). Übernommen werden nur Befehlslisten.
+function migrateSignale(s) {
+  const out = {};
+  if (!s || typeof s !== "object") return out;
+  for (const [spiel, evs] of Object.entries(s)) {
+    if (!evs || typeof evs !== "object") continue;
+    for (const [ev, liste] of Object.entries(evs)) {
+      if (!Array.isArray(liste)) continue;
+      (out[spiel] = out[spiel] || {})[ev] = liste.filter((z) => z && typeof z === "object").map((z) => ({ id: z.id || uid(), ziel: z.ziel || "", befehl: z.befehl || "eigene", werte: z.werte && typeof z.werte === "object" ? z.werte : {}, pc: z.pc || "", team: z.team || "" }));
+    }
+  }
+  return out;
+}
+
 // Gespeicherte Einstellungen einlesen, fehlende Felder ergänzen
 function migrateKonfig(k) {
   const d = standardKonfig();
-  if (!k || typeof k !== "object" || (k.version !== 3 && k.version !== 4)) return d;
+  if (!k || typeof k !== "object" || ![3, 4, 5].includes(k.version)) return d;
   const r = k.regie || {}, g = k.gamepc || {};
   const m = {
     ...d,
@@ -59,8 +77,8 @@ function migrateKonfig(k) {
       ...r,
       armed: false, // nach dem Start nie scharf: erst bewusst einschalten
       session: { ...d.regie.session, ...(r.session || {}) },
-      targets: Array.isArray(r.targets) ? r.targets.map((t) => ({ id: t.id || uid(), name: t.name || "", host: t.host || "", port: Number(t.port) || 0 })) : d.regie.targets,
-      signale: r.signale && typeof r.signale === "object" ? r.signale : {},
+      targets: Array.isArray(r.targets) ? r.targets.map(migrateZiel) : d.regie.targets,
+      signale: migrateSignale(r.signale),
       spiele: genutzteSpiele(r.spiele, d.regie.spiele),
     },
     gamepc: { ...d.gamepc, ...g, regie: { ...d.gamepc.regie, ...(g.regie || {}) }, gsiToken: g.gsiToken || d.gamepc.gsiToken },

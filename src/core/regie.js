@@ -1,10 +1,9 @@
 "use strict";
-// Regie: nimmt Ereignisse der Game-PCs an, lässt nur das aktive Spiel durch, entdoppelt und sendet OSC-Signale an alle Ziele.
+// Regie: nimmt Ereignisse der Game-PCs an, lässt nur das aktive Spiel durch, entdoppelt und führt die eingestellten OSC-Befehle aus.
 // Ohne Netzwerk: Senden und Melden kommen von außen (Main-Prozess oder Browser-Vorschau).
 
 const { Dedupe } = require("./events");
-const { eventInfo } = require("./spiele");
-const { oscAdresse, oscArgs, freigegeben } = require("./signal");
+const { befehleFuer, zeigeNachricht } = require("./signal");
 const { Statistik } = require("./statistik");
 
 const LOG_MAX = 300;
@@ -63,14 +62,18 @@ class Regie {
     return this.fire(e, p?.sim ? "sim" : "pc");
   }
 
-  // Neutrales Signal an alle Ziele. Gesperrte Ereignisse (Tab „Signale“) werden nur angezeigt.
+  // Führt die Befehle aus, die im Tab „Signale“ für dieses Event eingestellt sind.
+  // Ohne passende Zuweisung erscheint das Ereignis nur im Log.
   fire(ev, quelle = "pc") {
     const cfg = this.getConfig(), now = this.now();
     this.zaehler.ereignisse++;
-    const an = freigegeben(cfg, ev.spiel, ev.type);
-    const s = this.signal(ev);
-    const eintrag = { id: ++this.nr, t: now, ev, quelle, scharf: !!cfg.armed, gesperrt: !an, address: s.address, args: s.args.map((a) => a.value), ziele: (cfg.targets || []).length, fehler: [] };
-    if (cfg.armed && an) this.ausgeben(s, eintrag);
+    const befehle = befehleFuer(cfg, ev);
+    const eintrag = {
+      id: ++this.nr, t: now, ev, quelle, scharf: !!cfg.armed, gesperrt: befehle.length === 0,
+      befehle: befehle.map((b) => ({ ziel: b.ziel?.name || "?", typ: b.ziel?.typ || "", nachrichten: b.nachrichten.map(zeigeNachricht), fehler: b.fehler })),
+      fehler: befehle.filter((b) => b.fehler).map((b) => `${b.ziel?.name || "?"}: ${b.fehler}`),
+    };
+    if (cfg.armed) for (const b of befehle) this.ausgeben(b, eintrag);
     if (ev.spiel === this.aktiv()) this.statistik.add(ev);
     this.log.unshift(eintrag);
     if (this.log.length > LOG_MAX) this.log.length = LOG_MAX;
@@ -79,25 +82,23 @@ class Regie {
     return eintrag;
   }
 
-  signal(ev) {
-    const spieler = !!eventInfo(ev.spiel, ev.type)?.spieler;
-    return { address: oscAdresse(ev, spieler), args: oscArgs(ev, spieler) };
-  }
-
-  // Test-Knopf: sendet sofort, unabhängig von „scharf“ und Freigabe
-  testeSignal(spiel, type) {
-    const s = this.signal({ type, spiel, team: "CT", player: "Testspieler", pc: "Regie", pcId: "test", round: 1 });
-    const k = { address: s.address, args: s.args.map((a) => a.value), fehler: [] };
-    this.ausgeben(s, k);
+  // Test-Knopf einer Zuweisung im Tab „Signale“: sendet sofort, auch wenn die Ausgabe nicht scharf ist
+  testeZuweisung(spiel, type, zuweisung) {
+    const cfg = this.getConfig();
+    const ev = { type, spiel, team: zuweisung.team || (spiel === "rl" ? "BLUE" : "CT"), player: "Testspieler", pc: zuweisung.pc || "Regie", pcId: zuweisung.pc || "Regie", round: 1 };
+    const [b] = befehleFuer({ ...cfg, signale: { [spiel]: { [type]: [{ ...zuweisung, aus: false }] } } }, ev);
+    const k = { nachrichten: b ? b.nachrichten.map(zeigeNachricht) : [], ziel: b?.ziel?.name || "", fehler: b?.fehler ? [b.fehler] : [] };
+    if (b && !b.fehler) this.ausgeben(b, k);
     return k;
   }
 
-  ausgeben(s, k) {
-    for (const ziel of this.getConfig().targets || []) {
+  ausgeben(b, k) {
+    const ziel = b.ziel;
+    for (const n of b.nachrichten) {
       this.zaehler.gesendet++;
-      Promise.resolve(this.send({ ziel, address: s.address, args: s.args })).catch((e) => {
+      Promise.resolve(this.send({ ziel, address: n.address, args: n.args })).catch((e) => {
         this.zaehler.fehler++;
-        k.fehler.push(`${ziel.host}:${ziel.port}: ${e.message}`);
+        k.fehler.push(`${ziel.name || ziel.host}: ${e.message}`);
         this.emit("fehler", `${ziel.name || ziel.host}: ${e.message}`);
       });
     }

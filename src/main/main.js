@@ -15,6 +15,7 @@ const { RlQuelle } = require('../core/rl-quelle');
 const { rlIni, leseRlIni, RL_INI_DATEI } = require('../core/rl-ini');
 const { migrateKonfig } = require('../core/defaults');
 const { gsiCfg, CFG_DATEI } = require('../core/cfg');
+const { testNachricht, zeigeNachricht } = require('../core/signal');
 
 const root = app.getAppPath();
 const KONFIG_DATEI = () => path.join(app.getPath('userData'), 'advanced-lan.json');
@@ -269,11 +270,11 @@ ipcMain.handle('session-oeffnen', async () => { const ok = await session.oeffnen
 ipcMain.handle('session-schliessen', async () => { await session.schliessen(); cfg.regie.session.offen = false; speichereKonfig(); return gesamtStatus(); });
 ipcMain.handle('pc-trennen', (_, pcId) => { session.trennen(pcId); });
 ipcMain.handle('event-ausloesen', (_, ev) => regie.fire({ round: regie.stand?.runde, map: regie.stand?.map, ...ev, spiel: cfg.regie.aktivesSpiel, pc: 'Regie', pcId: 'regie' }, 'manuell'));
-ipcMain.handle('signal-testen', (_, spiel, type) => regie.testeSignal(spiel, type));
+ipcMain.handle('signal-testen', (_, spiel, type, zuweisung) => regie.testeZuweisung(spiel, type, zuweisung));
 ipcMain.handle('ziel-testen', async (_, zielId) => {
   const ziel = cfg.regie.targets.find((t) => t.id === zielId);
   if (!ziel) return { fehler: 'Ziel nicht gefunden' };
-  try { await osc.send({ ziel, address: '/lan/test', args: [{ type: 's', value: 'Advanced LAN' }] }); return { ok: true }; }
+  try { const n = testNachricht(ziel); await osc.send({ ziel, ...n }); return { ok: true, nachricht: zeigeNachricht(n) }; }
   catch (e) { return { fehler: e.message }; }
 });
 ipcMain.handle('sim-start', (_, modus) => { regieSim.start(modus, cfg.regie.aktivesSpiel); return regieSim.status(); });

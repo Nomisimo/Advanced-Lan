@@ -8,7 +8,17 @@ import { zielTyp, befehleVon, befehlVon } from "../../core/ziel-typen.js";
 import { baueNachrichten, zeigeNachricht } from "../../core/signal.js";
 import { Send, Plus, Trash2 } from "lucide-react";
 
-const ZEILE = "minmax(130px,160px) minmax(170px,220px) minmax(200px,1fr) minmax(170px,230px) auto";
+// Feste Spalten, damit Ziel, Befehl, Werte, PC, Team und Knöpfe in allen Zeilen untereinander stehen
+const ZEILE = "170px 230px minmax(220px,1fr) 130px 130px 92px";
+
+// Jedes Feld hat einen Titel darüber, auch leere Spalten, damit alle Zeilen gleich hoch beginnen
+const Feld = ({ titel, children, style }) => (
+  <label style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0, ...style }}>
+    <span style={{ fontSize: 10, color: MUTED, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", height: 13 }}>{titel}</span>
+    {children}
+  </label>
+);
+const Leer = ({ text = "–" }) => <span className="sig-leer" style={{ ...S.inputSm, display: "flex", alignItems: "center", color: MUTED, background: "transparent", borderColor: "transparent", fontSize: 12 }}>{text}</span>;
 
 // Vorschau mit Platzhaltern statt Werten aus dem Spiel
 function vorschau(ziel, z) {
@@ -28,46 +38,50 @@ function Zuweisung({ spiel, ev, z, cfg, pcs, aendern, loeschen, notify }) {
   };
   return (
     <div style={{ padding: "8px 0 8px 30px", borderTop: `1px dashed ${LINE}` }}>
-      <div style={{ display: "grid", gridTemplateColumns: ZEILE, gap: 8, alignItems: "start" }}>
-        <select style={S.selectSm} value={z.ziel} onChange={(e) => {
-          const t = cfg.targets.find((x) => x.id === e.target.value);
-          aendern((w) => { w.ziel = e.target.value; if (t && !befehlVon(t.typ, w.befehl)) { w.befehl = befehleVon(t.typ)[0].id; w.werte = {}; } });
-        }}>
-          {!ziel && <option value={z.ziel}>– Ziel wählen –</option>}
-          {cfg.targets.map((t) => <option key={t.id} value={t.id}>{t.name || zielTyp(t.typ).name}</option>)}
-        </select>
-        <select style={S.selectSm} value={befehl ? z.befehl : ""} disabled={!ziel} onChange={(e) => aendern((w) => { w.befehl = e.target.value; w.werte = {}; })}>
-          {!befehl && <option value="">– Befehl –</option>}
-          {ziel && befehleVon(ziel.typ).map((b) => <option key={b.id} value={b.id}>{b.label}</option>)}
-        </select>
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+      <div className="sig-zeile" style={{ display: "grid", gridTemplateColumns: ZEILE, gap: 8, alignItems: "start" }}>
+        <Feld titel="Ziel">
+          <select style={S.selectSm} value={z.ziel} onChange={(e) => {
+            const t = cfg.targets.find((x) => x.id === e.target.value);
+            aendern((w) => { w.ziel = e.target.value; if (t && !befehlVon(t.typ, w.befehl)) { w.befehl = befehleVon(t.typ)[0].id; w.werte = {}; } });
+          }}>
+            {!ziel && <option value={z.ziel}>– Ziel wählen –</option>}
+            {cfg.targets.map((t) => <option key={t.id} value={t.id}>{t.name || zielTyp(t.typ).name}</option>)}
+          </select>
+        </Feld>
+        <Feld titel="Befehl">
+          <select style={S.selectSm} value={befehl ? z.befehl : ""} disabled={!ziel} onChange={(e) => aendern((w) => { w.befehl = e.target.value; w.werte = {}; })}>
+            {!befehl && <option value="">– Befehl –</option>}
+            {ziel && befehleVon(ziel.typ).map((b) => <option key={b.id} value={b.id}>{b.label}</option>)}
+          </select>
+        </Feld>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", minWidth: 0 }}>
           {(befehl?.params || []).map((p) => (
-            <label key={p.key} style={{ display: "flex", flexDirection: "column", gap: 2, flex: p.art === "zahl" ? "0 0 84px" : "1 1 150px", minWidth: 0 }}>
-              <span style={{ fontSize: 10, color: MUTED, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.label}</span>
+            <Feld key={p.key} titel={p.label} style={{ flex: p.art === "zahl" ? "0 0 84px" : "1 1 150px" }}>
               <input style={{ ...S.inputSm, ...S.mono }} value={z.werte?.[p.key] ?? p.standard} inputMode={p.art === "zahl" ? "decimal" : undefined}
                 onChange={(e) => aendern((w) => { w.werte = { ...(w.werte || {}), [p.key]: e.target.value }; })} />
-            </label>
+            </Feld>
           ))}
-          {befehl && !befehl.params?.length && <span style={{ fontSize: 12, color: MUTED, paddingTop: 5 }}>ohne Werte</span>}
+          {befehl && !befehl.params?.length && <Feld titel="Werte"><Leer text="keine" /></Feld>}
         </div>
-        <div style={{ display: "flex", gap: 6 }}>
-          {ev.spieler && (
-            <>
-              <input list="advancedlan-pcs" style={{ ...S.inputSm, flex: 1 }} value={z.pc} placeholder="Alle PCs" title="Nur wenn dieser PC das Ereignis meldet" onChange={(e) => aendern((w) => { w.pc = e.target.value.trim(); })} />
-            </>
-          )}
-          {ev.team && spiel.teams?.length > 0 && (
-            <select style={{ ...S.selectSm, flex: 1, color: z.team ? teamFarbe(z.team) : "#fff" }} value={z.team} onChange={(e) => aendern((w) => { w.team = e.target.value; })}>
+        <Feld titel="PC">
+          {ev.spieler
+            ? <input list="advancedlan-pcs" style={S.inputSm} value={z.pc} placeholder="Alle PCs" title="Nur wenn dieser PC das Ereignis meldet" onChange={(e) => aendern((w) => { w.pc = e.target.value.trim(); })} />
+            : <Leer text="alle" />}
+        </Feld>
+        <Feld titel="Team">
+          {ev.team && spiel.teams?.length > 0
+            ? <select style={{ ...S.selectSm, color: z.team ? teamFarbe(z.team) : "#fff" }} value={z.team} onChange={(e) => aendern((w) => { w.team = e.target.value; })}>
               <option value="">Alle Teams</option>
               {spiel.teams.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
-          )}
-          {!ev.spieler && !ev.team && <span style={{ fontSize: 12, color: MUTED, paddingTop: 5 }}>immer</span>}
-        </div>
-        <div style={{ display: "flex", gap: 6, whiteSpace: "nowrap" }}>
-          <button style={S.smallBtn} disabled={!!v.fehler} onClick={testen} title="Jetzt senden, auch wenn die Ausgabe aus ist"><Send size={12} /> Test</button>
-          <button style={S.dangerBtn} onClick={loeschen} title="Befehl entfernen"><Trash2 size={12} /></button>
-        </div>
+            : <Leer text="alle" />}
+        </Feld>
+        <Feld titel=" ">
+          <div style={{ display: "flex", gap: 6, whiteSpace: "nowrap" }}>
+            <button style={{ ...S.smallBtn, padding: "6px 8px" }} disabled={!!v.fehler} onClick={testen} title="Jetzt senden, auch wenn die Ausgabe aus ist"><Send size={12} /> Test</button>
+            <button style={{ ...S.dangerBtn, padding: "6px 9px" }} onClick={loeschen} title="Befehl entfernen"><Trash2 size={12} /></button>
+          </div>
+        </Feld>
       </div>
       <div style={{ ...S.mono, fontSize: 11, marginTop: 5, color: v.fehler ? ERR : "#d9c6ff", display: "flex", gap: 8, alignItems: "center", overflow: "hidden" }}>
         {ziel && <ZielBadge typ={ziel.typ} />}
@@ -133,6 +147,7 @@ export default function SignaleTab(props) {
   const genutzt = SPIELE.filter((s) => cfg.spiele?.[s.id]);
   return (
     <>
+      <style>{`.sig-zeile select, .sig-zeile input, .sig-zeile .sig-leer { height: 30px; box-sizing: border-box; }`}</style>
       <datalist id="advancedlan-pcs">{status.pcs.map((p) => <option key={p.pcId} value={p.pcId} />)}</datalist>
       {!cfg.targets.length && (
         <Section style={{ borderColor: ACCENT }}>

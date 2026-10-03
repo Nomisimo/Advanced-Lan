@@ -16,9 +16,9 @@ const SIGNALE = { cs2: {
 
 function lauf({ armed = false, aktivesSpiel = "cs2", spiel = "cs2", seed = 42 } = {}) {
   const cfg = { ...standardRegie(), armed, aktivesSpiel, targets: ZIELE, signale: SIGNALE };
-  const gesendet = [], events = [];
+  const gesendet = [], events = [], verworfen = [];
   let t = 0;
-  const regie = new Regie({ getConfig: () => cfg, send: (s) => gesendet.push(s), emit: (typ, d) => typ === "event" && events.push(d), now: () => t });
+  const regie = new Regie({ getConfig: () => cfg, send: (s) => gesendet.push(s), emit: (typ, d) => typ === "event" && (d.verworfen ? verworfen : events).push(d), now: () => t });
   const pcs = Array.from({ length: 10 }, (_, i) => ({ pcId: `PC ${i + 1}`, token: `t${i}`, quelle: new CsQuelle() }));
   pcs.forEach((p) => regie.pcVerbunden(p.pcId, { spiele: ["cs2"] }));
   const m = new SimMatch({ clients: pcs, seed });
@@ -35,7 +35,7 @@ function lauf({ armed = false, aktivesSpiel = "cs2", spiel = "cs2", seed = 42 } 
     }
     runden++;
   }
-  return { regie, m, gesendet, events, runden };
+  return { regie, m, gesendet, events, verworfen, runden };
 }
 
 test("Simuliertes Match: jede Runde genau ein round_end, Match-Ende einmal", () => {
@@ -94,11 +94,35 @@ test("Test-Knopf sendet eine Zuweisung sofort, auch wenn nicht scharf", () => {
   assert.equal(regie.testeZuweisung("rl", "goal", { ziel: "weg", befehl: "go" }).fehler[0], "Ziel fehlt");
 });
 
-test("Nur das aktive Spiel erzeugt OSC, andere Spiele werden verworfen", () => {
-  const { gesendet, events, regie } = lauf({ armed: true, aktivesSpiel: "valorant" });
+test("Nur das aktive Spiel erzeugt OSC, andere Spiele werden verworfen und geloggt", () => {
+  const { gesendet, events, verworfen, regie } = lauf({ armed: true, aktivesSpiel: "valorant" });
   assert.equal(events.length, 0);
   assert.equal(gesendet.length, 0);
-  assert.ok(regie.snapshot().zaehler.verworfen > 0);
+  assert.ok(verworfen.length > 0 && verworfen.every((e) => e.verworfen === "anderes Spiel"));
+  assert.equal(regie.snapshot().zaehler.verworfen, verworfen.length);
+  assert.equal(regie.alleLogs().length, Math.min(verworfen.length, 300));
+});
+
+test("Doppelte Meldungen mehrerer PCs werden als verworfen geloggt, echte Events bleiben im eigenen Log", () => {
+  const { events, verworfen, regie } = lauf();
+  const doppelt = verworfen.filter((e) => e.verworfen === "doppelt");
+  assert.ok(doppelt.some((e) => e.ev.type === "round_end"), "9 von 10 PCs melden round_end doppelt");
+  assert.ok(regie.log.every((e) => !e.verworfen));
+  assert.equal(regie.log.length, Math.min(events.length, 300));
+  const alle = regie.alleLogs();
+  assert.ok(alle.every((e, i) => i === 0 || alle[i - 1].id > e.id), "neueste zuerst");
+});
+
+test("Sendefehler meldet den Log-Eintrag erneut mit derselben ID", async () => {
+  const cfg = { ...standardRegie(), armed: true, targets: ZIELE, signale: SIGNALE };
+  const gemeldet = [];
+  const regie = new Regie({ getConfig: () => cfg, send: () => Promise.reject(new Error("Netz weg")), emit: (typ, d) => typ === "event" && gemeldet.push({ id: d.id, fehler: [...d.fehler] }) });
+  regie.pcVerbunden("PC 1", { spiele: ["cs2"] });
+  regie.pcEvent("PC 1", "cs2", { type: "round_end", team: "T", round: 1 });
+  await new Promise((r) => setTimeout(r, 10));
+  assert.equal(gemeldet.length, 2);
+  assert.equal(gemeldet[0].id, gemeldet[1].id);
+  assert.deepEqual(gemeldet[1].fehler, ["MA3: Netz weg"]);
 });
 
 test("Simulator der Regie meldet 10 virtuelle PCs", () => {

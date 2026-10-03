@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { S, ACCENT, ACCENT_HI, LINE, SUB, MUTED, ERR, OK, WARN, CT, TT, BLAU, ORANGE, GLOW, teamFarbe } from "../theme.js";
 import { Section, TeamChip, Dot, EventIcon, eventLabel, zeit, Leer, SpielChip, th, td } from "../ui.jsx";
 import { api } from "../api.js";
@@ -241,7 +241,11 @@ export function EventZeile({ e, neu }) {
         <span style={{ flex: 1 }} />
         <span style={{ fontSize: 10, color: MUTED }}>{e.quelle === "manuell" ? "manuell" : e.ev.pc}</span>
       </div>
-      {e.gesperrt ? (
+      {e.verworfen ? (
+        <div style={{ fontSize: 11, marginTop: 2, paddingLeft: 66, color: WARN, display: "flex", gap: 6, alignItems: "center" }}>
+          verworfen: {VERWORFEN[e.verworfen] || e.verworfen}{e.verworfen === "anderes Spiel" && <SpielChip spiel={e.ev.spiel} />}
+        </div>
+      ) : e.gesperrt ? (
         <div style={{ fontSize: 11, marginTop: 2, paddingLeft: 66, color: MUTED }}>kein Befehl</div>
       ) : (e.befehle || []).map((b, i) => (
         <div key={i} style={{ ...S.mono, fontSize: 11, marginTop: 2, paddingLeft: 66, color: b.fehler ? ERR : !e.scharf ? MUTED : "#d9c6ff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -255,12 +259,36 @@ export function EventZeile({ e, neu }) {
   );
 }
 
+const VERWORFEN = { "anderes Spiel": "anderes Spiel als das aktive", doppelt: "doppelt, ein anderer PC hat es schon gemeldet" };
+const hatFehler = (e) => e.fehler?.length > 0 || (e.befehle || []).some((b) => b.fehler);
+const FILTER = [
+  ["alle", "Alle", (e) => !e.verworfen],
+  ["eingerichtet", "Eingerichtet", (e) => !e.verworfen && !e.gesperrt],
+  ["fehler", "Fehler", (e) => !e.verworfen && hatFehler(e)],
+  ["verworfen", "Verworfen", (e) => !!e.verworfen],
+];
+
 function Log({ log }) {
-  const neuesteId = log[0]?.id;
+  const [filter, setFilter] = useState(() => { try { return localStorage.getItem("advancedlan_logfilter") || "alle"; } catch { return "alle"; } });
+  const waehle = (f) => { setFilter(f); try { localStorage.setItem("advancedlan_logfilter", f); } catch {} };
+  const aktiv = FILTER.find(([k]) => k === filter) || FILTER[0];
+  const liste = log.filter(aktiv[2]);
+  const neuesteId = liste[0]?.id;
+  const farbe = { fehler: ERR, verworfen: WARN };
   return (
-    <Section title="Events" right={log.length > 0 && <span style={{ fontSize: 11, color: MUTED }}>{log.length}</span>} style={{ position: "sticky", top: 0 }}>
+    <Section title="Events" style={{ position: "sticky", top: 0 }} right={
+      <div style={{ display: "flex", gap: 4 }}>
+        {FILTER.map(([k, label, f]) => {
+          const n = log.filter(f).length, an = k === aktiv[0];
+          return (
+            <button key={k} onClick={() => waehle(k)} style={{ ...S.smallBtn, ...(an ? { borderColor: ACCENT, color: "#fff", boxShadow: GLOW } : { color: SUB }) }}>
+              {label}<span style={{ ...S.badge, marginLeft: 2, background: n && farbe[k] ? farbe[k] + "33" : "#1a1820", color: n && farbe[k] ? farbe[k] : MUTED }}>{n}</span>
+            </button>
+          );
+        })}
+      </div>}>
       <div style={{ height: "calc(100vh - 400px)", minHeight: 300, overflowY: "auto", border: `1px solid ${LINE}`, borderRadius: 8, background: "#1a1820" }}>
-        {log.length === 0 ? <div style={{ ...S.empty, padding: 14 }}>Noch keine Events.</div> : log.map((e) => <EventZeile key={e.id} e={e} neu={e.id === neuesteId} />)}
+        {liste.length === 0 ? <div style={{ ...S.empty, padding: 14 }}>{log.length ? "Keine Events in diesem Filter." : "Noch keine Events."}</div> : liste.map((e) => <EventZeile key={e.id} e={e} neu={e.id === neuesteId} />)}
       </div>
     </Section>
   );

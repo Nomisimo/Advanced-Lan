@@ -95,6 +95,14 @@ const GamePc = ({ goTab }) => (
     <Schritt n={4} titel="Spielen" onGo={goTab && (() => goTab("events"))} goLabel="Events">
       Der PC schickt alle erkannten Events aller Spiele an die Regie. Im Tab <b>Events</b> steht, was rausging. Die Test-Knöpfe schicken ein CS2-Event, ohne zu spielen.
     </Schritt>
+    <P>
+      <b>Mini-Overlay:</b> Ist die App minimiert, zeigt ein kleines App-Icon über allen Fenstern, ob alles läuft. Grün: Session verbunden und ein Spiel liefert Daten.
+      Orange: verbindet gerade oder kein Spiel liefert Daten. Rot: keine Session, abgelehnt oder CS2-Empfang gestört. Das Icon lässt sich verschieben, ein Klick öffnet die App.
+      Ein- und ausschalten im Tab <b>Setup</b>. Über Spielen im exklusiven Vollbild erscheint es nicht; in CS2 dafür „Vollbild (Fenster)“ wählen.
+    </P>
+    <P><span style={{ color: SUB }}>
+      CS2 und Rocket League gibt es nur für Windows. Auf dem Mac läuft die Regie; der Game-PC-Modus zeigt dort, dass es die Spiele nicht gibt.
+    </span></P>
   </Section>
 );
 

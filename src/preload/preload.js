@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld('regieAPI', {
   eventAusloesen:  call('event-ausloesen'),
   signalTesten:    call('signal-testen'),
   zielTesten:      call('ziel-testen'),
+  overlayZuruecksetzen: call('overlay-zuruecksetzen'),
   simStart:        call('sim-start'),
   simStop:         call('sim-stop'),
   simNeu:          call('sim-neu'),

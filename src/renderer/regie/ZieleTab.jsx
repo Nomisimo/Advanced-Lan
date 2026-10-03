@@ -46,7 +46,7 @@ function Datenbank({ cfg, mutate, notify }) {
               <div style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 11, color: SUB }}>
                 <span style={{ ...S.badge, background: f + "22", color: f }}>{KATEGORIEN.find((k) => k.id === t.kategorie)?.name}</span>
                 <span style={S.mono}>{t.protokoll} {t.port}</span>
-                <span style={{ flex: 1, textAlign: "right" }}>{t.befehle.length ? `${t.befehle.length} Befehle` : "frei"}</span>
+                <span style={{ flex: 1, textAlign: "right", whiteSpace: "nowrap" }}>{t.befehle.length ? `${t.befehle.length} Befehle` : "frei"}</span>
               </div>
               <button style={{ ...S.secondaryBtn, marginTop: 2 }} onClick={() => anlegen(t)}><Plus size={13} /> Anlegen</button>
             </div>

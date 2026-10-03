@@ -1,6 +1,6 @@
 import React from "react";
 import { S, ACCENT, ACCENT_HI, LINE, SUB } from "./theme.js";
-import { ZIEL_TYPEN, KATEGORIEN } from "../core/ziel-typen.js";
+import { ZIEL_TYPEN, KATEGORIEN, OHNE_OSC } from "../core/ziel-typen.js";
 import { Section, Kbd, th, td } from "./ui.jsx";
 import { CFG_DATEI, CFG_ORDNER } from "../core/cfg.js";
 import { RL_INI_DATEI, RL_INI_ORDNER, RL_RATE } from "../core/rl-ini.js";
@@ -163,6 +163,8 @@ const ZieleEinrichten = () => (
         ))}
       </tbody>
     </table>
+    <P><br /><b>Ohne OSC-Eingang</b> (laut Recherche), steuerbar über Bitfocus Companion:</P>
+    <L>{OHNE_OSC.map((o) => <li key={o.name}><b>{o.name}</b>: {o.weg}</li>)}</L>
   </Section>
 );
 

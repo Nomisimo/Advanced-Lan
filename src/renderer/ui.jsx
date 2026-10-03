@@ -70,7 +70,7 @@ export function Check({ ok, label, detail, warn }) {
     <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderBottom: `1px solid ${LINE}`, fontSize: 13 }}>
       <span style={{ color: farbe, display: "inline-flex", filter: ok ? `drop-shadow(0 0 4px ${OK})` : "none" }}>{ok ? <CircleCheck size={16} /> : <CircleX size={16} />}</span>
       <span style={{ fontWeight: 600, minWidth: 220 }}>{label}</span>
-      <span style={{ flex: 1, color: ok ? SUB : farbe, fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={detail}>{detail}</span>
+      <span style={{ flex: 1, minWidth: 0, color: ok ? SUB : farbe, fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={detail}>{detail}</span>
     </div>
   );
 }

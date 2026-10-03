@@ -35,7 +35,12 @@ test("Game-PC meldet sich mit Passwort an, Ereignisse werden zu OSC", async (t) 
   assert.equal(await server.oeffnen(), true);
 
   // Discovery: Session wird per mDNS gefunden
-  await warte(() => disco.liste().some((s) => s.port === 47911), 10000);
+  await warte(() => disco.liste().some((s) => s.port === 47911), 10000).catch((e) => {
+    // Diagnose für CI: was mDNS gesehen hat
+    console.log("mDNS-Dienste:", JSON.stringify((disco.browser?.services || []).map((d) => ({ name: d.name, port: d.port, addresses: d.addresses, referer: d.referer, txt: d.txt }))));
+    console.log("Liste:", JSON.stringify(disco.liste()), "Fehler:", disco.fehler, server.status());
+    throw e;
+  });
   const gefunden = disco.liste().find((s) => s.port === 47911);
   assert.equal(gefunden.session, "Test-LAN");
   assert.ok(gefunden.id.startsWith("Test-LAN"), "Session hat eine eindeutige Kennung für die Auswahl");

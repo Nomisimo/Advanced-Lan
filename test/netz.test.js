@@ -47,11 +47,16 @@ test("Game-PC meldet sich mit Passwort an, Ereignisse werden zu OSC", async () =
   falsch.trennen();
 
   // Richtig angemeldet
-  const pc = new SessionClient({});
+  const pc = new SessionClient({ geraet: () => ({ app: "9.9.9" }) });
   pc.verbinden({ host: "127.0.0.1", port: 47911, passwort: "geheim", pcId: "PC 01", spiele: ["cs2"] });
   await warte(() => pc.zustand === "verbunden");
   assert.equal(pc.aktivesSpiel, "cs2");
   assert.equal(regie.snapshot().pcs[0].pcId, "PC 01");
+  // Übersicht der Regie: Hostname, App-Version und genutzte Karte kommen vom Game-PC
+  const geraet = regie.snapshot().pcs[0].geraet;
+  assert.equal(geraet.app, "9.9.9");
+  assert.equal(geraet.hostname, require("node:os").hostname());
+  assert.equal(geraet.karte, "127.0.0.1");
 
   // CS2 auf dem Game-PC: GSI per HTTP an 127.0.0.1 → CsQuelle → WebSocket → Regie → OSC
   const quelle = new CsQuelle();
@@ -94,4 +99,17 @@ test("Game-PC meldet sich mit Passwort an, Ereignisse werden zu OSC", async () =
   disco.stop();
   osc.close();
   empfang.close();
+});
+
+test("Regie lauscht nur auf der gewählten Netzwerkkarte", async () => {
+  const cfg = { ...standardRegie(), session: { name: "Karte", passwort: "x", port: 47921, offen: true } };
+  const regie = new Regie({ getConfig: () => cfg, send: async () => {} });
+  const weg = new SessionServer({ regie, getConfig: () => cfg, lokal: () => ({ fehler: "Netzwerkkarte „Licht“ nicht verbunden" }) });
+  assert.equal(await weg.oeffnen(), false);
+  assert.match(weg.status().fehler, /Licht/);
+  const server = new SessionServer({ regie, getConfig: () => cfg, lokal: () => ({ ip: "127.0.0.1" }) });
+  assert.equal(await server.oeffnen(), true);
+  assert.equal(server.wss.address().address, "127.0.0.1");
+  assert.equal(server.status().ip, "127.0.0.1");
+  await server.schliessen();
 });

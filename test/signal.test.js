@@ -79,7 +79,7 @@ test("Einstellungen vor Version 5: Ziele werden allgemeine OSC-Geräte, alte An/
   const alt = { version: 4, regie: { targets: [{ id: "a", name: "MA", host: "10.0.0.5", port: 8000 }], signale: { cs2: { kill: false } } } };
   const m = migrateKonfig(alt);
   assert.equal(m.version, 5);
-  assert.deepEqual(m.regie.targets, [{ id: "a", typ: "osc", name: "MA", host: "10.0.0.5", port: 8000, optionen: {} }]);
+  assert.deepEqual(m.regie.targets, [{ id: "a", typ: "osc", name: "MA", host: "10.0.0.5", port: 8000, optionen: {}, netz: "" }]);
   assert.deepEqual(m.regie.signale, {});
   const neu = migrateKonfig({ ...m, regie: { ...m.regie, signale: { rl: { goal: [{ id: "x", ziel: "a", befehl: "eigene", werte: { adresse: "/x" } }] } } } });
   assert.equal(neu.regie.signale.rl.goal[0].werte.adresse, "/x");

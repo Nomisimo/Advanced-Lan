@@ -8,8 +8,8 @@ Gebaut mit **Overwolf Electron** (`@overwolf/ow-electron`), React 18 und esbuild
 
 | Modus | Läuft auf | Tabs |
 |---|---|---|
-| **Game-PC** | jedem PC, auf dem gespielt wird | Session (PC-ID, Sessions im Netz, beitreten), Setup (CS2 einrichten, „Ist korrekt aufgesetzt?“-Check), Events, Anleitung |
-| **Regie** | dem Regie-PC (ohne Spiel) | Control (aktives Spiel, Ausgabe, Verbindungscheck, Statistik, Events), Signale, Ziele, Session, Setup (genutzte Spiele, Check), Simulator, Anleitung |
+| **Game-PC** | jedem PC, auf dem gespielt wird | Session (PC-ID, Sessions im Netz, beitreten), Setup (CS2 und Rocket League einrichten, „Ist korrekt aufgesetzt?“-Check, Mini-Overlay, Netzwerkkarte), Events, Simulator (nur mit Session), Anleitung |
+| **Regie** | dem Regie-PC (ohne Spiel) | Control (aktives Spiel, Ausgabe, Verbindungscheck, Statistik, Events), Signale, Ziele, Session (mit Übersicht: PC-ID, Hostname, IP, MAC, Ping, App-Version), Setup (genutzte Spiele, Check, Netzwerkkarten), Simulator, Anleitung |
 
 Der Modus wird beim ersten Start gewählt und lässt sich oben rechts wechseln. Alle Erklärungen stehen im Tab „Anleitung“.
 
@@ -18,9 +18,11 @@ Der Modus wird beim ersten Start gewählt und lässt sich oben rechts wechseln. 
 - Die PC-ID lässt sich nur ändern, solange der PC in keiner Session ist.
 - Game-PCs melden immer alle Spiele, die die App kennt. Nur die Regie entscheidet: Im Tab „Setup“ werden die genutzten Spiele gewählt, im Tab „Control“ (und nur dort) das aktive Spiel. Events anderer Spiele werden verworfen.
 - Mehrere PCs melden dieselbe Runde oder Bombe: die Regie wertet jedes Event nur einmal aus.
-- Die Ausgabe ist nach jedem Start **aus**. Erst „Ausgabe scharf“ schickt OSC.
+- Die Ausgabe ist nach jedem Start **aus** (roter Knopf). Erst „AUSGABE AN“ (grün, pulsierend) schickt OSC.
 
 - **Mini-Overlay (Game-PC):** Ist die App minimiert, zeigt ein kleines App-Icon mit Statuspunkt über allen Fenstern, ob alles läuft (grün: Session und Spieldaten ok, orange: verbindet oder keine Spieldaten, rot: keine Session oder Fehler). Verschiebbar, Klick öffnet die App, abschaltbar im Tab „Setup“. Über exklusivem Vollbild erscheint es nicht (in CS2 „Vollbild (Fenster)“ nutzen).
+- **Simulator auf dem Game-PC:** spielt mit verbundener Session das aktive Spiel der Regie, als liefe es auf diesem PC, und schickt die Events wirklich an die Regie.
+- **Netzwerkkarten:** Die Regie wählt getrennt, über welche Karte sie Game-PCs empfängt und über welche sie OSC sendet, jedes Ziel kann eine eigene Karte haben; der Game-PC wählt seine Karte für die Session. Die App bindet Empfang bzw. Absender an die IP der Karte (eindeutig, wenn jede Karte in einem eigenen Subnetz liegt). Netzwerk-Anforderungen (IGMP, EEE, QoS …) stehen in der Anleitung.
 - **Startanimation** wie im Netzwerkplaner: Controller, dessen Knöpfe nacheinander gedrückt werden.
 - CS2 und Rocket League gibt es nur für Windows. Auf dem Mac läuft die Regie; der Game-PC-Modus meldet dort, dass die Spiele fehlen.
 

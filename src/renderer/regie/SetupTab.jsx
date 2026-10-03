@@ -1,6 +1,6 @@
 import React from "react";
 import { S, LINE, SUB, MUTED, OK, WARN } from "../theme.js";
-import { Section, Check } from "../ui.jsx";
+import { Section, Check, Field, KartenWahl, useKarten } from "../ui.jsx";
 import { SPIELE } from "../../core/spiele.js";
 
 // Welche Spiele die Regie nutzt. Nur diese erscheinen in „Control“ und „Signale“.
@@ -38,7 +38,7 @@ function RegieCheck({ cfg, status }) {
     { label: "Session offen", ok: ses.offen, detail: ses.offen ? `„${cfg.session.name}“ auf Port ${ses.port}` : ses.fehler || "geschlossen" },
     { label: "Ziel eingetragen", ok: cfg.targets.some((t) => t.host && t.port), detail: `${cfg.targets.filter((t) => t.host && t.port).length} Ziel(e)` },
     { label: "Aktives Spiel hat eine Datenquelle", ok: !!SPIELE.find((s) => s.id === cfg.aktivesSpiel)?.quelle, detail: SPIELE.find((s) => s.id === cfg.aktivesSpiel)?.name },
-    { label: "Ausgabe scharf", ok: !!cfg.armed, warn: true, detail: cfg.armed ? "scharf" : "aus (nach jedem Start)" },
+    { label: "Ausgabe an", ok: !!cfg.armed, warn: true, detail: cfg.armed ? "an" : "aus (nach jedem Start)" },
   ];
   const offen = punkte.filter((p) => !p.ok && !p.warn).length;
   return (
@@ -48,11 +48,45 @@ function RegieCheck({ cfg, status }) {
   );
 }
 
+// Netzwerkkarten: Empfang der Game-PCs und Senden der OSC-Befehle getrennt wählbar
+export function Netzwerk({ cfg, mutate, status }) {
+  const karten = useKarten();
+  const set = (k, v) => mutate((d) => { d.netz = { ...d.netz, [k]: v }; });
+  const eigene = cfg.targets.filter((t) => t.netz).length;
+  return (
+    <Section title="Netzwerkkarten" subtitle="Automatisch: das Betriebssystem wählt. Mit fester Karte bleibt jeder Verkehr in seinem Netz, z. B. Game-PCs im LAN und Licht im eigenen Netz.">
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        <Field label="Empfangen: Session für die Game-PCs" hint={status.session.offen ? `lauscht auf ${status.session.ip || "allen Karten"}, Port ${status.session.port}` : "Session ist geschlossen"}>
+          <KartenWahl karten={karten} wert={cfg.netz?.empfang} onChange={(v) => set("empfang", v)} leer="Alle Karten" />
+        </Field>
+        <Field label="Senden: OSC-Befehle an die Ziele" hint={`Standard für alle Ziele${eigene ? `, ${eigene} Ziel(e) mit eigener Karte` : ""} (Tab „Ziele“)`}>
+          <KartenWahl karten={karten} wert={cfg.netz?.senden} onChange={(v) => set("senden", v)} />
+        </Field>
+      </div>
+      <table style={S.table}>
+        <thead><tr>{["Karte", "IP", "Maske", "MAC"].map((h) => <th key={h} style={S.th}>{h}</th>)}</tr></thead>
+        <tbody>{karten.map((k) => (
+          <tr key={k.name + k.ip}>
+            <td style={{ ...S.td, fontWeight: 600 }}>{k.name}</td>
+            <td style={{ ...S.td, ...S.mono }}>{k.ip}</td>
+            <td style={{ ...S.td, ...S.mono, color: SUB }}>{k.maske}</td>
+            <td style={{ ...S.td, ...S.mono, color: SUB }}>{k.mac}</td>
+          </tr>
+        ))}</tbody>
+      </table>
+      {!karten.length && <div style={S.empty}>Keine aktive Netzwerkkarte gefunden.</div>}
+    </Section>
+  );
+}
+
 export default function SetupTab(props) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 20, alignItems: "start" }}>
-      <Spiele {...props} />
-      <RegieCheck {...props} />
-    </div>
+    <>
+      <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 20, alignItems: "start" }}>
+        <Spiele {...props} />
+        <RegieCheck {...props} />
+      </div>
+      <Netzwerk {...props} />
+    </>
   );
 }

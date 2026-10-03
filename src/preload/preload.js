@@ -37,5 +37,8 @@ contextBridge.exposeInMainWorld('regieAPI', {
   cfgInstallieren: call('cfg-installieren'),
   cfgSpeichern:    call('cfg-speichern'),
   testEvent:       call('test-event'),
+  gamePcSimStart:  call('gamepc-sim-start'),
+  gamePcSimStop:   call('gamepc-sim-stop'),
+  gamePcSimNeu:    call('gamepc-sim-neu'),
   onGamePcEvent:   abo('gamepc-event'),
 });

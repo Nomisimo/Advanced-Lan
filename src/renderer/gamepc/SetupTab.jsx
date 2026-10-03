@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { S, LINE, SUB, MUTED, OK, WARN, teamFarbe } from "../theme.js";
 import { api } from "../api.js";
-import { Section, Check, TeamChip, SpielChip, Kbd, Toggle } from "../ui.jsx";
+import { Section, Check, TeamChip, SpielChip, Kbd, Toggle, KartenWahl, useKarten } from "../ui.jsx";
+import { karteFuer } from "../../core/netzwerk.js";
 import { overlayStatus } from "../../core/overlay-status.js";
 import { SPIELE } from "../../core/spiele.js";
 import { CFG_ORDNER, CFG_DATEI } from "../../core/cfg.js";
@@ -44,6 +45,20 @@ function OverlayVorschau({ farbe }) {
   );
 }
 
+// Über welche Karte der PC Sessions sucht und mit der Regie spricht
+function Netzwerkkarte({ cfg, mutate }) {
+  const karten = useKarten();
+  const k = karteFuer(karten, cfg.netz) || (!cfg.netz && karten.length === 1 ? karten[0] : null);
+  return (
+    <Section title="Netzwerkkarte" subtitle="Über diese Karte sucht der PC Sessions und spricht mit der Regie. Nach einem Wechsel verbindet er sich neu.">
+      <KartenWahl karten={karten} wert={cfg.netz} onChange={(v) => mutate((d) => { d.netz = v; })} style={{ fontSize: 14, padding: "8px 10px" }} />
+      <div style={{ ...S.mono, fontSize: 11, color: SUB, marginTop: 8 }}>
+        {k ? `${k.ip} / ${k.maske} · MAC ${k.mac}` : cfg.netz ? <span style={{ color: "#ff5d5d" }}>Karte nicht verbunden</span> : `${karten.length} Karten, das Betriebssystem wählt`}
+      </div>
+    </Section>
+  );
+}
+
 export default function SetupTab({ cfg, mutate, g, jetzt, notify }) {
   const [check, setCheck] = useState(null);
   const laden = () => api.setupCheck().then(setCheck);
@@ -63,6 +78,7 @@ export default function SetupTab({ cfg, mutate, g, jetzt, notify }) {
         {check ? <Liste punkte={check.allgemein} /> : <div style={S.empty}>Prüfe …</div>}
       </Section>
 
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.4fr) minmax(0,1fr)", gap: 20, alignItems: "stretch" }}>
       <Section title="Mini-Overlay" right={<div style={{ display: "flex", gap: 10, alignItems: "center" }}>
         <Toggle checked={cfg.overlay?.an} label="Anzeigen, wenn die App minimiert ist" onChange={(v) => mutate((d) => { d.overlay = { ...(d.overlay || {}), an: v }; })} />
         <button style={S.smallBtn} onClick={async () => { await api.overlayZuruecksetzen(); notify("Overlay steht wieder oben rechts."); }}><LocateFixed size={12} /> Position zurücksetzen</button>
@@ -72,6 +88,8 @@ export default function SetupTab({ cfg, mutate, g, jetzt, notify }) {
           <span style={{ fontSize: 13, color: PUNKT[ampel.farbe] }}>{ampel.text}</span>
         </div>
       </Section>
+      <Netzwerkkarte cfg={cfg} mutate={mutate} />
+      </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 20, alignItems: "start" }}>
         <Section title={<span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>Counter-Strike 2 <SpielChip spiel="cs2" /></span>}

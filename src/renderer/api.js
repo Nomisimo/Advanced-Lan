@@ -5,6 +5,9 @@ import { migrateKonfig } from "../core/defaults.js";
 import { gsiCfg, CFG_DATEI } from "../core/cfg.js";
 import { rlIni, RL_INI_DATEI } from "../core/rl-ini.js";
 import { testNachricht, zeigeNachricht } from "../core/signal.js";
+import { SimRunner } from "../core/sim-runner.js";
+import { SimMatch } from "../core/gsi-sim.js";
+import { CsQuelle } from "../core/cs-quelle.js";
 
 export const isElectron = typeof window !== "undefined" && !!window.regieAPI;
 
@@ -24,11 +27,12 @@ function browserApi() {
   ];
   const status = () => {
     const s = { modus: cfg.modus, jetzt: Date.now(), vorschau: true };
-    if (cfg.modus === "regie") s.regie = { ...regie.snapshot(), session: { offen: sessionOffen, port: cfg.regie.session.port, fehler: "", verbunden: 0 }, sim: sim.status(), armed: cfg.regie.armed, spielAufRegie: "" };
+    if (cfg.modus === "regie") s.regie = { ...regie.snapshot(), session: { offen: sessionOffen, port: cfg.regie.session.port, ip: "", fehler: "", verbunden: regie.snapshot().pcs.filter((p) => p.verbunden && !p.sim).length }, sim: sim.status(), armed: cfg.regie.armed, spielAufRegie: "" };
     if (cfg.modus === "gamepc") s.gamepc = {
       client: { zustand: gp.zustand, grund: "", session: gp.zustand === "verbunden" ? cfg.gamepc.regie.session : "", aktivesSpiel: "cs2", ziel: null, gesendet: gp.log.filter((e) => e.gesendet).length, verworfen: 0 },
       sessions: SESSIONS,
-      discoveryFehler: "", gsi: { laeuft: true, port: cfg.gamepc.gsiPort, fehler: "" }, letzte: 0, status: null, stand: null, fremd: 0,
+      discoveryFehler: "", gsi: { laeuft: true, port: cfg.gamepc.gsiPort, fehler: "" }, letzte: gp.letzte || 0, status: null, stand: gp.stand || null, fremd: 0,
+      sim: { ...gpSim.status(), spiel: "cs2" },
       rl: { verbunden: false, port: cfg.gamepc.rlPort, letzte: 0, stand: null },
     };
     return s;
@@ -40,6 +44,24 @@ function browserApi() {
     emit: (typ, d) => { if (typ === "event") melde("regieEvent", d); statusMelden(); },
   });
   const sim = new RegieSim({ regie, onChange: statusMelden });
+  // Game-PC-Simulator der Vorschau: dieser PC ist Spieler 1 in einem CS2-Match
+  let gpQuelle = new CsQuelle();
+  const gpSim = new SimRunner({
+    onChange: () => statusMelden(),
+    neuesMatch: () => { const m = new SimMatch({ clients: Array.from({ length: 10 }, (_, i) => ({ token: i ? `sim${i}` : "ich" })) }); m.spieler[0].name = cfg.gamepc.pcId || "Ich"; return m; },
+    deliver: (p) => {
+      if (p.auth?.token !== "ich") return;
+      const r = gpQuelle.ingest(p);
+      gp.letzte = Date.now(); gp.stand = r.stand;
+      for (const ev of r.events) { const e = { id: ++gp.nr, t: Date.now(), spiel: "cs2", ev, gesendet: gp.zustand === "verbunden", sim: true }; gp.log.unshift(e); melde("gamePcEvent", e); }
+      statusMelden();
+    },
+  });
+  // Vorschau: zwei echte Game-PCs in der Session
+  const VORSCHAU_PCS = [
+    ["PC 01", "192.168.1.31", "GAMER-01", "3c:7c:3f:1a:22:01", 3],
+    ["PC 02", "192.168.1.32", "GAMER-02", "3c:7c:3f:1a:22:02", 41],
+  ];
   const abo = (k) => (cb) => { hoerer[k].add(cb); return () => hoerer[k].delete(cb); };
   const download = (name, text) => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text])); a.download = name; a.click(); };
   return {
@@ -54,13 +76,24 @@ function browserApi() {
     },
     setModus: async (m) => { cfg.modus = m; speichern(); sim.neu(); return status(); },
     status: async () => status(),
-    netzAdressen: async () => [{ name: "Vorschau", ip: "192.168.1.20" }],
+    netzAdressen: async () => [
+      { name: "Ethernet", ip: "192.168.1.20", maske: "255.255.255.0", mac: "3c:7c:3f:1a:20:00" },
+      { name: "Ethernet 2 (Licht)", ip: "2.0.0.20", maske: "255.0.0.0", mac: "00:e0:4c:68:01:20" },
+      { name: "WLAN", ip: "10.10.0.7", maske: "255.255.255.0", mac: "a4:83:e7:11:02:07" },
+    ],
     onStatus: abo("status"),
     onMeldung: abo("meldung"),
     openExternal: async (url) => window.open(url, "_blank"),
     regieLog: async () => regie.alleLogs(),
-    sessionOeffnen: async () => { sessionOffen = !!cfg.regie.session.passwort; return status(); },
-    sessionSchliessen: async () => { sessionOffen = false; return status(); },
+    sessionOeffnen: async () => {
+      sessionOffen = !!cfg.regie.session.passwort;
+      if (sessionOffen) for (const [id, ip, host, mac, ping] of VORSCHAU_PCS) {
+        regie.pcVerbunden(id, { spiele: ["cs2", "rl"], remote: ip, geraet: { hostname: host, app: __APP_VERSION__, mac, karte: `Ethernet (${ip})`, plattform: "win32" } });
+        regie.pcPing(id, ping);
+      }
+      return status();
+    },
+    sessionSchliessen: async () => { sessionOffen = false; for (const [id] of VORSCHAU_PCS) regie.pcGetrennt(id); return status(); },
     pcTrennen: async () => {},
     eventAusloesen: async (ev) => regie.fire({ round: regie.stand?.runde, map: regie.stand?.map, ...ev, spiel: cfg.regie.aktivesSpiel, pc: "Regie", pcId: "regie" }, "manuell"),
     signalTesten: async (spiel, type, z) => regie.testeZuweisung(spiel, type, z),
@@ -98,14 +131,17 @@ function browserApi() {
         { id: "rl-daten", label: "Rocket League sendet Daten", ok: false, detail: "In der Vorschau kein Rocket League" },
       ],
     }),
-    trennen: async () => { gp.zustand = "getrennt"; statusMelden(); },
+    trennen: async () => { gp.zustand = "getrennt"; gpSim.stop(); statusMelden(); },
+    gamePcSimStart: async (m) => { if (gp.zustand !== "verbunden") return { fehler: "Nur mit verbundener Session" }; if (!gpSim.match) gpQuelle = new CsQuelle(); gpSim.start(m); return { ok: true }; },
+    gamePcSimStop: async () => { gpSim.stop(); },
+    gamePcSimNeu: async () => { gpSim.neu(); },
     cs2Ordner: async () => null,
     cfgInstallieren: async () => ({ fehler: "In der Browser-Vorschau nicht möglich." }),
     rlIniInstallieren: async () => ({ fehler: "In der Browser-Vorschau nicht möglich." }),
     rlIniSpeichern: async () => { download(RL_INI_DATEI, rlIni({ webPort: cfg.gamepc.rlPort })); return { ok: true, pfad: RL_INI_DATEI }; },
     cfgSpeichern: async () => { download(CFG_DATEI, gsiCfg({ port: cfg.gamepc.gsiPort, token: cfg.gamepc.gsiToken })); return { ok: true, pfad: CFG_DATEI }; },
-    testEvent: async (type) => {
-      const e = { id: ++gp.nr, t: Date.now(), spiel: "cs2", ev: { type, team: "CT", player: cfg.gamepc.pcId, test: true }, gesendet: gp.zustand === "verbunden" };
+    testEvent: async (type, spiel = "cs2", team = "", kills = 1) => {
+      const e = { id: ++gp.nr, t: Date.now(), spiel, ev: { type, team, kills, player: cfg.gamepc.pcId, test: true }, gesendet: gp.zustand === "verbunden", sim: true };
       gp.log.unshift(e); melde("gamePcEvent", e); statusMelden(); return { ok: e.gesendet };
     },
     onGamePcEvent: abo("gamePcEvent"),

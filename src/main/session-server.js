@@ -3,14 +3,15 @@ const crypto = require('crypto');
 const os = require('os');
 const { WebSocketServer } = require('ws');
 const { Bonjour } = require('bonjour-service');
-const { mdnsTxt, leseNachricht, MDNS_TYP, PROTOKOLL_VERSION } = require('../core/protokoll');
+const { mdnsTxt, leseNachricht, leseGeraet, MDNS_TYP, PROTOKOLL_VERSION } = require('../core/protokoll');
 
 const beweis = (passwort, nonce) => crypto.createHmac('sha256', String(passwort)).update(nonce).digest('hex');
 const gleich = (a, b) => { const x = Buffer.from(String(a)), y = Buffer.from(String(b)); return x.length === y.length && crypto.timingSafeEqual(x, y); };
 
 class SessionServer {
-  constructor({ regie, getConfig, onChange }) {
+  constructor({ regie, getConfig, onChange, lokal }) {
     this.regie = regie;
+    this.lokal = lokal || (() => ({ ip: '' })); // gewählte Empfangskarte → { ip } oder { fehler }
     this.getConfig = getConfig; // → Regie-Einstellungen
     this.onChange = onChange || (() => {});
     this.wss = null;
@@ -29,15 +30,19 @@ class SessionServer {
     const s = this.getConfig().session;
     this.fehler = '';
     if (!s.passwort) { this.fehler = 'Ohne Passwort lässt sich keine Session öffnen.'; this.onChange(); return false; }
+    const karte = this.lokal();
+    if (karte.fehler) { this.fehler = karte.fehler; this.onChange(); return false; }
+    this.ip = karte.ip;
     // Standardport, sonst einen freien: die Game-PCs erfahren den Port ohnehin per mDNS
-    let wss = await this.lauschen(Number(s.port));
-    if (!wss && this.fehlerCode === 'EADDRINUSE') wss = await this.lauschen(0);
+    let wss = await this.lauschen(Number(s.port), this.ip);
+    if (!wss && this.fehlerCode === 'EADDRINUSE') wss = await this.lauschen(0, this.ip);
     if (!wss) { this.onChange(); return false; }
     this.fehler = '';
     this.wss = wss;
     this.port = wss.address().port;
     wss.on('connection', (ws, req) => this.verbindung(ws, (req.socket.remoteAddress || '').replace(/^::ffff:/, '')));
-    this.mdns = new Bonjour({}, (e) => { this.fehler = `mDNS: ${e.message}`; this.onChange(); });
+    // Mit gewählter Karte: mDNS nur dort (alle Adressen empfangen, Multicast über diese Karte)
+    this.mdns = new Bonjour(this.ip ? { interface: this.ip, bind: '0.0.0.0' } : {}, (e) => { this.fehler = `mDNS: ${e.message}`; this.onChange(); });
     this.ausrufen();
     // Verbindungscheck: alle 3 s ein Ping an jeden PC, die Antwortzeit sieht die Regie im Tab „Control“
     this.pingTimer = setInterval(() => {
@@ -51,9 +56,9 @@ class SessionServer {
     return true;
   }
 
-  lauschen(port) {
+  lauschen(port, host) {
     return new Promise((resolve) => {
-      const wss = new WebSocketServer({ port, maxPayload: 256 * 1024 });
+      const wss = new WebSocketServer({ port, host: host || undefined, maxPayload: 256 * 1024 });
       wss.once('listening', () => resolve(wss));
       wss.once('error', (e) => {
         this.fehlerCode = e.code;
@@ -85,7 +90,7 @@ class SessionServer {
   async veroeffentlichen() {
     if (!this.mdns) return;
     const s = this.getConfig().session;
-    const txt = mdnsTxt({ session: s.name, aktivesSpiel: this.getConfig().aktivesSpiel });
+    const txt = mdnsTxt({ session: s.name, aktivesSpiel: this.getConfig().aktivesSpiel, ip: this.ip });
     if (this.dienst && JSON.stringify(this.dienst.txt) === JSON.stringify(txt)) return;
     await this.dienstStoppen();
     if (!this.mdns) return;
@@ -120,7 +125,7 @@ class SessionServer {
         clearTimeout(anmeldeFrist);
         pcId = id;
         this.verbindungen.set(id, ws);
-        this.regie.pcVerbunden(id, { spiele: Array.isArray(m.spiele) ? m.spiele.map(String).slice(0, 20) : [], remote });
+        this.regie.pcVerbunden(id, { spiele: Array.isArray(m.spiele) ? m.spiele.map(String).slice(0, 20) : [], remote, geraet: leseGeraet(m.geraet) });
         senden({ t: 'ok', aktivesSpiel: this.getConfig().aktivesSpiel });
         this.onChange();
         return;
@@ -149,7 +154,7 @@ class SessionServer {
 
   trennen(pcId) { const ws = this.verbindungen.get(pcId); if (ws) ws.close(4003, 'Von der Regie getrennt'); }
 
-  status() { return { offen: this.offen, port: this.port, fehler: this.fehler, verbunden: this.verbindungen.size }; }
+  status() { return { offen: this.offen, port: this.port, ip: this.offen ? this.ip || '' : '', fehler: this.fehler, verbunden: this.verbindungen.size }; }
 }
 
 module.exports = { SessionServer, beweis };

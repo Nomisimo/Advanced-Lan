@@ -46,6 +46,7 @@ const Regie = ({ goTab }) => (
     </Schritt>
     <Schritt n={2} titel="Session öffnen" onGo={goTab && (() => goTab("session"))} goLabel="Session">
       Name und Passwort festlegen, <b>Öffnen</b>. Die Session wird per mDNS im Netz angekündigt. Ändert man das Passwort, müssen alle PCs neu beitreten.
+      Darunter steht, wer verbunden ist: PC-ID, Hostname, IP, MAC, Ping, App-Version und die Netzwerkkarte des PCs. Eine andere App-Version als die der Regie ist orange.
     </Schritt>
     <Schritt n={3} titel="Ziele anlegen" onGo={goTab && (() => goTab("ziele"))} goLabel="Ziele">
       Unten in der <b>Ziel-Datenbank</b> die Software oder das Gerät wählen und <b>Anlegen</b>. Dann IP-Adresse eintragen; der Port ist auf den Standard des Geräts gesetzt.
@@ -60,7 +61,7 @@ const Regie = ({ goTab }) => (
       Einzelne Events lassen sich direkt auslösen.
     </Schritt>
     <Schritt n={6} titel="Live gehen" onGo={goTab && (() => goTab("control"))} goLabel="Control">
-      Im Tab <b>Control</b> das aktive Spiel wählen (nur dort) und oben <b>Ausgabe</b> scharf schalten. Nach jedem Start der App ist die Ausgabe aus.
+      Im Tab <b>Control</b> das aktive Spiel wählen (nur dort) und oben <b>Ausgabe</b> einschalten (grün: AUSGABE AN, rot: AUSGABE AUS). Nach jedem Start der App ist die Ausgabe aus.
     </Schritt>
     <div style={{ marginTop: 14 }}>
       <div className="sp-section-label">Control</div>
@@ -92,8 +93,13 @@ const GamePc = ({ goTab }) => (
       Der Check „Ist korrekt aufgesetzt?“ zeigt für jedes Spiel, ob alles stimmt. Findet die App ein Spiel nicht, mit „Speichern unter …“ speichern und die Datei
       von Hand ablegen: <Kbd>{CFG_DATEI}</Kbd> nach <Kbd>{CFG_ORDNER}</Kbd>, <Kbd>{RL_INI_DATEI}</Kbd> nach <Kbd>{RL_INI_ORDNER}</Kbd>.
     </Schritt>
-    <Schritt n={4} titel="Spielen" onGo={goTab && (() => goTab("events"))} goLabel="Events">
-      Der PC schickt alle erkannten Events aller Spiele an die Regie. Im Tab <b>Events</b> steht, was rausging. Die Test-Knöpfe schicken ein CS2-Event, ohne zu spielen.
+    <Schritt n={4} titel="Proben" onGo={goTab && (() => goTab("sim"))} goLabel="Simulator">
+      Nur mit verbundener Session: Der Tab <b>Simulator</b> spielt das aktive Spiel der Regie, als liefe es auf diesem PC (bei CS2 als Spieler 1 in einem 5 gegen 5).
+      Die Daten laufen durch dieselbe Erkennung wie echte Spieldaten und gehen wirklich an die Regie. Einzelne Events lassen sich auch direkt auslösen.
+      Ist bei der Regie die Ausgabe an, lösen sie echte Befehle aus.
+    </Schritt>
+    <Schritt n={5} titel="Spielen" onGo={goTab && (() => goTab("events"))} goLabel="Events">
+      Der PC schickt alle erkannten Events aller Spiele an die Regie. Im Tab <b>Events</b> steht, was rausging; simulierte Events sind markiert.
     </Schritt>
     <P>
       <b>Mini-Overlay:</b> Ist die App minimiert, zeigt ein kleines App-Icon über allen Fenstern, ob alles läuft. Grün: Session verbunden und ein Spiel liefert Daten.
@@ -187,8 +193,42 @@ const Netz = () => (
       <li>Bricht die Verbindung ab, verbindet sich der Game-PC selbst neu. Events aus der Pause werden nicht nachgeschickt, damit nichts zur falschen Zeit kommt.</li>
       <li>Die Spiele senden nur an die App auf demselben PC: CS2 an <Kbd>127.0.0.1:3000</Kbd>, Rocket League auf <Kbd>127.0.0.1:49124</Kbd>. Dafür muss nichts in der Firewall freigegeben werden.</li>
       <li>Windows-Firewall: auf der Regie eingehend TCP 47801 erlauben, auf allen PCs UDP 5353. Beim ersten Start fragt Windows meist selbst.</li>
+      <li><b>Netzwerkkarten</b>: Die Regie wählt im Tab <b>Setup</b> getrennt, über welche Karte sie Game-PCs empfängt und über welche sie OSC sendet; im Tab <b>Ziele</b> kann jedes Ziel eine eigene Karte bekommen.
+        Der Game-PC wählt seine Karte im Tab <b>Setup</b>. Die App bindet Empfang und Absender an die IP der Karte. Das ist eindeutig, wenn jede Karte in einem eigenen Netz (Subnetz) liegt, z. B. LAN <Kbd>192.168.1.x</Kbd> und Licht <Kbd>2.x.x.x</Kbd>.
+        Liegen zwei Karten im selben Subnetz, entscheidet das Betriebssystem nach seiner Routing-Tabelle. Liegt ein Ziel nicht im Netz der gewählten Karte, zeigt der Tab Ziele einen Hinweis.</li>
       <li style={{ color: SUB }}>Der Modus (Regie oder Game-PC) lässt sich oben rechts wechseln.</li>
     </L>
+  </Section>
+);
+
+// Was Switch, Router und Netzwerkkarten können oder lassen müssen
+const ANFORDERUNGEN = [
+  ["Ein Netz (Subnetz, VLAN)", "Regie und alle Game-PCs im selben", "mDNS (Multicast 224.0.0.251) geht nicht über Router oder VLAN-Grenzen. Bei getrennten VLANs braucht es einen mDNS-Repeater (Reflector) im Router."],
+  ["IGMP Snooping", "darf an bleiben", "224.0.0.251 ist eine lokale Adresse (224.0.0.x), die Switches mit Snooping immer an alle Ports weitergeben. Tauchen Sessions trotzdem nicht auf: IGMP Querier einschalten oder Snooping aus."],
+  ["Multicast-Filter, Storm Control", "mDNS nicht sperren", "Manche Switches filtern unbekanntes Multicast oder drosseln es bei Last. UDP 5353 an 224.0.0.251 muss durch."],
+  ["EEE (Energy Efficient Ethernet, Green Ethernet, 802.3az)", "aus, an Switch und Netzwerkkarten", "Stromsparen weckt Ports erst bei Verkehr auf: kurze Aussetzer und Verzögerungen. Für Licht- und Shownetze empfehlen die Hersteller EEE grundsätzlich aus."],
+  ["QoS", "nicht nötig", "Die App braucht nur wenige kB/s. Bei einem vollen Netz: Regie und OSC-Ziele hoch priorisieren (DSCP 46 oder höchste Klasse), nichts davon drosseln. Besser: Licht in ein eigenes Netz mit eigener Karte."],
+  ["Spanning Tree", "PC-Ports als Edge-Port (PortFast)", "Sonst blockiert der Switch einen Port nach dem Einstecken bis zu 30 s. RSTP ist ok."],
+  ["Flusskontrolle, Jumbo Frames", "egal", "Die App sendet kleine Pakete."],
+  ["WLAN", "besser Kabel", "Wenn WLAN, dann Client-Isolation (AP-Isolation) aus, sonst sehen sich Regie und PCs nicht; mDNS über WLAN kann verzögert sein."],
+  ["DHCP", "feste IPs oder Reservierungen für Regie und Ziele", "OSC-Ziele werden per IP angesprochen. Game-PCs finden die Regie per mDNS, auch wenn sich ihre IP ändert."],
+  ["Firewall", "Regie: TCP 47801 eingehend. Alle: UDP 5353", "OSC geht ausgehend per UDP an die Ports der Ziele. Spiele senden nur an 127.0.0.1, dafür ist keine Freigabe nötig."],
+];
+
+const NetzAnforderungen = () => (
+  <Section title="Netzwerk-Anforderungen">
+    <P>Was am Switch, Router und an den Netzwerkkarten eingestellt sein sollte. Für ein normales LAN mit einem Switch passt meist alles ab Werk, bis auf EEE.</P>
+    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+      <thead><tr>{["Einstellung", "Empfehlung", "Warum"].map((h) => <th key={h} style={{ textAlign: "left", padding: "7px 8px", borderBottom: "2px solid #3a3647", color: SUB, fontSize: 11, textTransform: "uppercase" }}>{h}</th>)}</tr></thead>
+      <tbody>{ANFORDERUNGEN.map(([a, b, c]) => (
+        <tr key={a}>
+          <td style={{ padding: "7px 8px", borderBottom: "1px solid #3a3647", fontWeight: 700, verticalAlign: "top", width: "22%" }}>{a}</td>
+          <td style={{ padding: "7px 8px", borderBottom: "1px solid #3a3647", color: "#d9c6ff", verticalAlign: "top", width: "24%" }}>{b}</td>
+          <td style={{ padding: "7px 8px", borderBottom: "1px solid #3a3647", color: "#d4d0de", verticalAlign: "top", lineHeight: 1.5 }}>{c}</td>
+        </tr>
+      ))}</tbody>
+    </table>
+    <P><span style={{ color: SUB }}>Ping im Tab Session der Regie: im kabelgebundenen LAN unter 1 bis 2 ms. Werte über 10 ms deuten auf WLAN, einen überlasteten Switch oder EEE hin.</span></P>
   </Section>
 );
 
@@ -202,6 +242,7 @@ export default function AnleitungTab({ modus, goTab }) {
       <Osc />
       <ZieleEinrichten />
       <Netz />
+      <NetzAnforderungen />
     </>
   );
 }

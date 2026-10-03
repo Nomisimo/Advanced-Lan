@@ -6,7 +6,24 @@ import { overlayStatus } from "../../core/overlay-status.js";
 import { SPIELE } from "../../core/spiele.js";
 import { CFG_ORDNER, CFG_DATEI } from "../../core/cfg.js";
 import { RL_INI_DATEI, RL_INI_ORDNER } from "../../core/rl-ini.js";
-import { FileDown, Download, RefreshCw, LocateFixed } from "lucide-react";
+import { FileDown, Download, RefreshCw, LocateFixed, BookOpen } from "lucide-react";
+
+// Offizielle Dokumentation der Datenquellen, öffnet im Browser
+const DOKU = {
+  cs2: [
+    ["Valve: Game State Integration", "https://developer.valvesoftware.com/wiki/Counter-Strike:_Global_Offensive_Game_State_Integration"],
+  ],
+  rl: [
+    ["Psyonix: Rocket League Stats API", "https://www.rocketleague.com/developer/stats-api"],
+  ],
+};
+const DokuLinks = ({ spiel }) => (
+  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
+    {DOKU[spiel].map(([titel, url]) => (
+      <button key={url} style={{ ...S.smallBtn, padding: "5px 9px" }} title={url} onClick={() => api.openExternal(url)}><BookOpen size={12} /> {titel}</button>
+    ))}
+  </div>
+);
 
 const Liste = ({ punkte }) => <div style={{ border: `1px solid ${LINE}`, borderRadius: 8, overflow: "hidden" }}>{punkte.map((p) => <Check key={p.id} {...p} />)}</div>;
 
@@ -56,7 +73,7 @@ export default function SetupTab({ cfg, mutate, g, jetzt, notify }) {
         </div>
       </Section>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, alignItems: "start" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 20, alignItems: "start" }}>
         <Section title={<span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>Counter-Strike 2 <SpielChip spiel="cs2" /></span>}
           right={!mac && <div style={{ display: "flex", gap: 8 }}>
             <button style={S.primaryBtn} onClick={async () => fertig(await api.cfgInstallieren(), "cfg installiert. CS2 neu starten.")}><Download size={15} /> cfg installieren</button>
@@ -64,6 +81,7 @@ export default function SetupTab({ cfg, mutate, g, jetzt, notify }) {
           </div>}>
           {check && <Liste punkte={check.cs2} />}
           {check && !mac && !check.cs2[0]?.ok && <p style={S.hint}><Kbd>{CFG_DATEI}</Kbd> → <Kbd>{CFG_ORDNER}</Kbd></p>}
+          <DokuLinks spiel="cs2" />
           {g.status && (
             <div style={{ display: "flex", gap: 14, alignItems: "center", marginTop: 14, padding: "10px 12px", background: "#1a1820", border: `1px solid ${LINE}`, borderLeft: `3px solid ${teamFarbe(g.status.team)}`, borderRadius: 8, fontSize: 13 }}>
               <b>{g.status.spieler || (g.status.zuschauer ? `schaut ${g.status.zuschauer} zu` : "im Menü")}</b>
@@ -81,6 +99,7 @@ export default function SetupTab({ cfg, mutate, g, jetzt, notify }) {
           </div>}>
           {check && <Liste punkte={check.rl} />}
           {check && !mac && !check.rl[0]?.ok && <p style={S.hint}><Kbd>{RL_INI_DATEI}</Kbd> → <Kbd>{RL_INI_ORDNER}</Kbd></p>}
+          <DokuLinks spiel="rl" />
           {g.rl?.stand && (
             <div style={{ display: "flex", gap: 14, alignItems: "center", marginTop: 14, padding: "10px 12px", background: "#1a1820", border: `1px solid ${LINE}`, borderRadius: 8, fontSize: 13 }}>
               <b>{g.rl.stand.arena || "Match"}</b>

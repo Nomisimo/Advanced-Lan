@@ -22,6 +22,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+        timeout-minutes: 5
       - run: npm run build
       # Wie im Netzwerkplaner: ad-hoc signiert (identity "-"), kein Apple-Zertifikat, keine Overwolf-Signatur.
       # Auf dem Intel-Runner entsteht ein HFS+-Image; APFS-Images lehnen ältere macOS-Versionen als „beschädigt“ ab.

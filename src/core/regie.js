@@ -17,6 +17,7 @@ class Regie {
     this.pcs = new Map(); // pcId → { pcId, spiele, spiel (zuletzt gemeldet), verbunden, remote, sim, t, status, stand }
     this.stand = null; // letzter Spielstand des aktiven Spiels
     this.log = [];
+    this.verworfenLog = [];
     this.dedupe = new Dedupe();
     this.zaehler = { ereignisse: 0, verworfen: 0, gesendet: 0, fehler: 0 };
     this.nr = 0;
@@ -56,11 +57,25 @@ class Regie {
   pcEvent(pcId, spiel, ev) {
     const p = this.pcs.get(pcId);
     if (p) { p.t = this.now(); p.spiel = spiel; }
-    if (spiel !== this.aktiv()) { this.zaehler.verworfen++; this.emit("status"); return null; }
-    const e = { ...ev, spiel, pc: pcId, pcId };
-    if (!this.dedupe.accept(e, this.now())) return null; // mehrere PCs melden dieselbe Runde
-    return this.fire(e, p?.sim ? "sim" : "pc");
+    const e = { ...ev, spiel, pc: pcId, pcId }, quelle = p?.sim ? "sim" : "pc";
+    if (spiel !== this.aktiv()) return this.verwerfen(e, "anderes Spiel", quelle);
+    if (!this.dedupe.accept(e, this.now())) return this.verwerfen(e, "doppelt", quelle); // mehrere PCs melden dieselbe Runde
+    return this.fire(e, quelle);
   }
+
+  // Verworfene Ereignisse kommen in ein eigenes Log, damit sie die echten nicht verdrängen
+  verwerfen(ev, grund, quelle) {
+    this.zaehler.verworfen++;
+    const eintrag = { id: ++this.nr, t: this.now(), ev, quelle, verworfen: grund, scharf: false, gesperrt: true, befehle: [], fehler: [] };
+    this.verworfenLog.unshift(eintrag);
+    if (this.verworfenLog.length > LOG_MAX) this.verworfenLog.length = LOG_MAX;
+    this.emit("event", eintrag);
+    this.emit("status");
+    return null;
+  }
+
+  // Beide Logs, neueste zuerst
+  alleLogs() { return [...this.log, ...this.verworfenLog].sort((a, b) => b.id - a.id); }
 
   // Führt die Befehle aus, die im Tab „Signale“ für dieses Event eingestellt sind.
   // Ohne passende Zuweisung erscheint das Ereignis nur im Log.
@@ -100,6 +115,7 @@ class Regie {
         this.zaehler.fehler++;
         k.fehler.push(`${ziel.name || ziel.host}: ${e.message}`);
         this.emit("fehler", `${ziel.name || ziel.host}: ${e.message}`);
+        if (k.id) this.emit("event", k); // Log-Eintrag mit dem Fehler erneut melden (gleiche ID)
       });
     }
   }

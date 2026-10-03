@@ -265,7 +265,7 @@ ipcMain.handle('netz-adressen', () => {
 });
 
 // Regie
-ipcMain.handle('regie-log', () => regie.log);
+ipcMain.handle('regie-log', () => regie.alleLogs());
 ipcMain.handle('session-oeffnen', async () => { const ok = await session.oeffnen(); cfg.regie.session.offen = ok; speichereKonfig(); return gesamtStatus(); });
 ipcMain.handle('session-schliessen', async () => { await session.schliessen(); cfg.regie.session.offen = false; speichereKonfig(); return gesamtStatus(); });
 ipcMain.handle('pc-trennen', (_, pcId) => { session.trennen(pcId); });

@@ -46,7 +46,7 @@ test("Rocket League: simuliertes Match endet mit Sieger, Tore stimmen mit dem St
     let t = 0;
     const cfg = { ...standardRegie(), aktivesSpiel: "rl" };
     const events = [];
-    const regie = new Regie({ getConfig: () => cfg, send: () => {}, emit: (typ, d) => typ === "event" && events.push(d), now: () => t });
+    const regie = new Regie({ getConfig: () => cfg, send: () => {}, emit: (typ, d) => typ === "event" && !d.verworfen && events.push(d), now: () => t });
     const pcs = Array.from({ length: 6 }, (_, i) => ({ pcId: `PC ${i}`, quelle: new RlQuelle() }));
     pcs.forEach((p) => regie.pcVerbunden(p.pcId, { spiele: ["rl"] }));
     const m = new RlSimMatch({ seed });

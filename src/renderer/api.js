@@ -58,7 +58,7 @@ function browserApi() {
     onStatus: abo("status"),
     onMeldung: abo("meldung"),
     openExternal: async (url) => window.open(url, "_blank"),
-    regieLog: async () => [...regie.log],
+    regieLog: async () => regie.alleLogs(),
     sessionOeffnen: async () => { sessionOffen = !!cfg.regie.session.passwort; return status(); },
     sessionSchliessen: async () => { sessionOffen = false; return status(); },
     pcTrennen: async () => {},

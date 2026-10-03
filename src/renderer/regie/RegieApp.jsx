@@ -14,6 +14,13 @@ import { Gauge, ListChecks, Send, FlaskConical, BookOpen, Power, Radio, KeyRound
 
 const TABS = [["control", "Control", Gauge], ["signale", "Signale", ListChecks], ["ziele", "Ziele", Send], ["session", "Session", KeyRound], ["setup", "Setup", Settings], ["sim", "Simulator", FlaskConical], ["hilfe", "Anleitung", BookOpen]];
 const LOG_MAX = 300;
+// Neuer Eintrag oben; kommt dieselbe ID wieder (z. B. mit einem Sendefehler), wird er ersetzt.
+// Echte und verworfene Events haben je eigene Obergrenze.
+function logEinfuegen(l, e) {
+  const neu = l.some((x) => x.id === e.id) ? l.map((x) => (x.id === e.id ? e : x)) : [e, ...l];
+  let echt = 0, verw = 0;
+  return neu.filter((x) => (x.verworfen ? ++verw : ++echt) <= LOG_MAX);
+}
 
 export default function RegieApp({ cfg: alles, mutate: mutateAlles, status: st, jetzt, notify, version, modusWechseln }) {
   const cfg = alles.regie;
@@ -24,7 +31,7 @@ export default function RegieApp({ cfg: alles, mutate: mutateAlles, status: st, 
   useEffect(() => { try { localStorage.setItem("advancedlan_regie_tab", tab); } catch {} }, [tab]);
   useEffect(() => {
     api.regieLog().then(setLog);
-    return api.onRegieEvent((e) => setLog((l) => [e, ...l].slice(0, LOG_MAX)));
+    return api.onRegieEvent((e) => setLog((l) => logEinfuegen(l, e)));
   }, []);
   // Ohne offene Session zuerst dorthin
   useEffect(() => { if (!status.session.offen && !cfg.session.passwort) setTab("session"); }, []);

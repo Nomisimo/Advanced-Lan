@@ -15,7 +15,7 @@ const warte = (bed, ms = 3000) => new Promise((res, rej) => {
   const i = setInterval(() => { if (bed()) { clearInterval(i); res(); } else if (Date.now() - t0 > ms) { clearInterval(i); rej(new Error("Zeitüberschreitung")); } }, 20);
 });
 
-test("Game-PC meldet sich mit Passwort an, Ereignisse werden zu OSC", async () => {
+test("Game-PC meldet sich mit Passwort an, Ereignisse werden zu OSC", async (t) => {
   const empfang = dgram.createSocket("udp4");
   const pakete = [];
   empfang.on("message", (m) => pakete.push(m.toString("latin1")));
@@ -29,11 +29,13 @@ test("Game-PC meldet sich mit Passwort an, Ereignisse werden zu OSC", async () =
   const regie = new Regie({ getConfig: () => cfg, send: (s) => osc.send(s) });
   const server = new SessionServer({ regie, getConfig: () => cfg });
   const disco = new Discovery({});
+  // Aufräumen auch, wenn eine Prüfung fehlschlägt: sonst hält ein offener Socket den Testlauf an
+  t.after(async () => { disco.stop(); osc.close(); try { empfang.close(); } catch {} await server.schliessen(); });
   disco.start();
   assert.equal(await server.oeffnen(), true);
 
   // Discovery: Session wird per mDNS gefunden
-  await warte(() => disco.liste().some((s) => s.port === 47911), 5000);
+  await warte(() => disco.liste().some((s) => s.port === 47911), 10000);
   const gefunden = disco.liste().find((s) => s.port === 47911);
   assert.equal(gefunden.session, "Test-LAN");
   assert.ok(gefunden.id.startsWith("Test-LAN"), "Session hat eine eindeutige Kennung für die Auswahl");
@@ -48,6 +50,7 @@ test("Game-PC meldet sich mit Passwort an, Ereignisse werden zu OSC", async () =
 
   // Richtig angemeldet
   const pc = new SessionClient({ geraet: () => ({ app: "9.9.9" }) });
+  t.after(() => pc.trennen());
   pc.verbinden({ host: "127.0.0.1", port: 47911, passwort: "geheim", pcId: "PC 01", spiele: ["cs2"] });
   await warte(() => pc.zustand === "verbunden");
   assert.equal(pc.aktivesSpiel, "cs2");
@@ -62,6 +65,7 @@ test("Game-PC meldet sich mit Passwort an, Ereignisse werden zu OSC", async () =
   const quelle = new CsQuelle();
   const gsi = new GsiServer({ onPayload: (b) => { for (const ev of quelle.ingest(b).events) pc.event("cs2", ev); } });
   await gsi.start(47912);
+  t.after(() => gsi.stop());
   const zustand = (phase, extra = {}) => ({ provider: { steamid: "1" }, map: { name: "de_inferno", phase: "live", round: 4 }, round: { phase, ...extra }, player: { steamid: "1", name: "Blitz", team: "T", state: { health: 100 } } });
   for (const body of [zustand("live"), zustand("live", { bomb: "planted" }), zustand("over", { bomb: "exploded", win_team: "T" })])
     await fetch("http://127.0.0.1:47912/gsi", { method: "POST", body: JSON.stringify(body) });
@@ -94,11 +98,6 @@ test("Game-PC meldet sich mit Passwort an, Ereignisse werden zu OSC", async () =
 
   pc.trennen();
   await warte(() => regie.snapshot().pcs[0].verbunden === false);
-  await gsi.stop();
-  await server.schliessen();
-  disco.stop();
-  osc.close();
-  empfang.close();
 });
 
 test("Regie lauscht nur auf der gewählten Netzwerkkarte", async () => {

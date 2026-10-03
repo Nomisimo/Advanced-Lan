@@ -36,7 +36,7 @@ test("Rocket League: Tor an Reaper und MA3, mehrere PCs zählen einmal", () => {
   regie.pcEvent("PC 1", "rl", tor);
   regie.pcEvent("PC 2", "rl", tor);
   assert.deepEqual(gesendet.map((s) => [s.ziel.id, s.address, s.args.map((a) => a.value)]), [
-    ["r", "/marker", [4]], ["r", "/play", []], ["m", "/gma3/cmd", ["Goto Sequence 101 Cue 3"]],
+    ["r", "/marker/4", []], ["r", "/play", []], ["m", "/gma3/cmd", ["Goto Sequence 101 Cue 3"]],
   ]);
   assert.equal(regie.snapshot().statistik.match.tore.ORANGE, 1);
 });

@@ -59,7 +59,8 @@ function baue(ziel, befehl, eingaben = {}, ev = {}) {
   const werte = {};
   for (const p of befehl.params || []) werte[p.key] = einsetzen(eingaben?.[p.key] ?? p.standard ?? "", evVars);
   const vars = { ...evVars, ...optionen, ...werte };
-  return befehl.osc.map((n) => {
+  const vorab = (typ.vorab || []).filter((n) => String(optionen[n.nurWenn] ?? "").trim());
+  return [...vorab, ...befehl.osc].map((n) => {
     const address = normAdresse(einsetzen(n.address, vars));
     const args = n.argsFrei
       ? parseArgs(einsetzen(n.argsFrei, vars))

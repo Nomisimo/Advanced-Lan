@@ -14,8 +14,11 @@ test("Befehle aus der Ziel-Datenbank: Werte und Platzhalter aus dem Ereignis", (
   assert.equal(baueNachrichten({ ...ma3, optionen: { prefix: "" } }, { befehl: "go", werte: { seq: "7" } })[0].address, "/cmd", "ohne Prefix");
   assert.deepEqual(baueNachrichten({ typ: "qlab" }, { befehl: "start", werte: { cue: "{team}-{runde}" } }, ev)[0].address, "/cue/ORANGE-2/start");
   const r = baueNachrichten({ typ: "reaper" }, { befehl: "marker_play", werte: { marker: "4" } });
-  assert.deepEqual(r.map(zeigeNachricht), ["/marker 4", "/play"]);
+  assert.deepEqual(r.map(zeigeNachricht), ["/marker/4", "/play"]);
   assert.throws(() => baueNachrichten(ma3, { befehl: "gibtsnicht" }));
+  const ql = { typ: "qlab", optionen: { passcode: "1234" } };
+  assert.deepEqual(baueNachrichten(ql, { befehl: "go" }).map(zeigeNachricht), ['/connect "1234"', "/go"], "QLab-Passcode vorab");
+  assert.deepEqual(baueNachrichten({ typ: "qlab" }, { befehl: "go" }).map(zeigeNachricht), ["/go"]);
 });
 
 test("Eigene Nachricht: freie Adresse und Argumente mit Typen", () => {

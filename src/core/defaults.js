@@ -17,8 +17,9 @@ function standardRegie() {
     aktivesSpiel: "cs2",
     spiele: { cs2: true, valorant: false, rl: true }, // Tab „Setup“: nur genutzte Spiele erscheinen in Control und Signale
     session: { name: "LAN-Party", passwort: "", port: PORTS.session, offen: false },
+    netz: { empfang: "", senden: "" }, // Netzwerkkarten (Name, leer = automatisch): Empfang der Game-PCs, Senden der OSC-Befehle
     // Tab „Ziele“: angelegt aus der Ziel-Datenbank (ziel-typen.js)
-    targets: [], // [{ id, typ, name, host, port, optionen: {} }]
+    targets: [], // [{ id, typ, name, host, port, optionen: {}, netz }]  netz: eigene Netzwerkkarte, leer = wie „Senden“
     // Tab „Signale“: welches Event welchen Befehl an welches Ziel sendet
     signale: {}, // { [spiel]: { [event]: [{ id, ziel, befehl, werte, pc, team }] } }
   };
@@ -30,6 +31,7 @@ function standardGamePc() {
     regie: { id: "", session: "", host: "", port: 0 }, // gewählte Session aus mDNS, nie von Hand eingegeben
     passwort: "",
     autoVerbinden: false,
+    netz: "", // Netzwerkkarte zur Regie (Name, leer = automatisch)
     gsiPort: PORTS.gsi,
     overlay: { an: true, x: null, y: null }, // Mini-Overlay, solange die App minimiert ist (Tab „Setup“)
     rlPort: PORTS.rl, // WebSocket der Rocket-League-Stats-API
@@ -49,7 +51,7 @@ function genutzteSpiele(s, std) {
 }
 
 // Ziele vor Version 5 hatten keinen Typ: allgemeines OSC-Gerät
-const migrateZiel = (t) => ({ id: t.id || uid(), typ: t.typ || "osc", name: t.name || "", host: t.host || "", port: Number(t.port) || 0, optionen: t.optionen && typeof t.optionen === "object" ? t.optionen : {} });
+const migrateZiel = (t) => ({ id: t.id || uid(), typ: t.typ || "osc", name: t.name || "", host: t.host || "", port: Number(t.port) || 0, optionen: t.optionen && typeof t.optionen === "object" ? t.optionen : {}, netz: typeof t.netz === "string" ? t.netz : "" });
 
 // Vor Version 5 waren Signale nur an/aus (neutrales OSC). Übernommen werden nur Befehlslisten.
 function migrateSignale(s) {
@@ -78,6 +80,7 @@ function migrateKonfig(k) {
       ...r,
       armed: false, // nach dem Start nie scharf: erst bewusst einschalten
       session: { ...d.regie.session, ...(r.session || {}) },
+      netz: { ...d.regie.netz, ...(r.netz && typeof r.netz === "object" ? r.netz : {}) },
       targets: Array.isArray(r.targets) ? r.targets.map(migrateZiel) : d.regie.targets,
       signale: migrateSignale(r.signale),
       spiele: genutzteSpiele(r.spiele, d.regie.spiele),

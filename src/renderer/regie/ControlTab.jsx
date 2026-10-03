@@ -42,7 +42,7 @@ const Kennzahl = ({ label, wert, farbe }) => (
 function Ausgabe({ cfg, status }) {
   const z = status.zaehler || {};
   return (
-    <Section title={cfg.armed ? "Ausgabe scharf" : "Ausgabe aus"} style={{ borderColor: cfg.armed ? ERR : LINE, boxShadow: cfg.armed ? "0 0 16px rgba(255,93,93,.25)" : GLOW }}>
+    <Section title={cfg.armed ? "Ausgabe an" : "Ausgabe aus"} style={{ borderColor: cfg.armed ? OK : ERR, boxShadow: cfg.armed ? "0 0 16px rgba(46,204,113,.25)" : "0 0 16px rgba(255,93,93,.18)" }}>
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
         <Kennzahl label="Ereignisse" wert={z.ereignisse || 0} farbe={ACCENT_HI} />
         <Kennzahl label="Verworfen" wert={z.verworfen || 0} farbe={z.verworfen ? WARN : MUTED} />

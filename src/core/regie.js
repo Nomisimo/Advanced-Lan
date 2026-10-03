@@ -26,9 +26,9 @@ class Regie {
 
   aktiv() { return this.getConfig().aktivesSpiel; }
 
-  pcVerbunden(pcId, { spiele = [], remote = "", sim = false } = {}) {
+  pcVerbunden(pcId, { spiele = [], remote = "", sim = false, geraet = {} } = {}) {
     const alt = this.pcs.get(pcId) || {};
-    this.pcs.set(pcId, { ...alt, pcId, spiele, remote, sim, verbunden: true, t: this.now() });
+    this.pcs.set(pcId, { ...alt, pcId, spiele, remote, sim, geraet, verbunden: true, t: this.now() });
     this.emit("status");
   }
 
@@ -39,7 +39,7 @@ class Regie {
 
   pcPing(pcId, ms) {
     const p = this.pcs.get(pcId);
-    if (p) { p.ping = ms; p.pingT = this.now(); }
+    if (p) { p.ping = ms; p.pingT = this.now(); this.emit("status"); }
   }
 
   pcEntfernen(pcId) { this.pcs.delete(pcId); this.emit("status"); }
@@ -97,7 +97,7 @@ class Regie {
     return eintrag;
   }
 
-  // Test-Knopf einer Zuweisung im Tab „Signale“: sendet sofort, auch wenn die Ausgabe nicht scharf ist
+  // Test-Knopf einer Zuweisung im Tab „Signale“: sendet sofort, auch wenn die Ausgabe aus ist
   testeZuweisung(spiel, type, zuweisung) {
     const cfg = this.getConfig();
     const ev = { type, spiel, team: zuweisung.team || (spiel === "rl" ? "BLUE" : "CT"), player: "Testspieler", pc: zuweisung.pc || "Regie", pcId: zuweisung.pc || "Regie", round: 1 };

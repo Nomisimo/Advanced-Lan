@@ -3,6 +3,7 @@ import { S, ACCENT, LINE, SUB, MUTED, OK, WARN, ERR, teamFarbe } from "./theme.j
 import { Trophy, Timer, Bomb, Crosshair, Skull, Zap, Crown, Eye, CircleCheck, CircleX, Goal, Handshake, Shield, ShieldCheck, Target, CarFront, Flag, Play, Medal, Flame, Repeat } from "lucide-react";
 import { SPIEL_BY_ID, eventInfo } from "../core/spiele.js";
 import { zielTyp } from "../core/ziel-typen.js";
+import { api } from "./api.js";
 
 export function Section({ title, subtitle, right, children, style }) {
   return (
@@ -87,3 +88,28 @@ export const ZielBadge = ({ typ }) => {
   const t = zielTyp(typ), f = KAT_FARBE[t.kategorie] || SUB;
   return <span style={{ ...S.badge, background: f + "22", color: f, border: `1px solid ${f}66`, whiteSpace: "nowrap" }}>{t.name}</span>;
 };
+
+// Netzwerkkarten des PCs (Name, IP, Maske, MAC). Wird beim Öffnen und alle 5 s neu gelesen: Karten kommen und gehen.
+export function useKarten() {
+  const [karten, setKarten] = React.useState([]);
+  React.useEffect(() => {
+    let weg = false;
+    const laden = () => api.netzAdressen().then((k) => !weg && setKarten(k || []));
+    laden();
+    const t = setInterval(laden, 5000);
+    return () => { weg = true; clearInterval(t); };
+  }, []);
+  return karten;
+}
+
+// Auswahl einer Netzwerkkarte. Leer = automatisch. Gespeichert wird der Name, eine fehlende Karte bleibt sichtbar.
+export function KartenWahl({ karten, wert, onChange, leer = "Automatisch", style }) {
+  const fehlt = wert && !karten.some((k) => k.name === wert);
+  return (
+    <select style={{ ...S.selectSm, color: fehlt ? ERR : "#fff", ...style }} value={wert || ""} onChange={(e) => onChange(e.target.value)}>
+      <option value="">{leer}</option>
+      {karten.map((k) => <option key={k.name + k.ip} value={k.name}>{k.name} · {k.ip}</option>)}
+      {fehlt && <option value={wert}>{wert} (nicht verbunden)</option>}
+    </select>
+  );
+}

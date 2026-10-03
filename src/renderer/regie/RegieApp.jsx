@@ -38,9 +38,9 @@ export default function RegieApp({ cfg: alles, mutate: mutateAlles, status: st, 
 
   const verbunden = status.pcs.filter((p) => p.verbunden);
   const aktiv = SPIEL_BY_ID[cfg.aktivesSpiel];
-  const scharf = !!cfg.armed;
+  const an = !!cfg.armed;
   const ses = status.session;
-  const shared = { cfg, mutate, status, log, jetzt, notify, goTab: setTab };
+  const shared = { cfg, mutate, status, log, jetzt, notify, version, goTab: setTab };
 
   return (
     <div style={S.app}>
@@ -53,9 +53,9 @@ export default function RegieApp({ cfg: alles, mutate: mutateAlles, status: st, 
       </>}>
         {aktiv && <span title="Aktives Spiel (Tab „Control“)" style={{ borderRadius: 6, padding: "6px 12px", fontWeight: 800, fontSize: 12, letterSpacing: 0.5, background: aktiv.farbe, color: "#14121a", boxShadow: `0 0 12px ${aktiv.farbe}88` }}>{aktiv.kurz}</span>}
         <button onClick={() => mutate((d) => { d.armed = !d.armed; })}
-          title={scharf ? "Ausgabe stoppen" : "Ausgabe scharf schalten"}
-          style={{ ...S.primaryBtn, padding: "9px 16px", letterSpacing: 0.5, background: scharf ? ERR : "transparent", border: `1px solid ${scharf ? ERR : ACCENT}`, color: scharf ? "#fff" : "#e6dbff", boxShadow: scharf ? undefined : GLOW_STARK, animation: scharf ? "puls 1.6s ease-in-out infinite" : "none" }}>
-          <Power size={15} /> {scharf ? "AUSGABE SCHARF" : "AUSGABE AUS"}
+          title={an ? "Ausgabe ausschalten" : "Ausgabe einschalten"}
+          style={{ ...S.primaryBtn, padding: "9px 16px", letterSpacing: 0.5, background: an ? OK : ERR, border: `1px solid ${an ? OK : ERR}`, color: an ? "#0d1f14" : "#fff", boxShadow: an ? undefined : "0 0 10px rgba(255,93,93,.35)", animation: an ? "pulsGruen 1.6s ease-in-out infinite" : "none" }}>
+          <Power size={15} /> {an ? "AUSGABE AN" : "AUSGABE AUS"}
         </button>
       </Kopf>
       <nav style={S.nav}>

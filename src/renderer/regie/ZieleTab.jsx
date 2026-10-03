@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { S, SUB, MUTED, LINE, FELD, ACCENT, GLOW } from "../theme.js";
-import { Section, th, td, ZielBadge, KAT_FARBE } from "../ui.jsx";
+import { S, SUB, MUTED, LINE, FELD, ACCENT, GLOW, WARN } from "../theme.js";
+import { Section, th, td, ZielBadge, KAT_FARBE, KartenWahl, useKarten } from "../ui.jsx";
+import { karteFuer, zielHinweis } from "../../core/netzwerk.js";
 import { api } from "../api.js";
 import { uid } from "../../core/defaults.js";
 import { ZIEL_TYPEN, KATEGORIEN, zielTyp, befehleVon } from "../../core/ziel-typen.js";
@@ -110,6 +111,7 @@ function Datenbank({ cfg, mutate, notify, setInfo }) {
 
 export default function ZieleTab({ cfg, mutate, notify, goTab }) {
   const [info, setInfo] = useState(null);
+  const karten = useKarten();
   const setZiel = (id, fn) => mutate((d) => { const t = d.targets.find((x) => x.id === id); if (t) fn(t); });
   const loeschen = (t) => {
     const n = nutzung(cfg, t.id);
@@ -124,7 +126,7 @@ export default function ZieleTab({ cfg, mutate, notify, goTab }) {
       <Section title="Ziele" right={goTab && <button style={S.smallBtn} onClick={() => goTab("hilfe")}><BookOpen size={12} /> Einrichtung der Ziele</button>}>
         {cfg.targets.length === 0 ? <div style={S.empty}>Noch kein Ziel. Unten aus der Ziel-Datenbank anlegen.</div> : (
           <table style={{ ...S.table, marginTop: 0 }}>
-            <thead><tr><th style={th()}>Typ</th><th style={th()}>Name</th><th style={th()}>IP-Adresse</th><th style={th()}>Port (UDP)</th><th style={th()}>Optionen</th><th style={th()}>Signale</th><th style={th()}></th></tr></thead>
+            <thead><tr><th style={th()}>Typ</th><th style={th()}>Name</th><th style={th()}>IP-Adresse</th><th style={th()}>Port (UDP)</th><th style={th()}>Netzwerkkarte</th><th style={th()}>Optionen</th><th style={th()}>Signale</th><th style={th()}></th></tr></thead>
             <tbody>
               {cfg.targets.map((t) => {
                 const typ = zielTyp(t.typ), n = nutzung(cfg, t.id);
@@ -134,6 +136,10 @@ export default function ZieleTab({ cfg, mutate, notify, goTab }) {
                     <td style={td()}><input style={S.inputSm} value={t.name} placeholder={typ.name} onChange={(e) => setZiel(t.id, (z) => { z.name = e.target.value; })} /></td>
                     <td style={td({ width: 170 })}><input style={{ ...S.inputSm, ...S.mono }} value={t.host} placeholder="192.168.1.50" onChange={(e) => setZiel(t.id, (z) => { z.host = e.target.value.trim(); })} /></td>
                     <td style={td({ width: 100 })}><input style={S.inputSm} type="number" min="1" max="65535" value={t.port} onChange={(e) => setZiel(t.id, (z) => { z.port = +e.target.value || 0; })} /></td>
+                    <td style={td({ width: 200 })}>
+                      <KartenWahl karten={karten} wert={t.netz} leer={`Wie „Senden“ (${cfg.netz?.senden || "automatisch"})`} onChange={(v) => setZiel(t.id, (z) => { z.netz = v; })} />
+                      {(() => { const h = zielHinweis(t.host, karteFuer(karten, t.netz || cfg.netz?.senden)); return h && <div title={h} style={{ fontSize: 10, color: WARN, marginTop: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 200 }}>nicht im Netz dieser Karte</div>; })()}
+                    </td>
                     <td style={td({ width: 160 })}>
                       {(typ.optionen || []).map((o) => (
                         <label key={o.key} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: SUB }}>{o.label}

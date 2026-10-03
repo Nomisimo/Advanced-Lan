@@ -17,6 +17,13 @@ const { migrateKonfig } = require('../core/defaults');
 const { gsiCfg, CFG_DATEI } = require('../core/cfg');
 const { testNachricht, zeigeNachricht } = require('../core/signal');
 const { overlayStatus } = require('../core/overlay-status');
+const { kartenListe, lokaleIp } = require('../core/netzwerk');
+const { SimRunner } = require('../core/sim-runner');
+const { SimMatch } = require('../core/gsi-sim');
+const { RlSimMatch } = require('../core/rl-sim');
+const os = require('os');
+
+const karten = () => kartenListe(os.networkInterfaces());
 
 const root = app.getAppPath();
 const KONFIG_DATEI = () => path.join(app.getPath('userData'), 'advanced-lan.json');
@@ -50,14 +57,19 @@ const statusMelden = () => {
 const osc = new OscSender();
 const regie = new Regie({
   getConfig: () => cfg.regie,
-  send: (s) => osc.send(s),
+  send: (s) => oscSenden(s),
   emit: (typ, d) => {
     if (typ === 'event') an('regie-event', d);
     if (typ === 'fehler') meldung(`OSC fehlgeschlagen: ${d}`, 'err');
     statusMelden();
   },
 });
-const session = new SessionServer({ regie, getConfig: () => cfg.regie, onChange: statusMelden });
+// Absenderkarte: die des Ziels, sonst die für „Senden“, sonst automatisch
+function oscSenden(s) {
+  const l = lokaleIp(karten(), s.ziel.netz || cfg.regie.netz?.senden);
+  return l.fehler ? Promise.reject(new Error(l.fehler)) : osc.send({ ...s, lokal: l.ip });
+}
+const session = new SessionServer({ regie, getConfig: () => cfg.regie, onChange: statusMelden, lokal: () => lokaleIp(karten(), cfg.regie.netz?.empfang) });
 const regieSim = new RegieSim({ regie, onChange: statusMelden });
 
 // Auf dem Regie-PC darf kein Spiel laufen (Windows: Prozessliste prüfen)
@@ -80,11 +92,16 @@ const gp = { letzte: 0, status: null, stand: null, fremd: 0, log: [], nr: 0, sta
 let rlQuelle = new RlQuelle();
 const rl = { letzte: 0, stand: null, statusGesendet: 0 };
 const rlClient = new RlClient({ onNachricht: (m) => rlNachricht(m), onChange: statusMelden });
-const client = new SessionClient({ onChange: statusMelden, onAntwort: statusMelden });
-const discovery = new Discovery({ onChange: () => discoveryGeaendert() });
+const client = new SessionClient({
+  onChange: () => { if (client.zustand !== 'verbunden') gpSim.stop(); statusMelden(); },
+  onAntwort: statusMelden,
+  geraet: () => ({ app: app.getVersion() }),
+  karte: () => cfg.gamepc.netz,
+});
+const discovery = new Discovery({ onChange: () => discoveryGeaendert(), karte: () => cfg.gamepc.netz });
 const gsi = new GsiServer({ onPayload: (b) => gamePcPayload(b), onStatus: statusMelden });
 
-function gamePcPayload(body) {
+function gamePcPayload(body, sim = false) {
   if (cfg.modus !== 'gamepc') return;
   if (body?.auth?.token !== cfg.gamepc.gsiToken) { gp.fremd++; return statusMelden(); }
   const r = quelle.ingest(body);
@@ -92,29 +109,57 @@ function gamePcPayload(body) {
   const spiel = 'cs2'; // Game-PC sendet immer alles, was er erkennt. Was davon genutzt wird, entscheidet die Regie.
   for (const ev of r.events) {
     const ok = client.event(spiel, ev);
-    const e = { id: ++gp.nr, t: Date.now(), spiel, ev, gesendet: ok };
-    gp.log.unshift(e);
-    if (gp.log.length > 200) gp.log.length = 200;
-    an('gamepc-event', e);
+    gamePcLog({ spiel, ev, gesendet: ok, sim });
   }
   if (r.events.length || Date.now() - gp.statusGesendet > 500) { client.status(spiel, r.status, r.stand); gp.statusGesendet = Date.now(); }
   statusMelden();
 }
 
+function gamePcLog(x) {
+  const e = { id: ++gp.nr, t: Date.now(), ...x };
+  gp.log.unshift(e);
+  if (gp.log.length > 200) gp.log.length = 200;
+  an('gamepc-event', e);
+}
+
+// Simulator des Game-PCs: spielt das aktive Spiel der Session, als liefe es auf diesem PC.
+// Die Daten laufen durch dieselbe Erkennung wie echte Spieldaten. Nur mit verbundener Session.
+let gpSimSpiel = 'cs2';
+const gpSim = new SimRunner({
+  onChange: () => statusMelden(),
+  neuesMatch: () => {
+    if (gpSimSpiel === 'rl') return new RlSimMatch();
+    // 5 gegen 5, dieser PC ist Spieler 1 (CT): nur dessen Daten kommen hier an, wie bei echtem CS2
+    const m = new SimMatch({ clients: Array.from({ length: 10 }, (_, i) => ({ token: i === 0 ? cfg.gamepc.gsiToken : `sim${i}` })) });
+    m.spieler[0].name = cfg.gamepc.pcId || m.spieler[0].name;
+    return m;
+  },
+  deliver: (p) => {
+    if (gpSimSpiel === 'rl') rlNachricht(p, true);
+    else if (p.auth?.token === cfg.gamepc.gsiToken) gamePcPayload(p, true);
+  },
+});
+function gamePcSimStart(modus) {
+  if (client.zustand !== 'verbunden') return { fehler: 'Nur mit verbundener Session' };
+  const spiel = client.aktivesSpiel;
+  if (spiel !== 'cs2' && spiel !== 'rl') return { fehler: 'Für das aktive Spiel der Session gibt es keinen Simulator' };
+  if (spiel !== gpSimSpiel) { gpSim.neu(); gpSimSpiel = spiel; }
+  if (spiel === 'cs2' && !gpSim.match) quelle = new CsQuelle();
+  if (spiel === 'rl' && !gpSim.match) rlQuelle = new RlQuelle();
+  gpSim.start(modus);
+  return { ok: true };
+}
+
 // Verbinden mit der gewählten Session. Adresse und Port kommen immer aus mDNS, nie von Hand.
 let autoWartet = false;
 // Rocket League: Nachrichten der Stats API → Events an die Regie
-function rlNachricht(m) {
+function rlNachricht(m, sim = false) {
   if (cfg.modus !== 'gamepc') return;
   const r = rlQuelle.ingest(m);
   rl.letzte = Date.now();
   rl.stand = r.stand;
   for (const ev of r.events) {
-    const ok = client.event('rl', ev);
-    const e = { id: ++gp.nr, t: Date.now(), spiel: 'rl', ev, gesendet: ok };
-    gp.log.unshift(e);
-    if (gp.log.length > 200) gp.log.length = 200;
-    an('gamepc-event', e);
+    gamePcLog({ spiel: 'rl', ev, gesendet: client.event('rl', ev), sim });
   }
   if (r.events.length || Date.now() - rl.statusGesendet > 500) { client.status('rl', r.status, r.stand); rl.statusGesendet = Date.now(); }
   statusMelden();
@@ -191,6 +236,7 @@ async function setupCheck() {
 /* ── Modus wechseln ───────────────────────────────────────────────────── */
 async function modusStarten() {
   regieSim.stop();
+  gpSim.neu();
   await session.schliessen();
   clearInterval(spielCheck);
   client.trennen();
@@ -216,7 +262,7 @@ async function modusStarten() {
 function gesamtStatus() {
   const s = { modus: cfg.modus, jetzt: Date.now() };
   if (cfg.modus === 'regie') s.regie = { ...regie.snapshot(), session: session.status(), sim: regieSim.status(), armed: cfg.regie.armed, spielAufRegie };
-  if (cfg.modus === 'gamepc') s.gamepc = { client: client.info(), sessions: discovery.liste(), discoveryFehler: discovery.fehler, gsi: gsi.status(), letzte: gp.letzte, status: gp.status, stand: gp.stand, fremd: gp.fremd, rl: { ...rlClient.status(), letzte: rl.letzte, stand: rl.stand } };
+  if (cfg.modus === 'gamepc') s.gamepc = { client: client.info(), sessions: discovery.liste(), discoveryFehler: discovery.fehler, gsi: gsi.status(), letzte: gp.letzte, status: gp.status, stand: gp.stand, fremd: gp.fremd, sim: { ...gpSim.status(), spiel: gpSimSpiel }, rl: { ...rlClient.status(), letzte: rl.letzte, stand: rl.stand } };
   return s;
 }
 
@@ -337,11 +383,17 @@ ipcMain.handle('config-set', async (_, neu) => {
   speichereKonfig();
   overlayAktualisieren();
   if (cfg.modus === 'regie') {
+    if (session.offen && (cfg.regie.netz.empfang !== alt.regie.netz?.empfang)) await session.oeffnen();
     if (cfg.regie.aktivesSpiel !== alt.regie.aktivesSpiel) session.spielGewechselt();
     else if (session.offen && cfg.regie.session.name !== alt.regie.session.name) session.ausrufen();
     if (session.offen && (cfg.regie.session.port !== alt.regie.session.port || cfg.regie.session.passwort !== alt.regie.session.passwort)) await session.oeffnen();
   }
   if (cfg.modus === 'gamepc' && cfg.gamepc.gsiPort !== alt.gamepc.gsiPort) await gsi.start(Number(cfg.gamepc.gsiPort));
+  if (cfg.modus === 'gamepc' && cfg.gamepc.netz !== alt.gamepc.netz) {
+    // Andere Karte: Sessions dort neu suchen und eine bestehende Verbindung darüber neu aufbauen
+    discovery.stop(); discovery.start();
+    if (client.ziel) client.verbinden(client.ziel);
+  }
   statusMelden();
   return gesamtStatus();
 });
@@ -353,12 +405,7 @@ ipcMain.handle('modus-setzen', async (_, modus) => {
   return gesamtStatus();
 });
 ipcMain.handle('status', () => gesamtStatus());
-ipcMain.handle('netz-adressen', () => {
-  const out = [];
-  for (const [name, list] of Object.entries(require('os').networkInterfaces()))
-    for (const a of list || []) if (a.family === 'IPv4' && !a.internal) out.push({ name, ip: a.address });
-  return out;
-});
+ipcMain.handle('netz-adressen', () => karten());
 
 // Regie
 ipcMain.handle('regie-log', () => regie.alleLogs());
@@ -370,7 +417,7 @@ ipcMain.handle('signal-testen', (_, spiel, type, zuweisung) => regie.testeZuweis
 ipcMain.handle('ziel-testen', async (_, zielId) => {
   const ziel = cfg.regie.targets.find((t) => t.id === zielId);
   if (!ziel) return { fehler: 'Ziel nicht gefunden' };
-  try { const n = testNachricht(ziel); await osc.send({ ziel, ...n }); return { ok: true, nachricht: zeigeNachricht(n) }; }
+  try { const n = testNachricht(ziel); await oscSenden({ ziel, ...n }); return { ok: true, nachricht: zeigeNachricht(n) }; }
   catch (e) { return { fehler: e.message }; }
 });
 ipcMain.handle('sim-start', (_, modus) => { regieSim.start(modus, cfg.regie.aktivesSpiel); return regieSim.status(); });
@@ -409,14 +456,17 @@ ipcMain.handle('cfg-speichern', async () => {
   fs.writeFileSync(r.filePath, gsiCfg({ port: cfg.gamepc.gsiPort, token: cfg.gamepc.gsiToken }));
   return { ok: true, pfad: r.filePath };
 });
-ipcMain.handle('test-event', (_, type) => {
-  const ev = { type, team: 'CT', player: cfg.gamepc.pcId, kills: 1, round: gp.stand?.runde ?? 0, map: gp.stand?.map || '', test: true };
-  const ok = client.event('cs2', ev);
-  const e = { id: ++gp.nr, t: Date.now(), spiel: 'cs2', ev, gesendet: ok };
-  gp.log.unshift(e);
-  an('gamepc-event', e);
+// Einzelnes Event von diesem PC an die Regie (Tab „Simulator“)
+ipcMain.handle('test-event', (_, type, spiel = 'cs2', team = '', kills = 1) => {
+  const stand = spiel === 'rl' ? rl.stand : gp.stand;
+  const ev = { type: String(type), team: String(team || ''), player: cfg.gamepc.pcId, kills: Number(kills) || 1, round: stand?.runde ?? 0, map: stand?.map || '', test: true };
+  const ok = client.event(spiel, ev);
+  gamePcLog({ spiel, ev, gesendet: ok, sim: true });
   return { ok };
 });
+ipcMain.handle('gamepc-sim-start', (_, modus) => gamePcSimStart(modus));
+ipcMain.handle('gamepc-sim-stop', () => { gpSim.stop(); });
+ipcMain.handle('gamepc-sim-neu', () => { gpSim.neu(); });
 ipcMain.handle('open-external', (_, url) => { if (/^https?:\/\//i.test(url)) shell.openExternal(url); });
 
 /* ── Start ────────────────────────────────────────────────────────────── */
@@ -431,6 +481,7 @@ else {
   });
   app.on('window-all-closed', async () => {
     regieSim.stop();
+    gpSim.stop();
     client.trennen();
     rlClient.stop();
     discovery.stop();

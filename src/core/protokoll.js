@@ -23,7 +23,7 @@ const mdnsTxt = ({ session, aktivesSpiel, ip }) => ({ session, v: String(PROTOKO
 // Angaben des Game-PCs zu sich selbst, gekürzt auf Text
 function leseGeraet(g) {
   const t = (x, n = 64) => (typeof x === "string" || typeof x === "number" ? String(x).slice(0, n) : "");
-  return g && typeof g === "object" ? { hostname: t(g.hostname), app: t(g.app, 32), mac: t(g.mac, 17), karte: t(g.karte), plattform: t(g.plattform, 16) } : {};
+  return g && typeof g === "object" ? { hostname: t(g.hostname, 253), app: t(g.app, 32), mac: t(g.mac, 17), karte: t(g.karte), plattform: t(g.plattform, 16) } : {};
 }
 
 function leseNachricht(data) {

@@ -53,7 +53,7 @@ npm install
 npm test           # Erkennung, Regie, Netzwerk (WebSocket, UDP, OSC)
 npm start          # baut die Oberfläche und startet ow-electron
 npm run dist:win   # Windows-Installer mit ow-electron-builder
-npm run dist:mac   # macOS Intel (dmg und zip), nur auf einem Mac
+npm run dist:mac   # macOS Intel (dmg), nur auf einem Mac
 ```
 
 **Beta-Releases:** Ein Tag `v*` (z. B. `v0.1.0-beta.1`) startet `.github/workflows/release.yml`: Build für macOS Intel auf einem GitHub-Mac, Ergebnis als Vorabversion unter Releases. Unsigniert, deshalb beim ersten Start Rechtsklick → Öffnen. Apple Silicon und Windows folgen.

@@ -20,6 +20,10 @@ Der Modus wird beim ersten Start gewählt und lässt sich oben rechts wechseln. 
 - Mehrere PCs melden dieselbe Runde oder Bombe: die Regie wertet jedes Event nur einmal aus.
 - Die Ausgabe ist nach jedem Start **aus**. Erst „Ausgabe scharf“ schickt OSC.
 
+- **Mini-Overlay (Game-PC):** Ist die App minimiert, zeigt ein kleines App-Icon mit Statuspunkt über allen Fenstern, ob alles läuft (grün: Session und Spieldaten ok, orange: verbindet oder keine Spieldaten, rot: keine Session oder Fehler). Verschiebbar, Klick öffnet die App, abschaltbar im Tab „Setup“. Über exklusivem Vollbild erscheint es nicht (in CS2 „Vollbild (Fenster)“ nutzen).
+- **Startanimation** wie im Netzwerkplaner: Controller, dessen Knöpfe nacheinander gedrückt werden.
+- CS2 und Rocket League gibt es nur für Windows. Auf dem Mac läuft die Regie; der Game-PC-Modus meldet dort, dass die Spiele fehlen.
+
 ## CS2
 
 CS2 liefert seine Daten über Valves offizielle [Game State Integration](https://developer.valvesoftware.com/wiki/Counter-Strike:_Global_Offensive_Game_State_Integration): Eine cfg-Datei im CS2-Ordner (`…\game\csgo\cfg\gamestate_integration_advancedlan.cfg`) lässt das Spiel seinen Zustand per HTTP an die App auf demselben PC schicken (`127.0.0.1:3000`). Der Game-PC installiert die Datei per Knopfdruck im Tab „Setup“ und prüft dort, ob alles stimmt. Dafür braucht es keine Overwolf-Spielereignisse (GEP) und keine Freigabe.

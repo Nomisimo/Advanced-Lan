@@ -64,6 +64,7 @@ function browserApi() {
     pcTrennen: async () => {},
     eventAusloesen: async (ev) => regie.fire({ round: regie.stand?.runde, map: regie.stand?.map, ...ev, spiel: cfg.regie.aktivesSpiel, pc: "Regie", pcId: "regie" }, "manuell"),
     signalTesten: async (spiel, type, z) => regie.testeZuweisung(spiel, type, z),
+    overlayZuruecksetzen: async () => {},
     zielTesten: async (id) => { const z = cfg.regie.targets.find((t) => t.id === id); return z ? { ok: true, nachricht: zeigeNachricht(testNachricht(z)) } : { fehler: "Ziel nicht gefunden" }; },
     simStart: async (m) => { sim.start(m, cfg.regie.aktivesSpiel); return sim.status(); },
     simStop: async () => { sim.stop(); return sim.status(); },

@@ -31,6 +31,7 @@ function standardGamePc() {
     passwort: "",
     autoVerbinden: false,
     gsiPort: PORTS.gsi,
+    overlay: { an: true, x: null, y: null }, // Mini-Overlay, solange die App minimiert ist (Tab „Setup“)
     rlPort: PORTS.rl, // WebSocket der Rocket-League-Stats-API
     gsiToken: neuerToken(),
   };
@@ -81,7 +82,7 @@ function migrateKonfig(k) {
       signale: migrateSignale(r.signale),
       spiele: genutzteSpiele(r.spiele, d.regie.spiele),
     },
-    gamepc: { ...d.gamepc, ...g, regie: { ...d.gamepc.regie, ...(g.regie || {}) }, gsiToken: g.gsiToken || d.gamepc.gsiToken },
+    gamepc: { ...d.gamepc, ...g, regie: { ...d.gamepc.regie, ...(g.regie || {}) }, overlay: { ...d.gamepc.overlay, ...(g.overlay && typeof g.overlay === "object" ? g.overlay : {}) }, gsiToken: g.gsiToken || d.gamepc.gsiToken },
   };
   delete m.gamepc.spiel;
   // Das aktive Spiel muss ein genutztes Spiel sein

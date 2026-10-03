@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; background: #131118; overflow: hidden; -webkit-app-region: drag; user-select: none; }
+    body { transition: opacity .25s ease; font-family: 'Segoe UI', system-ui, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+      border-bottom: 3px solid #9d5cff; box-shadow: inset 0 -12px 24px -14px rgba(157, 92, 255, .7); }
+    .t { color: #c39bff; font-weight: 800; letter-spacing: 2px; font-size: 20px; text-shadow: 0 0 10px rgba(157, 92, 255, .7); opacity: 0; animation: ein .4s ease .15s forwards; }
+    .s { color: #a39eb3; font-size: 11px; letter-spacing: .5px; opacity: 0; animation: ein .4s ease .3s forwards; }
+    svg { overflow: visible; }
+    .pad { filter: drop-shadow(0 0 10px rgba(157, 92, 255, .75)); transform-origin: 256px 291px; animation: pad .45s cubic-bezier(.2, 1.4, .4, 1) both; }
+    /* Tasten werden nacheinander gedrückt: kurz kleiner, hell, mit Glow */
+    .k { fill: #16131d; transform-box: fill-box; transform-origin: center; animation: druck .26s ease both; }
+    @keyframes druck { 0% { transform: scale(1); } 45% { transform: scale(.72); fill: #f3ecff; filter: drop-shadow(0 0 6px #fff); } 100% { transform: scale(1); fill: #16131d; } }
+    @keyframes pad { from { opacity: 0; transform: scale(.82); } to { opacity: 1; transform: scale(1); } }
+    @keyframes ein { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  </style>
+</head>
+<body>
+  <svg width="150" height="90" viewBox="36 160 440 262">
+    <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b98bff"/><stop offset="1" stop-color="#7c3aed"/></linearGradient></defs>
+    <g class="pad">
+      <path fill="url(#g)" d="M150 168h212c44 0 74 26 86 70l26 98c11 42-14 78-52 78-24 0-40-14-54-34l-22-32c-8-11-18-16-32-16h-116c-14 0-24 5-32 16l-22 32c-14 20-30 34-54 34-38 0-63-36-52-78l26-98c12-44 42-70 86-70z"/>
+      <rect fill="#16131d" x="171" y="236" width="22" height="22"/>
+      <rect class="k" x="171" y="213" width="22" height="25" rx="5" style="animation-delay:.45s"/>
+      <rect class="k" x="191" y="236" width="25" height="22" rx="5" style="animation-delay:.6s"/>
+      <rect class="k" x="171" y="256" width="22" height="25" rx="5" style="animation-delay:.75s"/>
+      <rect class="k" x="148" y="236" width="25" height="22" rx="5" style="animation-delay:.9s"/>
+      <circle class="k" cx="350" cy="290" r="15" style="animation-delay:1.05s"/>
+      <circle class="k" cx="384" cy="258" r="15" style="animation-delay:1.17s"/>
+      <circle class="k" cx="316" cy="258" r="15" style="animation-delay:1.29s"/>
+      <circle class="k" cx="350" cy="226" r="15" style="animation-delay:1.41s"/>
+    </g>
+  </svg>
+  <div class="t">ADVANCED LAN</div>
+  <div class="s">Game-PC · Regie · OSC</div>
+</body>
+</html>

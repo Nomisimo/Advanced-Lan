@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, shell, ipcMain, dialog, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { execFile } = require('child_process');
@@ -16,6 +16,7 @@ const { rlIni, leseRlIni, RL_INI_DATEI } = require('../core/rl-ini');
 const { migrateKonfig } = require('../core/defaults');
 const { gsiCfg, CFG_DATEI } = require('../core/cfg');
 const { testNachricht, zeigeNachricht } = require('../core/signal');
+const { overlayStatus } = require('../core/overlay-status');
 
 const root = app.getAppPath();
 const KONFIG_DATEI = () => path.join(app.getPath('userData'), 'advanced-lan.json');
@@ -42,7 +43,7 @@ const meldung = (text, art = 'ok') => an('meldung', { text, art });
 let statusTimer = null;
 const statusMelden = () => {
   if (statusTimer) return;
-  statusTimer = setTimeout(() => { statusTimer = null; an('status', gesamtStatus()); }, 120);
+  statusTimer = setTimeout(() => { statusTimer = null; an('status', gesamtStatus()); overlayMelden(); }, 120);
 };
 
 /* ── Modus Regie: Session, aktives Spiel, Cues → OSC ──────────────────── */
@@ -155,8 +156,16 @@ async function rlCheck() {
 }
 
 // „Ist korrekt aufgesetzt“-Check des Game-PCs
+// CS2 und Rocket League gibt es nicht für macOS: dort nicht suchen, sondern das sagen
+const OHNE_MAC = (spiel) => [{ id: 'plattform', label: `${spiel} gibt es nicht für macOS`, ok: false, warn: true, nichtVerfuegbar: true, detail: 'Game-PC mit diesem Spiel nur unter Windows' }];
+
 async function setupCheck() {
   const g = cfg.gamepc, c = client.info(), gs = gsi.status();
+  const allgemein = [
+    { id: 'pcid', label: 'PC-ID eingetragen', ok: !!g.pcId.trim(), detail: g.pcId.trim() || 'fehlt' },
+    { id: 'session', label: 'Mit einer Session verbunden', ok: c.zustand === 'verbunden', detail: c.zustand === 'verbunden' ? c.session : c.grund || 'nicht verbunden' },
+  ];
+  if (process.platform === 'darwin') return { allgemein, cs2: OHNE_MAC('Counter-Strike 2'), rl: OHNE_MAC('Rocket League'), plattform: 'darwin' };
   const ordner = await findeCs2CfgOrdner();
   const datei = ordner ? path.join(ordner, CFG_DATEI) : '';
   let inhalt = null;
@@ -165,10 +174,8 @@ async function setupCheck() {
   const passt = inhalt != null && norm(inhalt) === norm(gsiCfg({ port: g.gsiPort, token: g.gsiToken }));
   const alter = gp.letzte ? Math.round((Date.now() - gp.letzte) / 1000) : null;
   return {
-    allgemein: [
-      { id: 'pcid', label: 'PC-ID eingetragen', ok: !!g.pcId.trim(), detail: g.pcId.trim() || 'fehlt' },
-      { id: 'session', label: 'Mit einer Session verbunden', ok: c.zustand === 'verbunden', detail: c.zustand === 'verbunden' ? c.session : c.grund || 'nicht verbunden' },
-    ],
+    allgemein,
+    plattform: process.platform,
     cs2: [
       { id: 'installiert', label: 'CS2 gefunden', ok: !!ordner, detail: ordner || 'nicht in den Steam-Bibliotheken' },
       { id: 'cfg', label: 'cfg-Datei installiert', ok: inhalt != null, detail: inhalt != null ? CFG_DATEI : 'fehlt' },
@@ -215,6 +222,13 @@ function gesamtStatus() {
 
 /* ── Fenster ──────────────────────────────────────────────────────────── */
 function createWindow() {
+  // Startanimation wie im Netzwerkplaner: Controller, dessen Tasten nacheinander gedrückt werden
+  const splash = new BrowserWindow({
+    width: 380, height: 240, frame: false, resizable: false, center: true,
+    alwaysOnTop: true, skipTaskbar: true, backgroundColor: '#131118',
+    webPreferences: { contextIsolation: true, nodeIntegration: false },
+  });
+  splash.loadFile(path.join(root, 'src', 'main', 'splash.html'));
   const iconPath = path.join(root, 'assets', 'app-icon', 'icon.png');
   mainWin = new BrowserWindow({
     width: 1480, height: 940, minWidth: 1100, minHeight: 680,
@@ -224,12 +238,91 @@ function createWindow() {
   });
   mainWin.setMenuBarVisibility(false);
   mainWin.loadFile(path.join(root, 'dist-app', 'index.html'));
-  mainWin.once('ready-to-show', () => mainWin.show());
+  let appBereit = false, animationFertig = false, gezeigt = false;
+  const zeigen = () => {
+    if (gezeigt || !appBereit || !animationFertig) return;
+    gezeigt = true;
+    splash.webContents.executeJavaScript('document.body.style.opacity="0"').catch(() => {});
+    setTimeout(() => {
+      hauptGezeigt = true;
+      mainWin.show(); mainWin.focus();
+      if (!splash.isDestroyed()) splash.close();
+    }, 250);
+  };
+  mainWin.once('ready-to-show', () => { appBereit = true; zeigen(); });
+  setTimeout(() => { animationFertig = true; zeigen(); }, 1900);
+  for (const ev of ['minimize', 'restore', 'hide', 'show']) mainWin.on(ev, () => setImmediate(overlayAktualisieren));
+  mainWin.on('closed', () => { if (overlayWin) overlayWin.destroy(); });
   mainWin.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//i.test(url)) shell.openExternal(url);
     return { action: 'deny' };
   });
 }
+
+/* ── Mini-Overlay (Game-PC) ───────────────────────────────────────────── */
+// Kleines App-Icon mit Status-Punkt über allen Fenstern, nur solange die App minimiert ist.
+// Normales Fenster ganz oben: sichtbar über Spielen im Fenster- oder randlosen Vollbild.
+let overlayWin = null;
+let hauptGezeigt = false; // vor dem ersten Zeigen (Startanimation) nie ein Overlay
+const OVERLAY_GROESSE = 64;
+
+function overlayErzeugen() {
+  const o = cfg.gamepc.overlay || {};
+  const wa = screen.getPrimaryDisplay().workArea;
+  const x = Number.isFinite(o.x) ? o.x : wa.x + wa.width - OVERLAY_GROESSE - 24;
+  const y = Number.isFinite(o.y) ? o.y : wa.y + 24;
+  overlayWin = new BrowserWindow({
+    width: OVERLAY_GROESSE, height: OVERLAY_GROESSE, x, y,
+    frame: false, transparent: true, resizable: false, movable: true, minimizable: false, maximizable: false, fullscreenable: false,
+    skipTaskbar: true, hasShadow: false, focusable: false, show: false, alwaysOnTop: true, title: 'Advanced LAN Overlay',
+    webPreferences: { contextIsolation: true, nodeIntegration: false, preload: path.join(root, 'src', 'preload', 'overlay-preload.js') },
+  });
+  overlayWin.setAlwaysOnTop(true, 'screen-saver');
+  if (process.platform === 'darwin') overlayWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  overlayWin.loadFile(path.join(root, 'src', 'main', 'overlay.html'));
+  overlayWin.webContents.once('did-finish-load', overlayMelden);
+  overlayWin.on('closed', () => { overlayWin = null; });
+}
+
+function overlayAktualisieren() {
+  const soll = cfg.modus === 'gamepc' && cfg.gamepc.overlay?.an && mainWin && !mainWin.isDestroyed() && hauptGezeigt && (mainWin.isMinimized() || !mainWin.isVisible());
+  if (soll) {
+    if (!overlayWin) overlayErzeugen();
+    overlayWin.showInactive();
+    overlayMelden();
+  } else if (overlayWin) overlayWin.hide();
+}
+
+function overlayMelden() {
+  if (!overlayWin || overlayWin.isDestroyed() || cfg.modus !== 'gamepc') return;
+  overlayWin.webContents.send('overlay-status', overlayStatus({ client: client.info(), gsi: gsi.status(), letzteCs2: gp.letzte, letzteRl: rl.letzte, jetzt: Date.now() }));
+}
+
+ipcMain.on('overlay-ziehen', (_, dx, dy) => {
+  if (!overlayWin) return;
+  const [x, y] = overlayWin.getPosition();
+  overlayWin.setPosition(Math.round(x + (Number(dx) || 0)), Math.round(y + (Number(dy) || 0)));
+});
+ipcMain.on('overlay-abgelegt', () => {
+  if (!overlayWin) return;
+  const [x, y] = overlayWin.getPosition();
+  cfg.gamepc.overlay = { ...cfg.gamepc.overlay, x, y };
+  speichereKonfig();
+});
+ipcMain.handle('overlay-zuruecksetzen', () => {
+  cfg.gamepc.overlay = { ...cfg.gamepc.overlay, x: null, y: null };
+  speichereKonfig();
+  if (overlayWin) { overlayWin.destroy(); overlayWin = null; }
+  overlayAktualisieren();
+});
+ipcMain.on('overlay-oeffnen', () => {
+  if (!mainWin) return;
+  if (mainWin.isMinimized()) mainWin.restore();
+  mainWin.show();
+  mainWin.focus();
+  overlayAktualisieren();
+});
+setInterval(overlayMelden, 2000).unref(); // Daten veralten auch ohne neue Meldung
 
 /* ── IPC ──────────────────────────────────────────────────────────────── */
 ipcMain.handle('app-version', () => app.getVersion());
@@ -240,7 +333,9 @@ ipcMain.handle('config-set', async (_, neu) => {
   cfg.regie.armed = !!neu.regie?.armed;
   cfg.regie.session.offen = alt.regie.session.offen; // offen/zu steuern nur die Session-Knöpfe
   if (client.zustand !== 'getrennt' && client.zustand !== 'abgelehnt') cfg.gamepc.pcId = alt.gamepc.pcId; // PC-ID nur ohne aktive Session änderbar
+  cfg.gamepc.overlay = { ...cfg.gamepc.overlay, x: alt.gamepc.overlay?.x ?? null, y: alt.gamepc.overlay?.y ?? null }; // Position setzt nur das Overlay selbst
   speichereKonfig();
+  overlayAktualisieren();
   if (cfg.modus === 'regie') {
     if (cfg.regie.aktivesSpiel !== alt.regie.aktivesSpiel) session.spielGewechselt();
     else if (session.offen && cfg.regie.session.name !== alt.regie.session.name) session.ausrufen();
@@ -254,6 +349,7 @@ ipcMain.handle('modus-setzen', async (_, modus) => {
   cfg.modus = modus === 'regie' || modus === 'gamepc' ? modus : null;
   speichereKonfig();
   await modusStarten();
+  overlayAktualisieren();
   return gesamtStatus();
 });
 ipcMain.handle('status', () => gesamtStatus());

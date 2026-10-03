@@ -3,6 +3,7 @@ name: CI
 
 on:
   pull_request:
+  workflow_dispatch:
   push:
     branches: [main]
 
@@ -19,3 +20,26 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm test
       - run: npm run build
+
+  # Mac-Installer wie im Release bauen und prüfen, ohne etwas zu veröffentlichen
+  mac-intel:
+    runs-on: macos-15-intel
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npx ow-electron-builder --mac --x64 --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: DMG prüfen
+        run: |
+          n=$(ls dist/*.dmg | wc -l | tr -d ' ')
+          if [ "$n" != "1" ]; then echo "::error::$n DMGs gebaut, erwartet 1"; exit 1; fi
+          hdiutil verify dist/*.dmg
+          if ! hdiutil imageinfo dist/*.dmg | grep -q "Apple_HFS"; then echo "::error::Intel-DMG ist kein HFS+-Image"; exit 1; fi
+          codesign -dv dist/mac/*.app 2>&1 | tee /dev/stderr | grep -q "Signature=adhoc" || { echo "::error::App nicht ad-hoc signiert"; exit 1; }
+          /usr/libexec/PlistBuddy -c "Print :NSLocalNetworkUsageDescription" dist/mac/*.app/Contents/Info.plist

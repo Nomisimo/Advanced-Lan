@@ -58,16 +58,21 @@
           "arch": [
             "x64"
           ]
-        },
-        {
-          "target": "zip",
-          "arch": [
-            "x64"
-          ]
         }
       ],
       "category": "public.app-category.utilities",
-      "identity": null
+      "identity": "-",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "extendInfo": {
+        "NSLocalNetworkUsageDescription": "Advanced LAN findet Sessions im lokalen Netz (mDNS), verbindet Game-PCs mit der Regie und sendet OSC-Befehle an Licht, Audio und Video.",
+        "NSBonjourServices": [
+          "_advancedlan._tcp"
+        ]
+      }
+    },
+    "dmg": {
+      "writeUpdateInfo": false
     }
   },
   "devDependencies": {

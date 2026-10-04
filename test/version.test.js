@@ -12,7 +12,7 @@ test("Versionen vergleichen, Betas vor der fertigen Version", () => {
 
 test("Neueste Version und passendes Mac-DMG aus der Release-Liste", () => {
   const list = [
-    { tag_name: "v0.1.0-beta.3", assets: [{ name: "Advanced.LAN-0.1.0-beta.3-mac-x64.dmg", url: "https://github.com/Nomisimo/Advanced-Lan-Party/releases/download/v0.1.0-beta.3/Advanced.LAN-0.1.0-beta.3-mac-x64.dmg" }] },
+    { tag_name: "v0.1.0-beta.3", assets: [{ name: "Advanced.LAN-0.1.0-beta.3-mac-x64.dmg", url: "https://github.com/Nomisimo/Advanced-Lan/releases/download/v0.1.0-beta.3/Advanced.LAN-0.1.0-beta.3-mac-x64.dmg" }] },
     { tag_name: "v0.1.0-beta.5", draft: true },
     { tag_name: "v0.1.0-beta.1", assets: [] },
   ];

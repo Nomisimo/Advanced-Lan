@@ -5,7 +5,7 @@
 <h1 align="center">Advanced LAN</h1>
 
 <p align="center">Spielmomente lösen echtes Bühnenlicht, Ton und Video aus.<br>
-<a href="https://github.com/Nomisimo/Advanced-Lan-Party/releases">Download (Beta, macOS Intel)</a></p>
+<a href="https://github.com/Nomisimo/Advanced-Lan/releases">Download (Beta, macOS Intel)</a></p>
 
 <p align="center"><img src="docs/screenshots/ablauf.jpg" alt="Ablauf: Game-PCs melden Events, die Regie schickt OSC-Befehle an Licht, Audio und Video" width="820"></p>
 

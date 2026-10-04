@@ -89,7 +89,7 @@ function browserApi() {
     onMeldung: abo("meldung"),
     openExternal: async (url) => window.open(url, "_blank"),
     // Updates: im Browser nur Hinweis und Download-Seite
-    fetchReleases: async () => { try { const r = await fetch("https://api.github.com/repos/Nomisimo/Advanced-Lan-Party/releases?per_page=20"); return r.ok ? r.json() : null; } catch { return null; } },
+    fetchReleases: async () => { try { const r = await fetch("https://api.github.com/repos/Nomisimo/Advanced-Lan/releases?per_page=20"); return r.ok ? r.json() : null; } catch { return null; } },
     checkForUpdates: async () => ({ auto: false, mac: false }),
     installUpdate: async (url) => window.open(url, "_blank"),
     macUpdateLaden: async () => ({ ok: false }),

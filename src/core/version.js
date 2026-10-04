@@ -2,7 +2,7 @@
 // Versionen und Änderungen wie im Netzwerkplaner. Die Versionsnummer steht in package.json
 // (SemVer, Betas als 0.x.y-beta.n). Hier stehen die Änderungen je Version für „Was ist neu?“ in der App.
 
-const REPO = "Nomisimo/Advanced-Lan-Party";
+const REPO = "Nomisimo/Advanced-Lan";
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {

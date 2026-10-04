@@ -24,7 +24,7 @@ Game data is read only from official interfaces: Valve Game State Integration (C
 
 ## Data sent to third parties
 
-- **Overwolf**: The app runs on Overwolf's ow-electron runtime. Overwolf collects anonymous analytics (for example a machine identifier, app version, crash and performance data) and loads its game-event packages. This processing is covered by the [Overwolf Privacy Policy](https://www.overwolf.com/legal/privacy/). You can review your choices in the app under **Setup → App → Privacy settings**.
+- **Overwolf**: The app runs on Overwolf's ow-electron runtime. Overwolf collects anonymous analytics (for example a machine identifier, app version, crash and performance data) and loads its game-event packages. This processing is covered by the privacy policies Overwolf publishes at [legal.overwolf.com](https://legal.overwolf.com/). You can review your choices in the app under **Setup → App → Privacy settings**.
 - **GitHub**: To check for updates, the app requests the public release list from `api.github.com` and downloads updates from `github.com`. GitHub receives your IP address as part of these requests ([GitHub Privacy Statement](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement)).
 - **Feedback**: If you click **Report** in the app, your browser opens a new GitHub issue that already contains the app version, your operating system and the selected mode. Nothing is sent unless you submit the issue yourself.
 

@@ -87,6 +87,7 @@ Einmalig: Windows SDK installieren (enthält `signtool.exe`): https://developer.
 Wenn das Zertifikat da ist, stelle ich `package.json` auf Signieren um (das brauchst du nicht selbst zu machen). Es kommt dann etwa so hinein:
 
 ```json
+"overwolf": { "requireSigning": true },
 "win": {
   "signAndEditExecutable": true,
   "signtoolOptions": {
@@ -96,6 +97,8 @@ Wenn das Zertifikat da ist, stelle ich `package.json` auf Signieren um (das brau
   }
 }
 ```
+
+`requireSigning` steht bis dahin auf `false`, damit die unsignierten Betas in GitHub Actions bauen. Mit `true` bricht der Build ab, wenn die Overwolf-Schlüssel fehlen, so rutscht keine unsignierte Version in den Store.
 
 Dann bei jedem Release:
 

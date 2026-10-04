@@ -37,6 +37,9 @@
       "**/node_modules/@stagetimerio/grandiose/dist/**"
     ],
     "npmRebuild": false,
+    "overwolf": {
+      "requireSigning": false
+    },
     "win": {
       "target": [
         {

@@ -20,7 +20,11 @@ function browserApi() {
   try { cfg = migrateKonfig(JSON.parse(localStorage.getItem(KEY))); } catch { cfg = migrateKonfig(null); }
   const speichern = () => { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch {} };
   const hoerer = { status: new Set(), meldung: new Set(), regieEvent: new Set(), gamePcEvent: new Set() };
-  const melde = (k, d) => hoerer[k].forEach((cb) => cb(d));
+  // Game-Stats-Screen der Vorschau: eigener Tab (index.html#stats), bekommt Status und Events über einen BroadcastChannel
+  const istStats = typeof location !== "undefined" && location.hash === "#stats";
+  const kanal = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("advancedlan-vorschau") : null;
+  let statsTab = null;
+  const melde = (k, d) => { hoerer[k].forEach((cb) => cb(d)); if (kanal && !istStats && (k === "status" || k === "regieEvent")) kanal.postMessage({ k, d }); };
   let sessionOffen = false;
   const gp = { zustand: "getrennt", log: [], nr: 0 };
   // Vorschau: zwei Regien im Netz
@@ -30,8 +34,10 @@ function browserApi() {
   ];
   const status = () => {
     const s = { modus: cfg.modus, jetzt: Date.now(), vorschau: true };
-    if (cfg.modus === "regie") s.regie = { ...regie.snapshot(), session: { offen: sessionOffen, port: cfg.regie.session.port, ip: "", fehler: "", verbunden: regie.snapshot().pcs.filter((p) => p.verbunden && !p.sim).length }, sim: sim.status(), armed: cfg.regie.armed, spielAufRegie: "" };
-    if (cfg.modus === "gamepc") s.gamepc = {
+    const statsOffen = !!(statsTab && !statsTab.closed);
+    if (cfg.modus === "regie" || cfg.modus === "standalone") s.regie = { ...regie.snapshot(), session: { offen: sessionOffen, port: cfg.regie.session.port, ip: "", fehler: "", verbunden: regie.snapshot().pcs.filter((p) => p.verbunden && !p.sim).length }, sim: sim.status(), armed: cfg.regie.armed, spielAufRegie: "",
+      stats: { fenster: statsOffen, ndi: { verfuegbar: false, laeuft: false, name: "", verbindungen: 0, fehler: "", aufloesung: "1920×1080", fps: 30 } }, lokal: cfg.modus === "standalone" ? cfg.gamepc.pcId.trim() || "Dieser PC" : null };
+    if (cfg.modus === "gamepc" || cfg.modus === "standalone") s.gamepc = {
       client: { zustand: gp.zustand, grund: "", session: gp.zustand === "verbunden" ? cfg.gamepc.regie.session : "", aktivesSpiel: "cs2", ziel: null, gesendet: gp.log.filter((e) => e.gesendet).length, verworfen: 0 },
       sessions: SESSIONS,
       discoveryFehler: "", gsi: { laeuft: true, port: cfg.gamepc.gsiPort, fehler: "" }, letzte: gp.letzte || 0, status: null, stand: gp.stand || null, fremd: 0,
@@ -67,6 +73,21 @@ function browserApi() {
     ["PC 02", "192.168.1.32", "GAMER-02", "3c:7c:3f:1a:22:02", 41],
   ];
   const abo = (k) => (cb) => { hoerer[k].add(cb); return () => hoerer[k].delete(cb); };
+  const statsMelden = () => statusMelden();
+  // Vorschau-Hauptfenster antwortet dem Stats-Tab mit Status und Log; der Stats-Tab übernimmt beides
+  let fremd = null, fremdLog = null;
+  if (kanal && !istStats) kanal.onmessage = ({ data }) => { if (data?.k === "hallo") { kanal.postMessage({ k: "status", d: status() }); kanal.postMessage({ k: "log", d: regie.alleLogs() }); } };
+  if (kanal && istStats) {
+    fremdLog = new Promise((ok) => {
+      setTimeout(() => ok([]), 1500);
+      kanal.onmessage = ({ data }) => {
+        if (data?.k === "status") { fremd = data.d; hoerer.status.forEach((cb) => cb(data.d)); }
+        if (data?.k === "regieEvent") hoerer.regieEvent.forEach((cb) => cb(data.d));
+        if (data?.k === "log") ok(data.d);
+      };
+    });
+    kanal.postMessage({ k: "hallo" });
+  }
   const download = (name, text) => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text])); a.download = name; a.click(); };
   return {
     appVersion: async () => __APP_VERSION__,
@@ -78,8 +99,13 @@ function browserApi() {
       if (gp.zustand === "verbunden") cfg.gamepc.pcId = pcId; // PC-ID nur ohne aktive Session
       speichern(); return status();
     },
-    setModus: async (m) => { cfg.modus = m; speichern(); sim.neu(); return status(); },
-    status: async () => status(),
+    setModus: async (m) => {
+      cfg.modus = m; speichern(); sim.neu();
+      for (const p of regie.snapshot().pcs.filter((x) => !x.sim && !VORSCHAU_PCS.some(([id]) => id === x.pcId))) regie.pcEntfernen(p.pcId);
+      if (m === "standalone") regie.pcVerbunden(cfg.gamepc.pcId.trim() || "Dieser PC", { spiele: QUELLEN, remote: "dieser PC", geraet: { hostname: "DIESER-PC", app: __APP_VERSION__, plattform: "win32", karte: "lokal" } });
+      return status();
+    },
+    status: async () => (istStats ? fremd || { modus: cfg.modus, regie: null } : status()),
     netzAdressen: async () => [
       { name: "Ethernet", ip: "192.168.1.20", maske: "255.255.255.0", mac: "3c:7c:3f:1a:20:00" },
       { name: "Ethernet 2 (Licht)", ip: "2.0.0.20", maske: "255.0.0.0", mac: "00:e0:4c:68:01:20" },
@@ -95,7 +121,7 @@ function browserApi() {
     macUpdateLaden: async () => ({ ok: false }),
     appBeenden: async () => {},
     onUpdateStatus: () => () => {},
-    regieLog: async () => regie.alleLogs(),
+    regieLog: async () => (istStats && fremdLog ? fremdLog : regie.alleLogs()),
     zaehlerZuruecksetzen: async () => { regie.zuruecksetzen(); return true; },
     sessionOeffnen: async () => {
       sessionOffen = !!cfg.regie.session.passwort;
@@ -115,6 +141,12 @@ function browserApi() {
     simStop: async () => { sim.stop(); return sim.status(); },
     simNeu: async () => { sim.neu(); return sim.status(); },
     onRegieEvent: abo("regieEvent"),
+    statsFenster: async (offen) => {
+      if (offen === false) { if (statsTab && !statsTab.closed) statsTab.close(); statsTab = null; }
+      else { statsTab = window.open(location.href.split("#")[0] + "#stats", "advancedlan-stats", "width=1280,height=720"); const t = setInterval(() => { if (!statsTab || statsTab.closed) { clearInterval(t); statsMelden(); } }, 1000); }
+      statsMelden(); return status().regie?.stats;
+    },
+    statsVollbild: async () => { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen?.(); },
     gamePcLog: async () => [...gp.log],
     verbinden: async () => {
       const g = cfg.gamepc;
@@ -124,7 +156,7 @@ function browserApi() {
       gp.zustand = "verbunden"; statusMelden(); return { ok: true };
     },
     setupCheck: async () => ({
-      allgemein: [
+      allgemein: cfg.modus === "standalone" ? [] : [
         { id: "pcid", label: "PC-ID eingetragen", ok: !!cfg.gamepc.pcId.trim(), detail: cfg.gamepc.pcId.trim() || "fehlt" },
         { id: "session", label: "Mit einer Session verbunden", ok: gp.zustand === "verbunden", detail: gp.zustand === "verbunden" ? cfg.gamepc.regie.session : "nicht verbunden" },
       ],

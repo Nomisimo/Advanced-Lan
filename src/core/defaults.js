@@ -22,6 +22,8 @@ function standardRegie() {
     targets: [], // [{ id, typ, name, host, port, optionen: {}, netz }]  netz: eigene Netzwerkkarte, leer = wie „Senden“
     // Tab „Signale“: welches Event welchen Befehl an welches Ziel sendet
     signale: {}, // { [spiel]: { [event]: [{ id, ziel, befehl, werte, pc, team }] } }
+    // Tab „Setup“: Game-Stats-Screen (Spielstand, beste Spieler, letzte Events) als Pop-out-Fenster oder NDI-Stream
+    stats: { an: false, ndi: false, ndiName: "Advanced LAN Stats" },
   };
 }
 
@@ -67,6 +69,15 @@ function migrateSignale(s) {
   return out;
 }
 
+// Modi: Regie, Game-PC und Standalone (Regie und Spiel auf einem PC)
+const MODI = ["regie", "gamepc", "standalone"];
+
+function migrateStats(s, std) {
+  if (!s || typeof s !== "object") return { ...std };
+  const name = typeof s.ndiName === "string" && s.ndiName.trim() ? s.ndiName.trim().slice(0, 60) : std.ndiName;
+  return { an: !!s.an, ndi: !!s.ndi, ndiName: name };
+}
+
 // Gespeicherte Einstellungen einlesen, fehlende Felder ergänzen
 function migrateKonfig(k) {
   const d = standardKonfig();
@@ -74,7 +85,7 @@ function migrateKonfig(k) {
   const r = k.regie || {}, g = k.gamepc || {};
   const m = {
     ...d,
-    modus: k.modus === "regie" || k.modus === "gamepc" ? k.modus : null,
+    modus: MODI.includes(k.modus) ? k.modus : null,
     regie: {
       ...d.regie,
       ...r,
@@ -84,6 +95,7 @@ function migrateKonfig(k) {
       targets: Array.isArray(r.targets) ? r.targets.map(migrateZiel) : d.regie.targets,
       signale: migrateSignale(r.signale),
       spiele: genutzteSpiele(r.spiele, d.regie.spiele),
+      stats: migrateStats(r.stats, d.regie.stats),
     },
     gamepc: { ...d.gamepc, ...g, regie: { ...d.gamepc.regie, ...(g.regie || {}) }, overlay: { ...d.gamepc.overlay, ...(g.overlay && typeof g.overlay === "object" ? g.overlay : {}) }, gsiToken: g.gsiToken || d.gamepc.gsiToken },
   };
@@ -93,4 +105,4 @@ function migrateKonfig(k) {
   return m;
 }
 
-module.exports = { standardKonfig, migrateKonfig, genutzteSpiele, standardRegie, standardGamePc, neuerToken, uid, PORTS };
+module.exports = { MODI, standardKonfig, migrateKonfig, genutzteSpiele, standardRegie, standardGamePc, neuerToken, uid, PORTS };

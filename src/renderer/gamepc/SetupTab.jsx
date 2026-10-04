@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { S, LINE, SUB, MUTED, OK, WARN, teamFarbe } from "../theme.js";
 import { api } from "../api.js";
-import { Section, Check, TeamChip, SpielChip, Kbd, Toggle, KartenWahl, useKarten } from "../ui.jsx";
+import { Section, Check, Field, TeamChip, SpielChip, Kbd, Toggle, KartenWahl, useKarten } from "../ui.jsx";
 import { karteFuer } from "../../core/netzwerk.js";
 import { overlayStatus } from "../../core/overlay-status.js";
 import { SPIELE } from "../../core/spiele.js";
@@ -67,7 +67,19 @@ function Netzwerkkarte({ cfg, mutate }) {
   );
 }
 
-export default function SetupTab({ cfg, mutate, g, jetzt, notify }) {
+// Standalone: Name, unter dem dieser PC in der eigenen Regie erscheint (sonst die PC-ID)
+function LokalName({ cfg, mutate }) {
+  const [name, setName] = useState(cfg.pcId || "");
+  useEffect(() => setName(cfg.pcId || ""), [cfg.pcId]);
+  return (
+    <Field label="Name dieses PCs in der Regie" hint="Erscheint in Control, im Event-Log und auf dem Game-Stats-Screen, wenn das Spiel keinen Spielernamen liefert" style={{ maxWidth: 360 }}>
+      <input style={S.input} value={name} placeholder="Dieser PC" maxLength={40} onChange={(e) => setName(e.target.value)}
+        onBlur={() => name.trim() !== cfg.pcId && mutate((d) => { d.pcId = name.trim(); })} onKeyDown={(e) => e.key === "Enter" && e.target.blur()} />
+    </Field>
+  );
+}
+
+export default function SetupTab({ cfg, mutate, g, jetzt, notify, standalone = false }) {
   const [check, setCheck] = useState(null);
   const laden = () => api.setupCheck().then(setCheck);
   useEffect(() => { laden(); const t = setInterval(laden, 3000); return () => clearInterval(t); }, []);
@@ -85,10 +97,11 @@ export default function SetupTab({ cfg, mutate, g, jetzt, notify }) {
         {check && <span style={{ fontSize: 13, fontWeight: 800, color: offen ? WARN : OK, textShadow: offen ? "none" : `0 0 8px ${OK}` }}>{offen ? `${offen} von ${alle.length} offen` : "Alles bereit"}</span>}
         <button style={S.smallBtn} onClick={laden}><RefreshCw size={12} /> Prüfen</button>
       </span>}>
-        {check ? <Liste punkte={check.allgemein} /> : <div style={S.empty}>Prüfe …</div>}
+        {standalone ? <LokalName cfg={cfg} mutate={mutate} /> : check ? <Liste punkte={check.allgemein} /> : <div style={S.empty}>Prüfe …</div>}
+        {standalone && <p style={S.hint}>Standalone: Die Spiele auf diesem PC melden ihre Events direkt an die Regie. Eine Session braucht es dafür nicht.</p>}
       </Section>
 
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.4fr) minmax(0,1fr)", gap: 20, alignItems: "stretch" }}>
+      {!standalone && <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.4fr) minmax(0,1fr)", gap: 20, alignItems: "stretch" }}>
       <Section title="Mini-Overlay" right={<div style={{ display: "flex", gap: 10, alignItems: "center" }}>
         <Toggle checked={cfg.overlay?.an} label="Anzeigen, wenn die App minimiert ist" onChange={(v) => mutate((d) => { d.overlay = { ...(d.overlay || {}), an: v }; })} />
         <button style={S.smallBtn} onClick={async () => { await api.overlayZuruecksetzen(); notify("Overlay steht wieder oben rechts."); }}><LocateFixed size={12} /> Position zurücksetzen</button>
@@ -99,7 +112,7 @@ export default function SetupTab({ cfg, mutate, g, jetzt, notify }) {
         </div>
       </Section>
       <Netzwerkkarte cfg={cfg} mutate={mutate} />
-      </div>
+      </div>}
 
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 20, alignItems: "start" }}>
         <Section title={<span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>Counter-Strike 2 <SpielChip spiel="cs2" /></span>}

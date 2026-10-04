@@ -1,7 +1,7 @@
 import React from "react";
 import { S, ACCENT, ACCENT_HI, LINE, SUB, MUTED, GLOW } from "./theme.js";
 import { APP_ICON } from "./Kopf.jsx";
-import { Clapperboard, Gamepad2 } from "lucide-react";
+import { Clapperboard, Gamepad2, MonitorPlay } from "lucide-react";
 
 const Karte = ({ icon: Ic, titel, text, onClick }) => (
   <button className="glow-hover" onClick={onClick}
@@ -14,7 +14,7 @@ const Karte = ({ icon: Ic, titel, text, onClick }) => (
 
 export default function ModusWahl({ onWahl, version }) {
   return (
-    <div style={{ ...S.app, alignItems: "center", justifyContent: "center", overflow: "auto", padding: 24 }}>
+    <div style={{ ...S.app, alignItems: "center", justifyContent: "center", overflow: "auto", padding: "24px 24px 110px", position: "relative" }}>
       <img src={APP_ICON} alt="" style={{ width: 84, height: 84, filter: "drop-shadow(0 0 16px rgba(157,92,255,.75))" }} />
       <div style={{ ...S.logo, fontSize: 30, marginTop: 12 }}>ADVANCED LAN</div>
       <div style={{ color: SUB, fontSize: 14, margin: "6px 0 30px" }}>Wofür ist dieser PC da?</div>
@@ -24,7 +24,14 @@ export default function ModusWahl({ onWahl, version }) {
         <Karte icon={Clapperboard} titel="Regie" onClick={() => onWahl("regie")}
           text="Öffnet die Session und sendet die Signale. Hier läuft kein Spiel." />
       </div>
-      {version && <div style={{ color: MUTED, fontSize: 11, marginTop: 28 }}>v{version}</div>}
+      {/* Standalone: Regie und Spiel auf einem PC, ohne zweiten Rechner */}
+      <div style={{ position: "absolute", left: 0, right: 0, bottom: 22, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+        <button onClick={() => onWahl("standalone")} title="Regie und Spiel auf diesem PC: die Spiele hier melden ihre Events direkt an die Regie, ohne Session"
+          style={{ background: "transparent", border: "none", color: SUB, cursor: "pointer", fontSize: 13, display: "inline-flex", alignItems: "center", gap: 7, padding: "6px 10px", textDecoration: "underline", textUnderlineOffset: 4, textDecorationColor: ACCENT + "88" }}>
+          <MonitorPlay size={14} color={ACCENT_HI} /> Standalone: Regie und Spiel auf diesem PC
+        </button>
+        {version && <div style={{ color: MUTED, fontSize: 11 }}>v{version}</div>}
+      </div>
     </div>
   );
 }

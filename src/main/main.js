@@ -17,7 +17,7 @@ const { DotaQuelle, DOTA_APPID, dotaCfg, dotaStartoptionen, DOTA_CFG_DATEI, DOTA
 const { GepQuelle, GEP_SPIELE, GEP_BY_ID } = require('../core/gep-spiele');
 const { QUELLEN, SPIEL_BY_ID } = require('../core/spiele');
 const { rlIni, leseRlIni, RL_INI_DATEI } = require('../core/rl-ini');
-const { migrateKonfig } = require('../core/defaults');
+const { migrateKonfig, MODI } = require('../core/defaults');
 const { gsiCfg, CFG_DATEI } = require('../core/cfg');
 const { testNachricht, zeigeNachricht } = require('../core/signal');
 const { overlayStatus } = require('../core/overlay-status');
@@ -28,6 +28,7 @@ const { RlSimMatch } = require('../core/rl-sim');
 const { DotaSimMatch } = require('../core/dota-sim');
 const { GepSimMatch } = require('../core/gep-sim');
 const { einrichtenUpdates } = require('./updates');
+const { StatsAusgabe } = require('./stats-ausgabe');
 const os = require('os');
 
 const karten = () => kartenListe(os.networkInterfaces());
@@ -51,8 +52,16 @@ function speichereKonfig() {
   }, 300);
 }
 
+// Modi: Regie, Game-PC oder Standalone (Regie und Spiel auf demselben PC, ohne Netzwerk)
+const istRegie = () => cfg?.modus === 'regie' || cfg?.modus === 'standalone';
+const hatSpiele = () => cfg?.modus === 'gamepc' || cfg?.modus === 'standalone';
+
 /* ── An die Oberfläche melden ─────────────────────────────────────────── */
-const an = (kanal, daten) => { if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.send(kanal, daten); };
+// Hauptfenster und Game-Stats-Screen (Pop-out und NDI) bekommen dieselben Meldungen
+const an = (kanal, daten) => {
+  if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.send(kanal, daten);
+  if (kanal === 'status' || kanal === 'regie-event') for (const wc of stats.webContents()) wc.send(kanal, daten);
+};
 const meldung = (text, art = 'ok') => an('meldung', { text, art });
 let statusTimer = null;
 const statusMelden = () => {
@@ -78,6 +87,10 @@ function oscSenden(s) {
 }
 const session = new SessionServer({ regie, getConfig: () => cfg.regie, onChange: statusMelden, lokal: () => lokaleIp(karten(), cfg.regie.netz?.empfang) });
 const regieSim = new RegieSim({ regie, onChange: statusMelden });
+const stats = new StatsAusgabe({
+  root, preload: path.join(root, 'src', 'preload', 'preload.js'), icon: path.join(root, 'assets', 'app-icon', 'icon.png'),
+  getStats: () => cfg.regie.stats, aktiv: () => istRegie(), onChange: statusMelden,
+});
 
 // Auf dem Regie-PC darf kein Spiel laufen (Windows: Prozessliste prüfen)
 const SPIEL_PROZESSE = { 'cs2.exe': 'CS2', 'valorant-win64-shipping.exe': 'Valorant', 'rocketleague.exe': 'Rocket League', 'dota2.exe': 'Dota 2', 'r5apex_dx12.exe': 'Apex Legends', 'rainbowsix_vulkan.exe': 'Rainbow Six Siege', 'rainbowsix_be.exe': 'Rainbow Six Siege',
@@ -116,18 +129,37 @@ const client = new SessionClient({
 const discovery = new Discovery({ onChange: () => discoveryGeaendert(), karte: () => cfg.gamepc.netz });
 const gsi = new GsiServer({ onPayload: (b) => gamePcPayload(b), onStatus: statusMelden });
 
+// Standalone: dieser PC meldet sich bei der eigenen Regie wie ein Game-PC, ohne Netzwerk
+let lokalPc = null;
+const lokalId = () => cfg.gamepc.pcId.trim() || 'Dieser PC';
+function lokalAnmelden() {
+  if (lokalPc && lokalPc !== lokalId()) regie.pcEntfernen(lokalPc);
+  lokalPc = lokalId();
+  regie.pcVerbunden(lokalPc, { spiele: QUELLEN, remote: 'dieser PC', geraet: { hostname: os.hostname(), app: app.getVersion(), plattform: process.platform, karte: 'lokal' } });
+}
+function lokalAbmelden() { if (lokalPc) regie.pcEntfernen(lokalPc); lokalPc = null; }
+// Ereignis und Status eines Spiels: im Standalone direkt an die Regie, sonst über die Session
+function anRegie(spiel, ev) {
+  if (cfg.modus === 'standalone') { regie.pcEvent(lokalId(), spiel, ev); return true; }
+  return client.event(spiel, ev);
+}
+function statusAnRegie(spiel, status, stand) {
+  if (cfg.modus === 'standalone') regie.pcStatus(lokalId(), { spiel, status, stand });
+  else client.status(spiel, status, stand);
+}
+
 function gamePcPayload(body, sim = false) {
-  if (cfg.modus !== 'gamepc') return;
+  if (!hatSpiele()) return;
   if (body?.auth?.token !== cfg.gamepc.gsiToken) { gp.fremd++; return statusMelden(); }
   if (body?.provider?.appid === DOTA_APPID) return quelleMelden('dota2', quellen.dota2.ingest(body), sim); // Dota 2 schickt an denselben Empfang
   const r = quelle.ingest(body);
   Object.assign(gp, { letzte: Date.now(), status: r.status, stand: r.stand });
   const spiel = 'cs2'; // Game-PC sendet immer alles, was er erkennt. Was davon genutzt wird, entscheidet die Regie.
   for (const ev of r.events) {
-    const ok = client.event(spiel, ev);
+    const ok = anRegie(spiel, ev);
     gamePcLog({ spiel, ev, gesendet: ok, sim });
   }
-  if (r.events.length || Date.now() - gp.statusGesendet > 500) { client.status(spiel, r.status, r.stand); gp.statusGesendet = Date.now(); }
+  if (r.events.length || Date.now() - gp.statusGesendet > 500) { statusAnRegie(spiel, r.status, r.stand); gp.statusGesendet = Date.now(); }
   statusMelden();
 }
 
@@ -135,14 +167,14 @@ function gamePcPayload(body, sim = false) {
 function quelleMelden(spiel, r, sim = false) {
   const d = daten[spiel] = daten[spiel] || { letzte: 0, statusGesendet: 0 };
   Object.assign(d, { letzte: Date.now(), stand: r.stand, status: r.status });
-  for (const ev of r.events) gamePcLog({ spiel, ev, gesendet: client.event(spiel, ev), sim });
-  if (r.events.length || Date.now() - d.statusGesendet > 500) { client.status(spiel, r.status, r.stand); d.statusGesendet = Date.now(); }
+  for (const ev of r.events) gamePcLog({ spiel, ev, gesendet: anRegie(spiel, ev), sim });
+  if (r.events.length || Date.now() - d.statusGesendet > 500) { statusAnRegie(spiel, r.status, r.stand); d.statusGesendet = Date.now(); }
   statusMelden();
 }
 
 // Overwolf-Spiele: GEP-Nachrichten des Spiels auf diesem PC
 function gepNachricht(spiel, m, sim = false) {
-  if (cfg?.modus !== 'gamepc' || !quellen[spiel]) return;
+  if (!hatSpiele() || !quellen[spiel]) return;
   quelleMelden(spiel, quellen[spiel].ingest(m), sim);
 }
 
@@ -191,14 +223,14 @@ function gamePcSimStart(modus) {
 let autoWartet = false;
 // Rocket League: Nachrichten der Stats API → Events an die Regie
 function rlNachricht(m, sim = false) {
-  if (cfg.modus !== 'gamepc') return;
+  if (!hatSpiele()) return;
   const r = rlQuelle.ingest(m);
   rl.letzte = Date.now();
   rl.stand = r.stand;
   for (const ev of r.events) {
-    gamePcLog({ spiel: 'rl', ev, gesendet: client.event('rl', ev), sim });
+    gamePcLog({ spiel: 'rl', ev, gesendet: anRegie('rl', ev), sim });
   }
-  if (r.events.length || Date.now() - rl.statusGesendet > 500) { client.status('rl', r.status, r.stand); rl.statusGesendet = Date.now(); }
+  if (r.events.length || Date.now() - rl.statusGesendet > 500) { statusAnRegie('rl', r.status, r.stand); rl.statusGesendet = Date.now(); }
   statusMelden();
 }
 
@@ -282,7 +314,8 @@ const OHNE_MAC = (spiel) => [{ id: 'plattform', label: `${spiel} gibt es nicht f
 
 async function setupCheck() {
   const g = cfg.gamepc, c = client.info(), gs = gsi.status();
-  const allgemein = [
+  // Standalone: keine Session nötig, die Spiele melden direkt an die Regie auf diesem PC
+  const allgemein = cfg.modus === 'standalone' ? [] : [
     { id: 'pcid', label: 'PC-ID eingetragen', ok: !!g.pcId.trim(), detail: g.pcId.trim() || 'fehlt' },
     { id: 'session', label: 'Mit einer Session verbunden', ok: c.zustand === 'verbunden', detail: c.zustand === 'verbunden' ? c.session : c.grund || 'nicht verbunden' },
   ];
@@ -323,27 +356,36 @@ async function modusStarten() {
   discovery.stop();
   rlClient.stop();
   await gsi.stop();
-  if (cfg.modus === 'regie') {
+  lokalAbmelden();
+  spielAufRegie = '';
+  if (istRegie()) {
+    // Im Standalone darf die Session offen sein: dann kommen weitere Game-PCs dazu
     if (cfg.regie.session.offen && cfg.regie.session.passwort) await session.oeffnen();
-    pruefeSpielProzesse();
-    spielCheck = setInterval(pruefeSpielProzesse, 15000);
+    if (cfg.modus === 'regie') { // Standalone: hier läuft das Spiel absichtlich
+      pruefeSpielProzesse();
+      spielCheck = setInterval(pruefeSpielProzesse, 15000);
+    }
   }
-  if (cfg.modus === 'gamepc') {
+  if (hatSpiele()) {
     quelle = new CsQuelle();
     await gsi.start(Number(cfg.gamepc.gsiPort));
     rlQuelle = new RlQuelle();
     neueQuellen();
     rlClient.start(Number(cfg.gamepc.rlPort));
+  }
+  if (cfg.modus === 'gamepc') {
     discovery.start();
     autoWartet = !!(cfg.gamepc.autoVerbinden && cfg.gamepc.regie.id && cfg.gamepc.passwort && cfg.gamepc.pcId);
   }
+  if (cfg.modus === 'standalone') lokalAnmelden();
+  await stats.anwenden();
   statusMelden();
 }
 
 function gesamtStatus() {
   const s = { modus: cfg.modus, jetzt: Date.now() };
-  if (cfg.modus === 'regie') s.regie = { ...regie.snapshot(), session: session.status(), sim: regieSim.status(), armed: cfg.regie.armed, spielAufRegie };
-  if (cfg.modus === 'gamepc') s.gamepc = { client: client.info(), sessions: discovery.liste(), discoveryFehler: discovery.fehler, gsi: gsi.status(), letzte: gp.letzte, status: gp.status, stand: gp.stand, fremd: gp.fremd, sim: { ...gpSim.status(), spiel: gpSimSpiel }, rl: { ...rlClient.status(), letzte: rl.letzte, stand: rl.stand }, daten, gep: gep.status() };
+  if (istRegie()) s.regie = { ...regie.snapshot(), session: session.status(), sim: regieSim.status(), armed: cfg.regie.armed, spielAufRegie, stats: stats.status(), lokal: lokalPc };
+  if (hatSpiele()) s.gamepc = { client: client.info(), sessions: discovery.liste(), discoveryFehler: discovery.fehler, gsi: gsi.status(), letzte: gp.letzte, status: gp.status, stand: gp.stand, fremd: gp.fremd, sim: { ...gpSim.status(), spiel: gpSimSpiel }, rl: { ...rlClient.status(), letzte: rl.letzte, stand: rl.stand }, daten, gep: gep.status() };
   return s;
 }
 
@@ -379,7 +421,7 @@ function createWindow() {
   mainWin.once('ready-to-show', () => { appBereit = true; zeigen(); });
   setTimeout(() => { animationFertig = true; zeigen(); }, 1900);
   for (const ev of ['minimize', 'restore', 'hide', 'show']) mainWin.on(ev, () => setImmediate(overlayAktualisieren));
-  mainWin.on('closed', () => { if (overlayWin) overlayWin.destroy(); });
+  mainWin.on('closed', () => { if (overlayWin) overlayWin.destroy(); stats.beenden(); });
   mainWin.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//i.test(url)) shell.openExternal(url);
     return { action: 'deny' };
@@ -465,13 +507,16 @@ ipcMain.handle('config-set', async (_, neu) => {
   cfg.gamepc.overlay = { ...cfg.gamepc.overlay, x: alt.gamepc.overlay?.x ?? null, y: alt.gamepc.overlay?.y ?? null }; // Position setzt nur das Overlay selbst
   speichereKonfig();
   overlayAktualisieren();
-  if (cfg.modus === 'regie') {
+  if (istRegie()) {
     if (session.offen && (cfg.regie.netz.empfang !== alt.regie.netz?.empfang)) await session.oeffnen();
     if (cfg.regie.aktivesSpiel !== alt.regie.aktivesSpiel) session.spielGewechselt();
     else if (session.offen && cfg.regie.session.name !== alt.regie.session.name) session.ausrufen();
     if (session.offen && (cfg.regie.session.port !== alt.regie.session.port || cfg.regie.session.passwort !== alt.regie.session.passwort)) await session.oeffnen();
   }
-  if (cfg.modus === 'gamepc' && cfg.gamepc.gsiPort !== alt.gamepc.gsiPort) await gsi.start(Number(cfg.gamepc.gsiPort));
+  if (hatSpiele() && cfg.gamepc.gsiPort !== alt.gamepc.gsiPort) await gsi.start(Number(cfg.gamepc.gsiPort));
+  if (hatSpiele() && cfg.gamepc.rlPort !== alt.gamepc.rlPort) rlClient.start(Number(cfg.gamepc.rlPort));
+  if (cfg.modus === 'standalone' && lokalPc !== lokalId()) lokalAnmelden();
+  if (istRegie() && JSON.stringify(cfg.regie.stats) !== JSON.stringify(alt.regie.stats)) await stats.anwenden();
   if (cfg.modus === 'gamepc' && cfg.gamepc.netz !== alt.gamepc.netz) {
     // Andere Karte: Sessions dort neu suchen und eine bestehende Verbindung darüber neu aufbauen
     discovery.stop(); discovery.start();
@@ -481,7 +526,7 @@ ipcMain.handle('config-set', async (_, neu) => {
   return gesamtStatus();
 });
 ipcMain.handle('modus-setzen', async (_, modus) => {
-  cfg.modus = modus === 'regie' || modus === 'gamepc' ? modus : null;
+  cfg.modus = MODI.includes(modus) ? modus : null;
   speichereKonfig();
   await modusStarten();
   overlayAktualisieren();
@@ -507,6 +552,10 @@ ipcMain.handle('ziel-testen', async (_, zielId) => {
 ipcMain.handle('sim-start', (_, modus) => { regieSim.start(modus, cfg.regie.aktivesSpiel); return regieSim.status(); });
 ipcMain.handle('sim-stop', () => { regieSim.stop(); return regieSim.status(); });
 ipcMain.handle('sim-neu', () => { regieSim.neu(); return regieSim.status(); });
+// Game-Stats-Screen
+ipcMain.handle('stats-fenster', (_, offen) => { if (offen === false) stats.fensterSchliessen(); else stats.fensterOeffnen(); statusMelden(); return stats.status(); });
+ipcMain.handle('stats-vollbild', () => stats.vollbild());
+ipcMain.handle('ndi-pruefen', () => stats.ndiVerfuegbar());
 
 // Game-PC
 ipcMain.handle('gamepc-log', () => gp.log);
@@ -557,7 +606,7 @@ ipcMain.handle('dota-cfg-speichern', async () => {
 ipcMain.handle('test-event', (_, type, spiel = 'cs2', team = '', kills = 1) => {
   const stand = spiel === 'rl' ? rl.stand : spiel === 'cs2' ? gp.stand : daten[spiel]?.stand;
   const ev = { type: String(type), team: String(team || ''), player: cfg.gamepc.pcId, kills: Number(kills) || 1, round: stand?.runde ?? 0, map: stand?.map || '', test: true };
-  const ok = client.event(spiel, ev);
+  const ok = anRegie(spiel, ev);
   gamePcLog({ spiel, ev, gesendet: ok, sim: true });
   return { ok };
 });
@@ -583,7 +632,7 @@ else {
     client.trennen();
     rlClient.stop();
     discovery.stop();
-    await Promise.allSettled([session.schliessen(), gsi.stop()]);
+    await Promise.allSettled([session.schliessen(), gsi.stop(), stats.beenden()]);
     osc.close();
     app.quit();
   });

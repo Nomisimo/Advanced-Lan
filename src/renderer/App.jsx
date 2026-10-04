@@ -48,6 +48,7 @@ export default function App() {
     <>
       {!cfg.modus && <ModusWahl onWahl={modusSetzen} version={version} />}
       {cfg.modus === "regie" && status.regie && <RegieApp {...shared} />}
+      {cfg.modus === "standalone" && status.regie && status.gamepc && <RegieApp {...shared} standalone />}
       {cfg.modus === "gamepc" && status.gamepc && <GamePcApp {...shared} />}
       {toast && <div style={{ position: "fixed", bottom: 18, left: "50%", transform: "translateX(-50%)", background: "#1a1820", border: `1px solid ${toast.kind === "err" ? ERR : toast.kind === "warn" ? WARN : ACCENT}`, color: "#ece9f2", padding: "9px 16px", borderRadius: 8, fontSize: 13, zIndex: 2000, boxShadow: "0 8px 24px rgba(0,0,0,.5)", maxWidth: "80vw" }}>{toast.msg}</div>}
     </>

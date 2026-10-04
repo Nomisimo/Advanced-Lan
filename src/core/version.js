@@ -7,6 +7,8 @@ const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
   "0.1.0-beta.4": [
+    "Standalone: Regie und Spiel auf einem PC (Knopf unten in der Modus-Wahl). Die Spiele hier melden direkt an die Regie, ohne Session; Tab „Spiele“ richtet sie ein wie auf einem Game-PC",
+    "Game-Stats-Screen für Publikum und Stream: Spielstand, Zahlen des Matches, beste Spieler und letzte Events des aktiven Spiels. Als Pop-out-Fenster (Knopf „Stats“ oben) oder als NDI-Quelle in 1920×1080, einzuschalten in Regie → Setup",
     "Sieben neue Spiele: Dota 2, Overwatch 2, Rainbow Six Siege, Marvel Rivals, Fortnite, Apex Legends und PUBG, jedes mit eigenen Events in „Signale“, Simulator, Statistik und Match-Check",
     "Dota 2 über Valves Game State Integration wie CS2: cfg per Knopfdruck, Check der Startoption -gamestateintegration, läuft auch auf dem Mac. Events u. a. Horn, Tag/Nacht, Roshan, Turm, Double Kill bis Rampage",
     "Overwatch 2, R6, Marvel Rivals, Fortnite, Apex und PUBG über Overwolf Game Events (GEP). Echte Daten erst mit Overwolf-Freigabe und signierter Windows-App, der Simulator geht schon",

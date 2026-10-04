@@ -30,10 +30,10 @@ export function Field({ label, children, hint, style }) {
   );
 }
 
-export function Toggle({ checked, onChange, label, title }) {
+export function Toggle({ checked, onChange, label, title, disabled }) {
   return (
-    <label title={title} style={{ display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", cursor: "pointer", fontSize: 12, color: "#d4d0de", userSelect: "none" }}>
-      <input type="checkbox" checked={!!checked} onChange={(e) => onChange(e.target.checked)} style={{ accentColor: ACCENT }} />
+    <label title={title} style={{ display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", cursor: disabled ? "default" : "pointer", fontSize: 12, color: "#d4d0de", userSelect: "none", opacity: disabled ? 0.45 : 1 }}>
+      <input type="checkbox" checked={!!checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} style={{ accentColor: ACCENT }} />
       {label}
     </label>
   );

@@ -27,6 +27,7 @@ const Ueberblick = () => (
     <P>
       Eine App, zwei Modi. Auf jedem PC, auf dem gespielt wird, läuft sie als <b>Game-PC</b>. Auf dem Regie-PC läuft sie als <b>Regie</b>; dort darf kein Spiel laufen.
       Im selben Netz braucht es also mindestens zwei PCs. Es kann mehrere Regien mit je einer eigenen Session geben.
+      Für einen einzelnen PC gibt es <b>Standalone</b> (Knopf unten in der Modus-Wahl): Regie und Spiel laufen dann auf demselben PC.
     </P>
     <P>
       Die Regie öffnet eine Session mit Name und Passwort. Game-PCs sehen alle Sessions im Netz automatisch und treten mit ihrer PC-ID bei.
@@ -271,11 +272,47 @@ const NetzAnforderungen = () => (
   </Section>
 );
 
+const Standalone = ({ goTab }) => (
+  <Section title="Standalone: Regie und Spiel auf einem PC">
+    <P>
+      Für Streamer, kleine Events oder zum Ausprobieren: Die App ist Regie und Game-PC zugleich. Die Spiele auf diesem PC melden ihre Events direkt an die Regie, ohne Session und ohne Netzwerk.
+      Alles andere ist wie in der Regie: aktives Spiel, Ziele, Signale, Simulator und Game-Stats-Screen.
+    </P>
+    <Schritt n={1} titel="Spiele einrichten" onGo={goTab && (() => goTab("spiele"))} goLabel="Spiele">
+      Im Tab <b>Spiele</b> wie auf einem Game-PC die cfg-Dateien installieren (CS2, Dota 2) und die Stats API einschalten (Rocket League). Overwolf-Spiele erkennt die App selbst.
+      Oben steht der Name, unter dem dieser PC in der Regie erscheint.
+    </Schritt>
+    <Schritt n={2} titel="Spiele, Ziele und Signale" onGo={goTab && (() => goTab("setup"))} goLabel="Setup">
+      Wie in der Regie: Spiele anhaken, Ziele anlegen, Signale belegen, Ausgabe einschalten.
+    </Schritt>
+    <Schritt n={3} titel="Weitere PCs (optional)" onGo={goTab && (() => goTab("session"))} goLabel="Session">
+      Wer doch noch Game-PCs dazunehmen will, öffnet im Tab <b>Session</b> eine Session. Die Game-PCs treten bei wie bei einer normalen Regie.
+    </Schritt>
+  </Section>
+);
+
+const StatsHilfe = ({ goTab }) => (
+  <Section title="Game-Stats-Screen">
+    <P>
+      Ein Bildschirm für Publikum und Stream: Spielstand, Runde oder Spielzeit, Zahlen des Matches, die besten Spieler und die letzten Events des aktiven Spiels.
+      Er wird nur in der Regie (und im Standalone) im Tab <b>Setup</b> eingeschaltet. Gestaltet ist er für 1920×1080 und passt sich jedem Fenster an.
+    </P>
+    <L>
+      <li><b>Pop-out-Fenster:</b> Knopf <b>Stats</b> oben in der Kopfzeile oder im Setup. Das Fenster auf einen zweiten Bildschirm oder Beamer ziehen, Doppelklick schaltet Vollbild.</li>
+      <li><b>NDI-Stream:</b> im Setup einschalten und einen Namen vergeben. OBS (mit NDI-Plugin), vMix oder ein NDI-Monitor im selben Netz sehen die Quelle unter diesem Namen, 1920×1080 mit 30 Bildern pro Sekunde. NDI braucht kein offenes Fenster.</li>
+    </L>
+    <P><span style={{ color: SUB }}>NDI® ist eine eingetragene Marke von Vizrt NDI AB.</span></P>
+    {goTab && <button style={S.smallBtn} onClick={() => goTab("setup")}>Zum Setup</button>}
+  </Section>
+);
+
 export default function AnleitungTab({ modus, goTab }) {
   return (
     <>
       <Ueberblick />
+      {modus === "standalone" && <Standalone goTab={goTab} />}
       {modus === "gamepc" ? <><GamePc goTab={goTab} /><Regie /></> : <><Regie goTab={goTab} /><GamePc /></>}
+      {modus !== "gamepc" && <StatsHilfe goTab={goTab} />}
       <Cs2 />
       <Rl />
       <Dota />
@@ -284,6 +321,8 @@ export default function AnleitungTab({ modus, goTab }) {
       <ZieleEinrichten />
       <Netz />
       <NetzAnforderungen />
+      {modus === "gamepc" && <StatsHilfe />}
+      {modus !== "standalone" && <Standalone />}
     </>
   );
 }

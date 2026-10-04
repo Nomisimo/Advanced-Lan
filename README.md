@@ -1,4 +1,13 @@
-# Advanced LAN
+<p align="center">
+  <img src="docs/logo.svg" alt="Advanced LAN" width="160">
+</p>
+
+<h1 align="center">Advanced LAN</h1>
+
+<p align="center">Spielmomente lösen echtes Bühnenlicht, Ton und Video aus.<br>
+<a href="https://github.com/Nomisimo/Advanced-Lan-Party/releases">Download (Beta, macOS Intel)</a></p>
+
+<p align="center"><img src="docs/screenshots/ablauf.jpg" alt="Ablauf: Game-PCs melden Events, die Regie schickt OSC-Befehle an Licht, Audio und Video" width="820"></p>
 
 Eine App für die LAN-Party: Die Game-PCs melden Spielereignisse, die Regie sendet daraus OSC-Befehle an Lichtpulte, Audio- und Videosoftware (z. B. grandMA3, QLab, Reaper, Resolume). Design und Aufbau wie [Netzwerkplaner](https://github.com/Nomisimo/Netzwerkplaner) und Stromplaner, Akzentfarbe Lila.
 
@@ -27,6 +36,18 @@ Der Modus wird beim ersten Start gewählt und lässt sich oben rechts wechseln. 
 - **Updates wie im Netzwerkplaner:** Die App prüft beim Start die GitHub-Releases und zeigt eine neuere Version als grünen Knopf neben der Versionsnummer. Mac: Klick lädt das DMG in den Download-Ordner und öffnet es, dann die App nach „Programme“ ziehen (unsigniert, deshalb kein Austausch im Hintergrund). Windows: `electron-updater` lädt und installiert selbst, sobald es Windows-Releases gibt. Klick auf die Versionsnummer öffnet „Was ist neu?“ (`src/core/version.js`, dort bei jeder Version die Änderungen eintragen).
 - **Startanimation** wie im Netzwerkplaner: Controller, dessen Knöpfe nacheinander gedrückt werden.
 - CS2 und Rocket League gibt es nur für Windows. Auf dem Mac läuft die Regie; der Game-PC-Modus meldet dort, dass die Spiele fehlen.
+
+## Screenshots
+
+| Regie: Control | Regie: Signale |
+|---|---|
+| <img src="docs/screenshots/regie-control.jpg" alt="Regie, Tab Control" width="400"> | <img src="docs/screenshots/regie-signale.jpg" alt="Regie, Tab Signale" width="400"> |
+| **Regie: Ziele** | **Regie: Session-Übersicht** |
+| <img src="docs/screenshots/regie-ziele.jpg" alt="Regie, Tab Ziele" width="400"> | <img src="docs/screenshots/regie-session.png" alt="Regie, Tab Session" width="400"> |
+| **Game-PC: Setup** | **Game-PC: Simulator** |
+| <img src="docs/screenshots/gamepc-setup.png" alt="Game-PC, Tab Setup" width="400"> | <img src="docs/screenshots/gamepc-simulator.png" alt="Game-PC, Tab Simulator" width="400"> |
+| **Game-PC: Events** | |
+| <img src="docs/screenshots/gamepc-events.jpg" alt="Game-PC, Tab Events" width="400"> | |
 
 ## CS2
 

@@ -6,6 +6,7 @@ import { CFG_DATEI, CFG_ORDNER } from "../core/cfg.js";
 import { RL_INI_DATEI, RL_INI_ORDNER, RL_RATE } from "../core/rl-ini.js";
 import { DOTA_CFG_DATEI, DOTA_CFG_ORDNER, DOTA_STARTOPTION } from "../core/dota.js";
 import { GEP_SPIELE } from "../core/gep-spiele.js";
+import { STANDARD_HOTKEY, hotkeyText } from "../core/app-info.js";
 
 // Alle Erklärungen der App stehen hier, für beide Modi. Der eigene Modus steht oben.
 const P = ({ children }) => <p style={{ fontSize: 13, lineHeight: 1.7, color: "#d4d0de", margin: "0 0 10px" }}>{children}</p>;
@@ -306,6 +307,18 @@ const StatsHilfe = ({ goTab }) => (
   </Section>
 );
 
+const AppHilfe = ({ goTab }) => (
+  <Section title="Tastenkürzel, Datenschutz und Feedback">
+    <L>
+      <li><b>Ein-/Ausblenden:</b> <Kbd>{hotkeyText(STANDARD_HOTKEY, "win32")}</Kbd> (Mac: <Kbd>{hotkeyText(STANDARD_HOTKEY, "darwin")}</Kbd>) holt Advanced LAN nach vorn oder minimiert es, auch mitten im Spiel. Unter <b>Setup → App</b> lässt es sich ändern oder ausschalten. Nutzt schon eine andere App dieselbe Kombination, steht dort „belegt“.</li>
+      <li><b>Datenschutz:</b> Advanced LAN zeigt keine Werbung und sammelt keine persönlichen Daten. Spielereignisse gehen nur an die Regie und an die Ziele, die du einträgst. Die Overwolf-Laufzeit sendet anonyme Nutzungsdaten an Overwolf; was genau, steht in den <b>Datenschutz-Einstellungen</b> unter Setup → App.</li>
+      <li><b>Einführung:</b> Die Tour vom ersten Start gibt es unter Setup → App noch einmal.</li>
+      <li><b>Feedback:</b> „Melden“ unter Setup → App öffnet ein neues GitHub-Issue, Version und System sind schon eingetragen.</li>
+    </L>
+    {goTab && <button style={{ ...S.smallBtn, marginTop: 10 }} onClick={() => goTab("setup")}>Zum Setup</button>}
+  </Section>
+);
+
 export default function AnleitungTab({ modus, goTab }) {
   return (
     <>
@@ -323,6 +336,7 @@ export default function AnleitungTab({ modus, goTab }) {
       <NetzAnforderungen />
       {modus === "gamepc" && <StatsHilfe />}
       {modus !== "standalone" && <Standalone />}
+      <AppHilfe goTab={goTab} />
     </>
   );
 }

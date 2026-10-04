@@ -2,7 +2,7 @@
 // package.json → "overwolf": { "packages": ["gep"] } lässt ow-electron das Paket laden; danach meldet es erkannte Spiele
 // und deren Events. Overwolf liefert GEP nur an freigegebene (whitelisted) Apps und in verteilten Builds nur mit
 // Code-Signatur. Zum Entwickeln: Spiele, die noch nicht in PROD sind, mit
-//   --owepm-packages-url=https://electronapi-qa.overwolf.com/v2/packages
+//   --owepm-package-channel (ersetzt --owepm-packages-url, siehe Overwolf-Changelog „Package Channels“)
 // Doku: https://dev.overwolf.com/ow-electron/live-game-data-gep/live-game-data-gep-intro/
 const { GEP_BY_OWID } = require('../core/gep-spiele');
 

@@ -1,5 +1,6 @@
 "use strict";
 // Einstellungen der App. Eine Datei für beide Modi: Regie und Game-PC.
+const { STANDARD_HOTKEY, gueltigerHotkey } = require("./app-info");
 
 const PORTS = { session: 47801, gsi: 3000, rl: 49124 };
 
@@ -41,8 +42,22 @@ function standardGamePc() {
   };
 }
 
+// Für alle Modi: Einführung beim ersten Start, Nutzungsbedingungen, Tastenkürzel zum Ein- und Ausblenden
+function standardApp() {
+  return { einfuehrung: false, bedingungen: "", hotkey: STANDARD_HOTKEY };
+}
+
 function standardKonfig() {
-  return { format: "advanced-lan", version: 5, modus: null, regie: standardRegie(), gamepc: standardGamePc() };
+  return { format: "advanced-lan", version: 5, modus: null, app: standardApp(), regie: standardRegie(), gamepc: standardGamePc() };
+}
+
+function migrateApp(a, std) {
+  if (!a || typeof a !== "object") return { ...std };
+  return {
+    einfuehrung: !!a.einfuehrung,
+    bedingungen: typeof a.bedingungen === "string" ? a.bedingungen : "", // Datum der Zustimmung (ISO), leer = noch nicht
+    hotkey: a.hotkey === "" ? "" : gueltigerHotkey(a.hotkey) ? a.hotkey : std.hotkey, // leer = bewusst ausgeschaltet
+  };
 }
 
 function genutzteSpiele(s, std) {
@@ -86,6 +101,7 @@ function migrateKonfig(k) {
   const m = {
     ...d,
     modus: MODI.includes(k.modus) ? k.modus : null,
+    app: migrateApp(k.app, d.app),
     regie: {
       ...d.regie,
       ...r,
@@ -105,4 +121,4 @@ function migrateKonfig(k) {
   return m;
 }
 
-module.exports = { MODI, standardKonfig, migrateKonfig, genutzteSpiele, standardRegie, standardGamePc, neuerToken, uid, PORTS };
+module.exports = { MODI, standardKonfig, standardApp, migrateKonfig, genutzteSpiele, standardRegie, standardGamePc, neuerToken, uid, PORTS };

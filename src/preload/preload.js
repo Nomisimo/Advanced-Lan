@@ -13,6 +13,9 @@ contextBridge.exposeInMainWorld('regieAPI', {
   onStatus:        abo('status'),
   onMeldung:       abo('meldung'),
   openExternal:    call('open-external'),
+  cmpPruefen:      call('cmp-pruefen'),
+  privacyOeffnen:  call('privacy-oeffnen'),
+  feedbackOeffnen: call('feedback-oeffnen'),
   // Updates (wie im Netzwerkplaner)
   fetchReleases:   call('fetch-releases'),
   checkForUpdates: call('check-for-updates'),

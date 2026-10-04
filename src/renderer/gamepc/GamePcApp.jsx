@@ -4,6 +4,7 @@ import { api } from "../api.js";
 import Kopf from "../Kopf.jsx";
 import SessionTab from "./SessionTab.jsx";
 import SetupTab from "./SetupTab.jsx";
+import AppEinstellungen from "../AppEinstellungen.jsx";
 import EventsTab from "./EventsTab.jsx";
 import SimTab from "./SimTab.jsx";
 import AnleitungTab from "../AnleitungTab.jsx";
@@ -50,7 +51,7 @@ export default function GamePcApp({ cfg: alles, mutate: mutateAlles, status: st,
         <main style={S.main}>
           <div style={{ animation: "npFade .18s ease" }}>
             {tab === "session" && <SessionTab {...shared} />}
-            {tab === "setup" && <SetupTab {...shared} />}
+            {tab === "setup" && <><SetupTab {...shared} /><AppEinstellungen cfg={alles} status={st} mutate={mutateAlles} notify={notify} /></>}
             {tab === "events" && <EventsTab {...shared} />}
             {tab === "sim" && <SimTab {...shared} />}
             {tab === "hilfe" && <AnleitungTab modus="gamepc" goTab={setTab} />}

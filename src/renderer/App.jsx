@@ -4,6 +4,7 @@ import { api } from "./api.js";
 import ModusWahl from "./ModusWahl.jsx";
 import RegieApp from "./regie/RegieApp.jsx";
 import GamePcApp from "./gamepc/GamePcApp.jsx";
+import Einfuehrung from "./Einfuehrung.jsx";
 
 const clone = (x) => JSON.parse(JSON.stringify(x));
 
@@ -50,6 +51,7 @@ export default function App() {
       {cfg.modus === "regie" && status.regie && <RegieApp {...shared} />}
       {cfg.modus === "standalone" && status.regie && status.gamepc && <RegieApp {...shared} standalone />}
       {cfg.modus === "gamepc" && status.gamepc && <GamePcApp {...shared} />}
+      {!cfg.app?.einfuehrung && <Einfuehrung cfg={cfg} status={status} mutate={mutate} notify={notify} />}
       {toast && <div style={{ position: "fixed", bottom: 18, left: "50%", transform: "translateX(-50%)", background: "#1a1820", border: `1px solid ${toast.kind === "err" ? ERR : toast.kind === "warn" ? WARN : ACCENT}`, color: "#ece9f2", padding: "9px 16px", borderRadius: 8, fontSize: 13, zIndex: 2000, boxShadow: "0 8px 24px rgba(0,0,0,.5)", maxWidth: "80vw" }}>{toast.msg}</div>}
     </>
   );

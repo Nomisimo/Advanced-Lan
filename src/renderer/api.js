@@ -11,6 +11,7 @@ import { CsQuelle } from "../core/cs-quelle.js";
 import { DOTA_CFG_DATEI, DOTA_STARTOPTION, dotaCfg } from "../core/dota.js";
 import { GEP_SPIELE } from "../core/gep-spiele.js";
 import { QUELLEN } from "../core/spiele.js";
+import { feedbackUrl } from "../core/app-info.js";
 
 export const isElectron = typeof window !== "undefined" && !!window.regieAPI;
 
@@ -33,7 +34,7 @@ function browserApi() {
     { id: "Bühne 2 (REGIE-2)", session: "Bühne 2", host: "REGIE-2", ip: "192.168.1.21", port: 47801, aktivesSpiel: "rl" },
   ];
   const status = () => {
-    const s = { modus: cfg.modus, jetzt: Date.now(), vorschau: true };
+    const s = { modus: cfg.modus, jetzt: Date.now(), vorschau: true, app: { hotkeyFehler: "", plattform: "win32" } };
     const statsOffen = !!(statsTab && !statsTab.closed);
     if (cfg.modus === "regie" || cfg.modus === "standalone") s.regie = { ...regie.snapshot(), session: { offen: sessionOffen, port: cfg.regie.session.port, ip: "", fehler: "", verbunden: regie.snapshot().pcs.filter((p) => p.verbunden && !p.sim).length }, sim: sim.status(), armed: cfg.regie.armed, spielAufRegie: "",
       stats: { fenster: statsOffen, ndi: { verfuegbar: false, laeuft: false, name: "", verbindungen: 0, fehler: "", aufloesung: "1920×1080", fps: 30 } }, lokal: cfg.modus === "standalone" ? cfg.gamepc.pcId.trim() || "Dieser PC" : null };
@@ -114,6 +115,10 @@ function browserApi() {
     onStatus: abo("status"),
     onMeldung: abo("meldung"),
     openExternal: async (url) => window.open(url, "_blank"),
+    // Datenschutz (Overwolf CMP) gibt es nur in der App
+    cmpPruefen: async () => ({ verfuegbar: false, erforderlich: false }),
+    privacyOeffnen: async () => ({ fehler: "Nur in der Overwolf-Version der App verfügbar." }),
+    feedbackOeffnen: async () => window.open(feedbackUrl({ version: __APP_VERSION__, system: navigator.userAgent, modus: cfg.modus }), "_blank"),
     // Updates: im Browser nur Hinweis und Download-Seite
     fetchReleases: async () => { try { const r = await fetch("https://api.github.com/repos/Nomisimo/Advanced-Lan/releases?per_page=20"); return r.ok ? r.json() : null; } catch { return null; } },
     checkForUpdates: async () => ({ auto: false, mac: false }),

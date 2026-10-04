@@ -1,0 +1,17 @@
+Advanced LAN - Terms of Use and Privacy Policy
+
+By installing Advanced LAN you agree to the Terms of Use and the Privacy Policy:
+
+Terms of Use:   https://github.com/Nomisimo/Advanced-Lan/blob/main/docs/TERMS.md
+Privacy Policy: https://github.com/Nomisimo/Advanced-Lan/blob/main/docs/PRIVACY.md
+
+Short version:
+
+- Advanced LAN is free, open-source software (MIT License). It shows no ads and has no user accounts.
+- The publisher does not collect personal data. Game events stay in your local network and go only to the devices you configure.
+- The app runs on Overwolf's ow-electron runtime, which sends anonymous usage data to Overwolf (Overwolf Privacy Policy: https://www.overwolf.com/legal/privacy/).
+- To look for updates the app contacts GitHub.
+- You are responsible for the lighting, audio and video equipment you control with the app. Test your setup before a live event.
+- The app is provided "as is", without warranty of any kind.
+
+Copyright (c) 2026 Momo (Nomisimo)

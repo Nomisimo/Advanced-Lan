@@ -10,6 +10,7 @@ import ZieleTab from "./ZieleTab.jsx";
 import SimTab from "./SimTab.jsx";
 import SessionTab from "./SessionTab.jsx";
 import AnleitungTab from "../AnleitungTab.jsx";
+import AppEinstellungen from "../AppEinstellungen.jsx";
 import GpSetupTab from "../gamepc/SetupTab.jsx";
 import { Gauge, ListChecks, Send, FlaskConical, BookOpen, Power, Radio, KeyRound, TriangleAlert, Settings, Gamepad2, MonitorPlay } from "lucide-react";
 
@@ -80,7 +81,7 @@ export default function RegieApp({ cfg: alles, mutate: mutateAlles, status: st, 
         <main style={S.main}>
           <div style={{ animation: "npFade .18s ease" }}>
             {tab === "control" && <ControlTab {...shared} />}
-            {tab === "setup" && <SetupTab {...shared} />}
+            {tab === "setup" && <><SetupTab {...shared} /><AppEinstellungen cfg={alles} status={st} mutate={mutateAlles} notify={notify} /></>}
             {tab === "spiele" && standalone && <GpSetupTab cfg={alles.gamepc} mutate={(fn) => mutateAlles((d) => fn(d.gamepc))} g={st.gamepc} jetzt={jetzt} notify={notify} standalone />}
             {tab === "signale" && <SignaleTab {...shared} />}
             {tab === "ziele" && <ZieleTab {...shared} />}

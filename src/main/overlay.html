@@ -40,6 +40,6 @@
     start = null;
     bewegt ? window.overlayAPI.abgelegt() : window.overlayAPI.oeffnen();
   });
-  window.overlayAPI.onStatus((s) => { punkt.className = s.farbe; knopf.title = "Advanced LAN: " + s.text; });
+  window.overlayAPI.onStatus((s) => { punkt.className = s.farbe; knopf.title = "Advanced LAN: " + s.text + (s.hotkey ? "\nEin-/Ausblenden: " + s.hotkey : ""); });
 </script>
 </body></html>

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, ipcMain, dialog, screen } = require('electron');
+const { app, BrowserWindow, shell, ipcMain, dialog, screen, globalShortcut } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { execFile } = require('child_process');
@@ -29,6 +29,7 @@ const { DotaSimMatch } = require('../core/dota-sim');
 const { GepSimMatch } = require('../core/gep-sim');
 const { einrichtenUpdates } = require('./updates');
 const { StatsAusgabe } = require('./stats-ausgabe');
+const { hotkeyText, feedbackUrl } = require('../core/app-info');
 const os = require('os');
 
 const karten = () => kartenListe(os.networkInterfaces());
@@ -36,6 +37,7 @@ const karten = () => kartenListe(os.networkInterfaces());
 const root = app.getAppPath();
 const KONFIG_DATEI = () => path.join(app.getPath('userData'), 'advanced-lan.json');
 let mainWin = null;
+let hotkeyAktiv = '', hotkeyFehler = ''; // Tastenkürzel zum Ein- und Ausblenden (siehe unten)
 
 /* ── Einstellungen ────────────────────────────────────────────────────── */
 let cfg = null;
@@ -383,7 +385,7 @@ async function modusStarten() {
 }
 
 function gesamtStatus() {
-  const s = { modus: cfg.modus, jetzt: Date.now() };
+  const s = { modus: cfg.modus, jetzt: Date.now(), app: { hotkeyFehler, plattform: process.platform } };
   if (istRegie()) s.regie = { ...regie.snapshot(), session: session.status(), sim: regieSim.status(), armed: cfg.regie.armed, spielAufRegie, stats: stats.status(), lokal: lokalPc };
   if (hatSpiele()) s.gamepc = { client: client.info(), sessions: discovery.liste(), discoveryFehler: discovery.fehler, gsi: gsi.status(), letzte: gp.letzte, status: gp.status, stand: gp.stand, fremd: gp.fremd, sim: { ...gpSim.status(), spiel: gpSimSpiel }, rl: { ...rlClient.status(), letzte: rl.letzte, stand: rl.stand }, daten, gep: gep.status() };
   return s;
@@ -393,14 +395,15 @@ function gesamtStatus() {
 function createWindow() {
   // Startanimation wie im Netzwerkplaner: Controller, dessen Tasten nacheinander gedrückt werden
   const splash = new BrowserWindow({
-    width: 380, height: 240, frame: false, resizable: false, center: true,
+    name: 'splash', width: 380, height: 240, frame: false, resizable: false, center: true,
     alwaysOnTop: true, skipTaskbar: true, backgroundColor: '#131118',
     webPreferences: { contextIsolation: true, nodeIntegration: false },
   });
   splash.loadFile(path.join(root, 'src', 'main', 'splash.html'));
   const iconPath = path.join(root, 'assets', 'app-icon', 'icon.png');
+  // name: Fenstername für die Statistik im Overwolf Developers Console (electron.d.ts von ow-electron, „name?: string“)
   mainWin = new BrowserWindow({
-    width: 1480, height: 940, minWidth: 1100, minHeight: 680,
+    name: 'desktop', width: 1480, height: 940, minWidth: 1100, minHeight: 680,
     title: 'Advanced LAN', show: false, backgroundColor: '#131118',
     icon: fs.existsSync(iconPath) ? iconPath : undefined,
     webPreferences: { contextIsolation: true, nodeIntegration: false, preload: path.join(root, 'src', 'preload', 'preload.js') },
@@ -441,7 +444,7 @@ function overlayErzeugen() {
   const x = Number.isFinite(o.x) ? o.x : wa.x + wa.width - OVERLAY_GROESSE - 24;
   const y = Number.isFinite(o.y) ? o.y : wa.y + 24;
   overlayWin = new BrowserWindow({
-    width: OVERLAY_GROESSE, height: OVERLAY_GROESSE, x, y,
+    name: 'overlay', width: OVERLAY_GROESSE, height: OVERLAY_GROESSE, x, y,
     frame: false, transparent: true, resizable: false, movable: true, minimizable: false, maximizable: false, fullscreenable: false,
     skipTaskbar: true, hasShadow: false, focusable: false, show: false, alwaysOnTop: true, title: 'Advanced LAN Overlay',
     webPreferences: { contextIsolation: true, nodeIntegration: false, preload: path.join(root, 'src', 'preload', 'overlay-preload.js') },
@@ -465,7 +468,8 @@ function overlayAktualisieren() {
 function overlayMelden() {
   if (!overlayWin || overlayWin.isDestroyed() || cfg.modus !== 'gamepc') return;
   const weitere = Object.fromEntries(Object.entries(daten).map(([id, d]) => [SPIEL_BY_ID[id]?.name || id, d.letzte]));
-  overlayWin.webContents.send('overlay-status', overlayStatus({ client: client.info(), gsi: gsi.status(), letzteCs2: gp.letzte, letzteRl: rl.letzte, weitere, jetzt: Date.now() }));
+  const hotkey = cfg.app.hotkey && !hotkeyFehler ? hotkeyText(cfg.app.hotkey, process.platform) : '';
+  overlayWin.webContents.send('overlay-status', { ...overlayStatus({ client: client.info(), gsi: gsi.status(), letzteCs2: gp.letzte, letzteRl: rl.letzte, weitere, jetzt: Date.now() }), hotkey });
 }
 
 ipcMain.on('overlay-ziehen', (_, dx, dy) => {
@@ -494,6 +498,43 @@ ipcMain.on('overlay-oeffnen', () => {
 });
 setInterval(overlayMelden, 2000).unref(); // Daten veralten auch ohne neue Meldung
 
+/* ── Tastenkürzel ─────────────────────────────────────────────────────── */
+// Blendet die App ein und aus, auch mitten im Spiel (Overwolf: Hotkey und Hotkey-Erinnerung in den Einstellungen)
+function fensterUmschalten() {
+  if (!mainWin || mainWin.isDestroyed()) return;
+  if (mainWin.isVisible() && !mainWin.isMinimized() && mainWin.isFocused()) mainWin.minimize();
+  else { if (mainWin.isMinimized()) mainWin.restore(); mainWin.show(); mainWin.focus(); }
+  overlayAktualisieren();
+}
+function hotkeyAnwenden() {
+  const soll = cfg.app.hotkey || '';
+  if (soll === hotkeyAktiv && !hotkeyFehler) return;
+  if (hotkeyAktiv) globalShortcut.unregister(hotkeyAktiv);
+  hotkeyAktiv = ''; hotkeyFehler = '';
+  if (!soll) return;
+  let ok = false;
+  try { ok = globalShortcut.register(soll, fensterUmschalten); } catch { ok = false; }
+  if (ok) hotkeyAktiv = soll;
+  else hotkeyFehler = 'belegt: eine andere App nutzt dieses Tastenkürzel schon';
+}
+
+/* ── Datenschutz (Overwolf CMP) ───────────────────────────────────────── */
+// ow-electron-types.d.ts: app.overwolf.isCMPRequired() und app.overwolf.openAdPrivacySettingsWindow()
+ipcMain.handle('cmp-pruefen', async () => {
+  const ow = app.overwolf;
+  if (!ow?.isCMPRequired) return { verfuegbar: false, erforderlich: false };
+  return { verfuegbar: true, erforderlich: await ow.isCMPRequired() };
+});
+ipcMain.handle('privacy-oeffnen', async () => {
+  const ow = app.overwolf;
+  if (!ow?.openAdPrivacySettingsWindow) return { fehler: 'Nur in der Overwolf-Version der App verfügbar.' };
+  try { await ow.openAdPrivacySettingsWindow({ parent: mainWin, modal: true, backgroundColor: '#131118' }); return { ok: true }; }
+  catch (e) { return { fehler: `Datenschutz-Einstellungen nicht geöffnet: ${e?.message || e}` }; }
+});
+ipcMain.handle('feedback-oeffnen', () => {
+  shell.openExternal(feedbackUrl({ version: app.getVersion(), plattform: process.platform, system: `${os.type()} ${os.release()} (${process.arch})`, modus: cfg.modus }));
+});
+
 /* ── IPC ──────────────────────────────────────────────────────────────── */
 ipcMain.handle('app-version', () => app.getVersion());
 const updates = einrichtenUpdates({ app, ipcMain, shell, getWin: () => mainWin });
@@ -506,6 +547,7 @@ ipcMain.handle('config-set', async (_, neu) => {
   if (client.zustand !== 'getrennt' && client.zustand !== 'abgelehnt') cfg.gamepc.pcId = alt.gamepc.pcId; // PC-ID nur ohne aktive Session änderbar
   cfg.gamepc.overlay = { ...cfg.gamepc.overlay, x: alt.gamepc.overlay?.x ?? null, y: alt.gamepc.overlay?.y ?? null }; // Position setzt nur das Overlay selbst
   speichereKonfig();
+  if (cfg.app.hotkey !== alt.app.hotkey) hotkeyAnwenden();
   overlayAktualisieren();
   if (istRegie()) {
     if (session.offen && (cfg.regie.netz.empfang !== alt.regie.netz?.empfang)) await session.oeffnen();
@@ -623,9 +665,11 @@ else {
   app.whenReady().then(async () => {
     ladeKonfig();
     createWindow();
+    hotkeyAnwenden();
     updates.autoUpdaterStarten();
     await modusStarten();
   });
+  app.on('will-quit', () => globalShortcut.unregisterAll());
   app.on('window-all-closed', async () => {
     regieSim.stop();
     gpSim.stop();

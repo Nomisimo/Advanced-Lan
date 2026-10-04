@@ -51,7 +51,7 @@ class StatsAusgabe {
     if (!this.aktiv() || !this.getStats().an) return false;
     if (this.fenster && !this.fenster.isDestroyed()) { if (this.fenster.isMinimized()) this.fenster.restore(); this.fenster.show(); this.fenster.focus(); return true; }
     this.fenster = new BrowserWindow({
-      width: 1280, height: 720, minWidth: 480, minHeight: 270, title: 'Advanced LAN · Game Stats', backgroundColor: '#131118', icon: this.icon,
+      name: 'stats-screen', width: 1280, height: 720, minWidth: 480, minHeight: 270, title: 'Advanced LAN · Game Stats', backgroundColor: '#131118', icon: this.icon,
       webPreferences: { contextIsolation: true, nodeIntegration: false, preload: this.preload },
     });
     this.fenster.setMenuBarVisibility(false);
@@ -80,7 +80,7 @@ class StatsAusgabe {
       } catch (e) { this.sender = null; this.ndiFehler = `NDI-Sender nicht gestartet: ${e?.message || e}`; return; }
       // Unsichtbares Fenster, das die Seite in voller Größe rendert und jedes Bild meldet
       const win = new BrowserWindow({
-        show: false, width: NDI_BREITE, height: NDI_HOEHE, useContentSize: true, frame: false, backgroundColor: '#131118',
+        name: 'stats-ndi', show: false, width: NDI_BREITE, height: NDI_HOEHE, useContentSize: true, frame: false, backgroundColor: '#131118',
         webPreferences: { offscreen: true, contextIsolation: true, nodeIntegration: false, preload: this.preload, backgroundThrottling: false },
       });
       this.ndiWin = win;

@@ -21,6 +21,31 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  # Windows-Installer wie im Release bauen und prüfen, ohne etwas zu veröffentlichen
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+        timeout-minutes: 5
+      - run: npm run build
+      - run: npx ow-electron-builder --win --x64 --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Installer prüfen
+        shell: bash
+        run: |
+          ls -l dist
+          n=$(ls dist/*.exe | wc -l | tr -d ' ')
+          if [ "$n" != "1" ]; then echo "::error::$n Installer gebaut, erwartet 1"; exit 1; fi
+          test -f dist/latest.yml || { echo "::error::latest.yml fehlt (Update-Suche unter Windows)"; exit 1; }
+          test -f dist/win-unpacked/resources/app.asar || { echo "::error::app.asar fehlt"; exit 1; }
+
   # Mac-Installer wie im Release bauen und prüfen, ohne etwas zu veröffentlichen
   mac-intel:
     runs-on: macos-15-intel

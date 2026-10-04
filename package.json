@@ -4,7 +4,7 @@
   "private": true,
   "description": "Advanced LAN: Game-PCs melden Spielereignisse, die Regie sendet OSC-Befehle an Licht, Audio und Video",
   "author": "Momo",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "main": "src/main/main.js",
   "overwolf": {
     "packages": [

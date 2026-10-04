@@ -4,6 +4,8 @@ import { ZIEL_TYPEN, KATEGORIEN, OHNE_OSC } from "../core/ziel-typen.js";
 import { Section, Kbd, th, td } from "./ui.jsx";
 import { CFG_DATEI, CFG_ORDNER } from "../core/cfg.js";
 import { RL_INI_DATEI, RL_INI_ORDNER, RL_RATE } from "../core/rl-ini.js";
+import { DOTA_CFG_DATEI, DOTA_CFG_ORDNER, DOTA_STARTOPTION } from "../core/dota.js";
+import { GEP_SPIELE } from "../core/gep-spiele.js";
 
 // Alle Erklärungen der App stehen hier, für beide Modi. Der eigene Modus steht oben.
 const P = ({ children }) => <p style={{ fontSize: 13, lineHeight: 1.7, color: "#d4d0de", margin: "0 0 10px" }}>{children}</p>;
@@ -57,7 +59,8 @@ const Regie = ({ goTab }) => (
       Auswählbar sind nur Ziele aus dem Tab Ziele. <b>Test</b> sendet den Befehl sofort, auch bei Ausgabe aus.
     </Schritt>
     <Schritt n={5} titel="Proben" onGo={goTab && (() => goTab("sim"))} goLabel="Simulator">
-      Der Simulator spielt das aktive Spiel mit virtuellen Game-PCs und derselben Erkennung wie echte PCs: CS2 mit 10 PCs (5 gegen 5), Rocket League mit 6 PCs (3 gegen 3).
+      Der Simulator spielt das aktive Spiel mit virtuellen Game-PCs und derselben Erkennung wie echte PCs: CS2, Dota 2, Overwatch 2 und Rainbow Six mit 10 PCs (5 gegen 5), Marvel Rivals mit 12 (6 gegen 6), Rocket League mit 6 (3 gegen 3),
+      Fortnite und PUBG mit 8 PCs in zwei Vierer-Squads, Apex mit 6 PCs in zwei Trios. Bei Battle Royales spielen die LAN-Squads in einer vollen Lobby, eine Runde ist eine Zone.
       Einzelne Events lassen sich direkt auslösen.
     </Schritt>
     <Schritt n={6} titel="Live gehen" onGo={goTab && (() => goTab("control"))} goLabel="Control">
@@ -69,7 +72,7 @@ const Regie = ({ goTab }) => (
         <li><b>Aktives Spiel</b>: nur dessen Events werden gesendet. Die Game-PCs erfahren den Wechsel sofort.</li>
         <li><b>Ausgabe</b>: Events, verworfene Events, gesendete OSC-Nachrichten, Events mit Fehler. Die Zahlen sind dieselben wie an den Filtern im Event-Log; die Liste zeigt davon die letzten 300. <b>Zurücksetzen</b> setzt alle Zähler auf null und leert das Log.</li>
         <li><b>Verbindungscheck</b> je PC: Verbindung steht, Daten kommen (in den letzten 15 s), Spiel passt zum aktiven Spiel, Ping. Ein PC ist ok, wenn alle drei grün sind.
-          Die Spalte <b>Match</b> zeigt, ob der PC im selben Match ist wie die meisten: Rocket League liefert eine eindeutige Match-ID, CS2 nicht, dort werden Map und Spielstand verglichen (eine Runde Unterschied ist erlaubt).</li>
+          Die Spalte <b>Match</b> zeigt, ob der PC im selben Match ist wie die meisten: Rocket League, Dota 2 und die Overwolf-Spiele liefern eine Match-ID, CS2 nicht, dort werden Map und Spielstand verglichen (eine Runde Unterschied ist erlaubt).</li>
         <li><b>Statistik</b>: Spielstand, aktuelle Runde (Kills, Headshots, Bombe, Sieger, MVP) und Match (Runden, Kills, Headshot-Quote, Multikills, Aces, Top-Spieler). Beginnt bei jedem Matchstart neu.</li>
         <li><b>Events</b>: neueste oben, darunter jeder Befehl mit Ziel und OSC-Nachricht. „nicht gesendet“ heißt Ausgabe aus, „kein Befehl“ heißt im Tab Signale nicht belegt.
           Filter: <b>Alle</b> (ohne verworfene), <b>Eingerichtet</b> (Events mit Befehl, gesendet oder nicht), <b>Fehler</b> (Befehl fehlgeschlagen oder Ziel fehlt), <b>Verworfen</b>.</li>
@@ -90,12 +93,13 @@ const GamePc = ({ goTab }) => (
       sobald die Session wieder im Netz ist.
     </Schritt>
     <Schritt n={3} titel="Spiele einrichten" onGo={goTab && (() => goTab("setup"))} goLabel="Setup">
-      Im Tab <b>Setup</b> einmal je Spiel: bei CS2 <b>cfg installieren</b>, bei Rocket League <b>Stats API einschalten</b>, danach das Spiel neu starten.
+      Im Tab <b>Setup</b> einmal je Spiel: bei CS2 und Dota 2 <b>cfg installieren</b> (Dota 2 zusätzlich mit der Startoption <Kbd>{DOTA_STARTOPTION}</Kbd>), bei Rocket League <b>Stats API einschalten</b>, danach das Spiel neu starten.
+      Die Overwolf-Spiele brauchen nichts: Die App erkennt das laufende Spiel selbst.
       Der Check „Ist korrekt aufgesetzt?“ zeigt für jedes Spiel, ob alles stimmt. Findet die App ein Spiel nicht, mit „Speichern unter …“ speichern und die Datei
-      von Hand ablegen: <Kbd>{CFG_DATEI}</Kbd> nach <Kbd>{CFG_ORDNER}</Kbd>, <Kbd>{RL_INI_DATEI}</Kbd> nach <Kbd>{RL_INI_ORDNER}</Kbd>.
+      von Hand ablegen: <Kbd>{CFG_DATEI}</Kbd> nach <Kbd>{CFG_ORDNER}</Kbd>, <Kbd>{DOTA_CFG_DATEI}</Kbd> nach <Kbd>{DOTA_CFG_ORDNER}</Kbd>, <Kbd>{RL_INI_DATEI}</Kbd> nach <Kbd>{RL_INI_ORDNER}</Kbd>.
     </Schritt>
     <Schritt n={4} titel="Proben" onGo={goTab && (() => goTab("sim"))} goLabel="Simulator">
-      Nur mit verbundener Session: Der Tab <b>Simulator</b> spielt das aktive Spiel der Regie, als liefe es auf diesem PC (bei CS2 als Spieler 1 in einem 5 gegen 5).
+      Nur mit verbundener Session: Der Tab <b>Simulator</b> spielt das aktive Spiel der Regie, als liefe es auf diesem PC (als Spieler 1, z. B. bei CS2 in einem 5 gegen 5).
       Die Daten laufen durch dieselbe Erkennung wie echte Spieldaten und gehen wirklich an die Regie. Einzelne Events lassen sich auch direkt auslösen.
       Ist bei der Regie die Ausgabe an, lösen sie echte Befehle aus.
     </Schritt>
@@ -108,7 +112,7 @@ const GamePc = ({ goTab }) => (
       Ein- und ausschalten im Tab <b>Setup</b>. Über Spielen im exklusiven Vollbild erscheint es nicht; in CS2 dafür „Vollbild (Fenster)“ wählen.
     </P>
     <P><span style={{ color: SUB }}>
-      CS2 und Rocket League gibt es nur für Windows. Auf dem Mac läuft die Regie; der Game-PC-Modus zeigt dort, dass es die Spiele nicht gibt.
+      CS2, Rocket League und die Overwolf-Spiele gibt es als Game-PC nur unter Windows, Dota 2 auch auf dem Mac. Auf dem Mac läuft vor allem die Regie; der Game-PC-Modus zeigt dort, welche Spiele fehlen.
     </span></P>
   </Section>
 );
@@ -138,7 +142,41 @@ const Rl = () => (
       Teams heißen <Kbd>BLUE</Kbd> und <Kbd>ORANGE</Kbd>. Die Stats API meldet alle Spieler des Matches, deshalb tragen Rocket-League-Events den Spieler als Argument, aber keine PC-ID in der Adresse.
       Alle PCs im selben Match melden dasselbe; die Regie wertet jedes Event nur einmal aus.
     </P>
-    <P>Valorant lässt sich in der Regie schon auswählen, seine Datenquelle kommt später.</P>
+  </Section>
+);
+
+const Dota = () => (
+  <Section title="Dota 2">
+    <P>
+      Dota 2 liefert seine Daten wie CS2 über Valves <b>Game State Integration</b>: Die cfg-Datei <Kbd>{DOTA_CFG_DATEI}</Kbd> im Ordner <Kbd>{DOTA_CFG_ORDNER}</Kbd> lässt
+      das Spiel seinen Zustand an denselben Empfang wie CS2 schicken (<Kbd>127.0.0.1:3000</Kbd>). Zusätzlich braucht Dota die Startoption <Kbd>{DOTA_STARTOPTION}</Kbd>
+      (Steam → Dota 2 → Eigenschaften → Startoptionen); der Setup-Check liest sie aus Steam. Kein Overwolf nötig, läuft auch auf dem Mac.
+    </P>
+    <P>
+      Erkannt werden: Heldenwahl, Vorbereitung, Horn (Spiel startet), Ancient zerstört (mit Siegerteam), Tag und Nacht, Roshan getötet, Aegis, Turm und Kaserne zerstört (Team = wer zerstört hat),
+      Kill, Double Kill, Triple Kill, Ultra Kill, Rampage, Assist, Spieler stirbt. Teams heißen <Kbd>RADIANT</Kbd> und <Kbd>DIRE</Kbd>.
+      Ein spielender PC meldet nur seinen eigenen Helden und die Gebäude seines Teams; zusammen ergeben alle PCs das ganze Spiel.
+    </P>
+  </Section>
+);
+
+const Gep = () => (
+  <Section title="Overwolf-Spiele (GEP)">
+    <P>
+      {GEP_SPIELE.map((s) => s.name).join(", ")} liefern ihre Events über <b>Overwolf Game Events (GEP)</b>, das Paket steckt in ow-electron. Die App erkennt das laufende Spiel selbst,
+      einzurichten ist nichts. Jeder PC meldet, was sein Spieler erlebt: eigene Kills, Tode und Assists, dazu Match, Runden und Sieg.
+    </P>
+    <P>
+      <b>Wichtig:</b> Overwolf liefert diese Daten nur an freigegebene Apps, und in verteilten Builds nur mit signierter Windows-App. Bis dahin bleiben die echten Events aus,
+      der Simulator geht aber schon. Spiele, die Overwolf noch nicht in PROD hat, laufen zum Testen mit dem Startparameter <Kbd>--owepm-packages-url=https://electronapi-qa.overwolf.com/v2/packages</Kbd>.
+    </P>
+    <L>
+      <li><b>Overwatch 2</b> und <b>Marvel Rivals</b>: Match startet/vorbei, Match gewonnen (mit Team), Runde startet/vorbei, Kill, Assist, Tod, bei Overwatch auch Respawn und Wiederbelebt. Teams <Kbd>TEAM 1</Kbd>/<Kbd>TEAM 2</Kbd>.</li>
+      <li><b>Rainbow Six Siege</b>: Match, Runde startet, Runde gewonnen, Defuser gelegt/entschärft, Kill, Headshot, niedergeschlagen, Tod. Team ist die Seite der Runde: <Kbd>ATK</Kbd> (Angriff) oder <Kbd>DEF</Kbd> (Verteidigung).
+        Nach den Overwolf-Regeln für R6 nutzt die App nur den Namen, den das Spiel gerade zeigt.</li>
+      <li><b>Fortnite</b>, <b>Apex Legends</b>, <b>PUBG</b>: Match startet, Sieg (Victory Royale, Champion, Chicken Dinner), Kill, Gegner niedergeschlagen, selbst niedergeschlagen, Tod, Apex auch Squad ausgeschieden. Ohne Teams; der Sieg kommt einmal, egal wie viele PCs im Squad ihn melden.</li>
+    </L>
+    <P><span style={{ color: SUB }}>Valorant und die anderen Riot-Spiele bleiben draußen: Riot gibt keine Live-Daten frei.</span></P>
   </Section>
 );
 
@@ -151,7 +189,7 @@ const Osc = () => (
     <P>In jedem Wert dürfen Platzhalter stehen, die beim Senden aus dem Event gefüllt werden:</P>
     <table style={{ ...S.table, marginTop: 0, marginBottom: 12 }}>
       <tbody>
-        {[["{spieler}", "Spielername"], ["{team}", "CT, T, BLUE, ORANGE"], ["{pc}", "PC-ID des meldenden PCs"], ["{runde}", "Rundennummer (CS2)"], ["{spiel}", "cs2, rl"], ["{event}", "Event-ID, z. B. goal"]].map(([k, v]) => (
+        {[["{spieler}", "Spielername"], ["{team}", "CT, T, BLUE, ORANGE, RADIANT, DIRE, ATK, DEF, TEAM 1, TEAM 2"], ["{pc}", "PC-ID des meldenden PCs"], ["{runde}", "Rundennummer (CS2, R6, Overwatch, Marvel Rivals)"], ["{spiel}", "cs2, rl, dota2, ow2, r6, mr, fn, apex, pubg"], ["{event}", "Event-ID, z. B. goal"]].map(([k, v]) => (
           <tr key={k}><td style={td({ ...S.mono, width: 120 })}>{k}</td><td style={td()}>{v}</td></tr>
         ))}
       </tbody>
@@ -192,7 +230,7 @@ const Netz = () => (
       <li>Verbindung: WebSocket auf Port <Kbd>47801</Kbd>. Ist er belegt, nimmt die Regie einen freien Port und kündigt ihn per mDNS an.</li>
       <li>Das Passwort geht nicht im Klartext übers Netz (Challenge-Response mit HMAC-SHA256).</li>
       <li>Bricht die Verbindung ab, verbindet sich der Game-PC selbst neu. Events aus der Pause werden nicht nachgeschickt, damit nichts zur falschen Zeit kommt.</li>
-      <li>Die Spiele senden nur an die App auf demselben PC: CS2 an <Kbd>127.0.0.1:3000</Kbd>, Rocket League auf <Kbd>127.0.0.1:49124</Kbd>. Dafür muss nichts in der Firewall freigegeben werden.</li>
+      <li>Die Spiele senden nur an die App auf demselben PC: CS2 und Dota 2 an <Kbd>127.0.0.1:3000</Kbd>, Rocket League auf <Kbd>127.0.0.1:49124</Kbd>. Dafür muss nichts in der Firewall freigegeben werden.</li>
       <li>Windows-Firewall: auf der Regie eingehend TCP 47801 erlauben, auf allen PCs UDP 5353. Beim ersten Start fragt Windows meist selbst.</li>
       <li><b>Netzwerkkarten</b>: Die Regie wählt im Tab <b>Setup</b> getrennt, über welche Karte sie Game-PCs empfängt und über welche sie OSC sendet; im Tab <b>Ziele</b> kann jedes Ziel eine eigene Karte bekommen.
         Der Game-PC wählt seine Karte im Tab <b>Setup</b>. Die App bindet Empfang und Absender an die IP der Karte. Das ist eindeutig, wenn jede Karte in einem eigenen Netz (Subnetz) liegt, z. B. LAN <Kbd>192.168.1.x</Kbd> und Licht <Kbd>2.x.x.x</Kbd>.
@@ -240,6 +278,8 @@ export default function AnleitungTab({ modus, goTab }) {
       {modus === "gamepc" ? <><GamePc goTab={goTab} /><Regie /></> : <><Regie goTab={goTab} /><GamePc /></>}
       <Cs2 />
       <Rl />
+      <Dota />
+      <Gep />
       <Osc />
       <ZieleEinrichten />
       <Netz />

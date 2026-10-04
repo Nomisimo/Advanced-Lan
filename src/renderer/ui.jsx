@@ -1,6 +1,6 @@
 import React from "react";
 import { S, ACCENT, LINE, SUB, MUTED, OK, WARN, ERR, teamFarbe } from "./theme.js";
-import { Trophy, Timer, Bomb, Crosshair, Skull, Zap, Crown, Eye, CircleCheck, CircleX, Goal, Handshake, Shield, ShieldCheck, Target, CarFront, Flag, Play, Medal, Flame, Repeat } from "lucide-react";
+import { Trophy, Timer, Bomb, Crosshair, Skull, Zap, Crown, Eye, CircleCheck, CircleX, Goal, Handshake, Shield, ShieldCheck, Target, CarFront, Flag, Play, Medal, Flame, Repeat, Sun, Moon, Castle, HeartPulse, ArrowDownToLine, Users, UserX, Swords, ShieldOff } from "lucide-react";
 import { SPIEL_BY_ID, eventInfo } from "../core/spiele.js";
 import { zielTyp } from "../core/ziel-typen.js";
 import { api } from "./api.js";
@@ -50,8 +50,14 @@ export const TeamChip = ({ team }) => team ? (
 
 const ICONS = { Match: Trophy, Runde: Timer, Bombe: Bomb, Spieler: Crosshair };
 const RL_ICONS = { goal: Goal, assist: Handshake, hat_trick: Flame, save: Shield, epic_save: ShieldCheck, shot: Target, demolition: CarFront, crossbar: Flag, kickoff: Play, overtime: Timer, podium: Medal, mvp: Crown, replay_start: Repeat, replay_end: Repeat, match_start: Trophy, match_end: Trophy };
+// Dota 2 und Overwolf-Spiele
+const ALLE_ICONS = { match_start: Play, match_end: Trophy, match_won: Trophy, victory: Crown, squad_out: UserX, draft: Users, pre_game: Timer, day: Sun, night: Moon,
+  roshan_killed: Swords, aegis: Shield, tower_destroyed: Castle, barracks_destroyed: Castle, round_start: Timer, round_end: Flag,
+  kill: Crosshair, headshot: Target, assist: Handshake, death: Skull, knockdown: ArrowDownToLine, knockout: ArrowDownToLine, knocked: ArrowDownToLine,
+  respawn: HeartPulse, revive: HeartPulse, revived: HeartPulse, bomb_planted: Bomb, bomb_defused: ShieldOff, double_kill: Zap, triple_kill: Zap, ultra_kill: Zap, rampage: Flame };
 export function EventIcon({ type, spiel = "cs2", size = 15 }) {
   if (spiel === "rl" && RL_ICONS[type]) { const Ic = RL_ICONS[type]; return <Ic size={size} />; }
+  if (spiel !== "cs2" && spiel !== "rl" && ALLE_ICONS[type]) { const Ic = ALLE_ICONS[type]; return <Ic size={size} />; }
   const e = eventInfo(spiel, type);
   const Ic = type === "death" ? Skull : type === "ace" || type.startsWith("multikill") ? Zap : type === "mvp" ? Crown : type === "flashed" ? Eye : ICONS[e?.gruppe] || Zap;
   return <Ic size={size} />;
@@ -112,4 +118,13 @@ export function KartenWahl({ karten, wert, onChange, leer = "Automatisch", style
       {fehlt && <option value={wert}>{wert} (nicht verbunden)</option>}
     </select>
   );
+}
+
+// Spielstand des Simulators: „CT 3 : 5 T nach 8 Runden“ oder bei Battle Royale „Zone 3 · 20 Spieler übrig“
+export function SimStand({ sim }) {
+  const a = sim?.anzeige;
+  if (!a) return null;
+  if (!a.teams) return <>Simulation: {a.text}</>;
+  const [[t1, p1], [t2, p2]] = a.teams;
+  return <>Simulation: <span style={{ color: teamFarbe(t1) }}>{t1}</span> <b style={{ color: teamFarbe(t1) }}>{p1}</b> : <b style={{ color: teamFarbe(t2) }}>{p2}</b> <span style={{ color: teamFarbe(t2) }}>{t2}</span> nach {sim.runde || 0} {a.einheit}{a.text ? ` · ${a.text}` : ""}</>;
 }

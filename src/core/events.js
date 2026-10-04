@@ -2,15 +2,16 @@
 // Erkennt Spielereignisse aus zwei aufeinanderfolgenden CS2-GSI-Zuständen (Valve Game State Integration).
 // Reine Funktionen ohne Node-Abhängigkeiten: laufen im Hauptprozess und in der Browser-Vorschau.
 
+// fest: Team, das dieses Event immer hat (Bombe legen immer T); der Simulator setzt es beim Auslösen
 const EVENT_TYPES = [
   { id: "match_live", label: "Match startet", gruppe: "Match" },
   { id: "match_end", label: "Match vorbei", gruppe: "Match", team: true },
   { id: "freezetime", label: "Freezetime (Kaufphase)", gruppe: "Runde" },
   { id: "round_live", label: "Runde läuft", gruppe: "Runde" },
   { id: "round_end", label: "Runde gewonnen", gruppe: "Runde", team: true },
-  { id: "bomb_planted", label: "Bombe gelegt", gruppe: "Bombe" },
-  { id: "bomb_defused", label: "Bombe entschärft", gruppe: "Bombe" },
-  { id: "bomb_exploded", label: "Bombe explodiert", gruppe: "Bombe" },
+  { id: "bomb_planted", label: "Bombe gelegt", gruppe: "Bombe", fest: "T" },
+  { id: "bomb_defused", label: "Bombe entschärft", gruppe: "Bombe", fest: "CT" },
+  { id: "bomb_exploded", label: "Bombe explodiert", gruppe: "Bombe", fest: "T" },
   { id: "kill", label: "Kill", gruppe: "Spieler", team: true, spieler: true },
   { id: "headshot", label: "Headshot", gruppe: "Spieler", team: true, spieler: true },
   { id: "multikill_3", label: "3 Kills in einer Runde", gruppe: "Spieler", team: true, spieler: true },
@@ -91,7 +92,9 @@ class Dedupe {
     this.fensterSpieler = fensterSpieler;
     this.seen = new Map();
   }
+  // einmal: eindeutiger Schlüssel eines Ereignisses (z. B. ein bestimmter Turm), das mehrere PCs melden
   key(e) {
+    if (e.einmal) return `${e.type}:${e.einmal}`;
     return e.steamid ? `${e.type}:${e.steamid}:${e.round ?? ""}:${e.kills ?? ""}` : `${e.type}:${e.team || ""}`;
   }
   accept(e, now) {

@@ -7,6 +7,10 @@ const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
   "0.1.0-beta.4": [
+    "Sieben neue Spiele: Dota 2, Overwatch 2, Rainbow Six Siege, Marvel Rivals, Fortnite, Apex Legends und PUBG, jedes mit eigenen Events in „Signale“, Simulator, Statistik und Match-Check",
+    "Dota 2 über Valves Game State Integration wie CS2: cfg per Knopfdruck, Check der Startoption -gamestateintegration, läuft auch auf dem Mac. Events u. a. Horn, Tag/Nacht, Roshan, Turm, Double Kill bis Rampage",
+    "Overwatch 2, R6, Marvel Rivals, Fortnite, Apex und PUBG über Overwolf Game Events (GEP). Echte Daten erst mit Overwolf-Freigabe und signierter Windows-App, der Simulator geht schon",
+    "Battle Royales im Simulator: LAN-Squads in einer vollen Lobby, eine Runde ist eine Zone, am Ende gewinnt ein Squad",
     "Update-Knopf wie im Netzwerkplaner: Die App sucht beim Start nach einer neuen Version und zeigt sie oben neben der Versionsnummer. Auf dem Mac lädt ein Klick das DMG und öffnet es, unter Windows installiert sich das Update selbst",
     "„Was ist neu?“: Klick auf die Versionsnummer zeigt die Änderungen je Version und sucht nach Updates",
     "Control: Die Zähler zeigen dieselben Zahlen wie die Filter im Event-Log; „Verworfen“ zählt nur verworfene Events. Die Liste zeigt die letzten 300 und sagt das",

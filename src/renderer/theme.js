@@ -1,11 +1,12 @@
 // Designsprache wie Stromplaner und Netzwerkplaner, Akzent Lila mit leichtem Glow
+import { TEAM_FARBEN } from "../core/spiele.js";
 export const ACCENT = "#9d5cff", ACCENT_HI = "#c39bff", DARK = "#1b1922", PANEL = "#23212c", LINE = "#3a3647", BG = "#131118", FELD = "#1a1820";
 export const OK = "#2ecc71", WARN = "#f39c12", ERR = "#ff5d5d", INFO = "#4ea1ff", MUTED = "#7f7a8e", SUB = "#a39eb3";
 export const CT = "#5aa9ff", TT = "#f2b33d"; // Teamfarben wie im Spiel
 export const BLAU = "#3b9dff", ORANGE = "#ff8a1f"; // Rocket League
 export const GLOW = "0 0 14px rgba(157,92,255,.45)";
 export const GLOW_STARK = "0 0 18px rgba(157,92,255,.75), 0 0 2px rgba(195,155,255,.9)";
-export const teamFarbe = (t) => (t === "CT" ? CT : t === "T" ? TT : t === "BLUE" ? BLAU : t === "ORANGE" ? ORANGE : SUB);
+export const teamFarbe = (t) => TEAM_FARBEN[t] || SUB; // Teams aller Spiele (core/spiele.js)
 
 export const S = {
   app:          { fontFamily: "'Segoe UI',system-ui,sans-serif", background: BG, height: "100vh", color: "#ece9f2", display: "flex", flexDirection: "column", overflow: "hidden" },

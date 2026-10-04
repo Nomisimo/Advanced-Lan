@@ -32,7 +32,7 @@ test("Statistik: Runde und Match", () => {
 
 test("Setup: nur genutzte Spiele, aktives Spiel ist immer eins davon", () => {
   const k = standardKonfig();
-  assert.deepEqual(k.regie.spiele, { cs2: true, valorant: false, rl: true });
+  assert.deepEqual(k.regie.spiele, { cs2: true, rl: true, dota2: false, ow2: false, r6: false, mr: false, fn: false, apex: false, pubg: false, valorant: false });
   k.regie.spiele = { cs2: false, valorant: true, rl: false };
   k.regie.aktivesSpiel = "cs2";
   assert.equal(migrateKonfig(k).regie.aktivesSpiel, "valorant");

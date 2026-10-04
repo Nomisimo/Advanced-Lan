@@ -15,7 +15,7 @@ function standardRegie() {
   return {
     armed: false,
     aktivesSpiel: "cs2",
-    spiele: { cs2: true, valorant: false, rl: true }, // Tab „Setup“: nur genutzte Spiele erscheinen in Control und Signale
+    spiele: { cs2: true, rl: true, dota2: false, ow2: false, r6: false, mr: false, fn: false, apex: false, pubg: false, valorant: false }, // Tab „Setup“: nur genutzte Spiele erscheinen in Control und Signale
     session: { name: "LAN-Party", passwort: "", port: PORTS.session, offen: false },
     netz: { empfang: "", senden: "" }, // Netzwerkkarten (Name, leer = automatisch): Empfang der Game-PCs, Senden der OSC-Befehle
     // Tab „Ziele“: angelegt aus der Ziel-Datenbank (ziel-typen.js)

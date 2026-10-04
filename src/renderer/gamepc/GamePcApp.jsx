@@ -25,7 +25,8 @@ export default function GamePcApp({ cfg: alles, mutate: mutateAlles, status: st,
   }, []);
   const c = g.client;
   const [zText, zFarbe] = ZUSTAND[c.zustand] || ZUSTAND.getrennt;
-  const cs2Aktiv = (g.letzte && jetzt - g.letzte < 15000) || (g.rl?.letzte && jetzt - g.rl.letzte < 15000);
+  const frisch = (t) => t && jetzt - t < 15000;
+  const cs2Aktiv = frisch(g.letzte) || frisch(g.rl?.letzte) || Object.values(g.daten || {}).some((d) => frisch(d.letzte)); // irgendein Spiel liefert Daten
   const shared = { cfg, mutate, g, log, jetzt, notify, goTab: setTab };
 
   return (

@@ -43,6 +43,8 @@ contextBridge.exposeInMainWorld('regieAPI', {
   rlIniInstallieren: call('rl-ini-installieren'),
   rlIniSpeichern:  call('rl-ini-speichern'),
   cfgInstallieren: call('cfg-installieren'),
+  dotaCfgInstallieren: call('dota-cfg-installieren'),
+  dotaCfgSpeichern: call('dota-cfg-speichern'),
   cfgSpeichern:    call('cfg-speichern'),
   testEvent:       call('test-event'),
   gamePcSimStart:  call('gamepc-sim-start'),

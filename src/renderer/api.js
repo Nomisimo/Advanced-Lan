@@ -8,6 +8,9 @@ import { testNachricht, zeigeNachricht } from "../core/signal.js";
 import { SimRunner } from "../core/sim-runner.js";
 import { SimMatch } from "../core/gsi-sim.js";
 import { CsQuelle } from "../core/cs-quelle.js";
+import { DOTA_CFG_DATEI, DOTA_STARTOPTION, dotaCfg } from "../core/dota.js";
+import { GEP_SPIELE } from "../core/gep-spiele.js";
+import { QUELLEN } from "../core/spiele.js";
 
 export const isElectron = typeof window !== "undefined" && !!window.regieAPI;
 
@@ -34,6 +37,7 @@ function browserApi() {
       discoveryFehler: "", gsi: { laeuft: true, port: cfg.gamepc.gsiPort, fehler: "" }, letzte: gp.letzte || 0, status: null, stand: gp.stand || null, fremd: 0,
       sim: { ...gpSim.status(), spiel: "cs2" },
       rl: { verbunden: false, port: cfg.gamepc.rlPort, letzte: 0, stand: null },
+      daten: {}, gep: { geladen: false, laedt: false, version: "", fehler: "", spiel: null, admin: false },
     };
     return s;
   };
@@ -96,7 +100,7 @@ function browserApi() {
     sessionOeffnen: async () => {
       sessionOffen = !!cfg.regie.session.passwort;
       if (sessionOffen) for (const [id, ip, host, mac, ping] of VORSCHAU_PCS) {
-        regie.pcVerbunden(id, { spiele: ["cs2", "rl"], remote: ip, geraet: { hostname: host, app: __APP_VERSION__, mac, karte: `Ethernet (${ip})`, plattform: "win32" } });
+        regie.pcVerbunden(id, { spiele: QUELLEN, remote: ip, geraet: { hostname: host, app: __APP_VERSION__, mac, karte: `Ethernet (${ip})`, plattform: "win32" } });
         regie.pcPing(id, ping);
       }
       return status();
@@ -138,6 +142,18 @@ function browserApi() {
         { id: "rl-verbunden", label: "Mit Rocket League verbunden", ok: false, detail: "Rocket League läuft nicht oder Stats API aus" },
         { id: "rl-daten", label: "Rocket League sendet Daten", ok: false, detail: "In der Vorschau kein Rocket League" },
       ],
+      dota2: [
+        { id: "dota-installiert", label: "Dota 2 gefunden", ok: true, detail: "C:\\Program Files (x86)\\Steam\\steamapps\\common\\dota 2 beta\\game\\dota\\cfg" },
+        { id: "dota-cfg", label: "cfg-Datei installiert", ok: true, detail: DOTA_CFG_DATEI },
+        { id: "dota-aktuell", label: "cfg-Datei passt zu dieser App", ok: true, detail: "Port und Token stimmen" },
+        { id: "dota-start", label: `Startoption ${DOTA_STARTOPTION}`, ok: false, detail: "fehlt: Steam → Dota 2 → Eigenschaften → Startoptionen" },
+        { id: "dota-empfang", label: "Empfang bereit", ok: true, detail: `127.0.0.1:${cfg.gamepc.gsiPort} (wie CS2)` },
+        { id: "dota-daten", label: "Dota 2 sendet Daten", ok: false, detail: "In der Vorschau kein Dota 2" },
+      ],
+      gep: {
+        punkte: [{ id: "gep-geladen", label: "Overwolf-Spieldaten (GEP) geladen", ok: false, detail: "nicht geladen: braucht Overwolf-Freigabe und signierte App" }],
+        spiele: GEP_SPIELE.map((d) => ({ id: `gep-${d.id}`, spiel: d.id, label: d.name, ok: false, warn: true, detail: "nicht gestartet" })),
+      },
     }),
     trennen: async () => { gp.zustand = "getrennt"; gpSim.stop(); statusMelden(); },
     gamePcSimStart: async (m) => { if (gp.zustand !== "verbunden") return { fehler: "Nur mit verbundener Session" }; if (!gpSim.match) gpQuelle = new CsQuelle(); gpSim.start(m); return { ok: true }; },
@@ -145,6 +161,8 @@ function browserApi() {
     gamePcSimNeu: async () => { gpSim.neu(); },
     cs2Ordner: async () => null,
     cfgInstallieren: async () => ({ fehler: "In der Browser-Vorschau nicht möglich." }),
+    dotaCfgInstallieren: async () => ({ fehler: "In der Browser-Vorschau nicht möglich." }),
+    dotaCfgSpeichern: async () => { download(DOTA_CFG_DATEI, dotaCfg({ port: cfg.gamepc.gsiPort, token: cfg.gamepc.gsiToken })); return { ok: true, pfad: DOTA_CFG_DATEI }; },
     rlIniInstallieren: async () => ({ fehler: "In der Browser-Vorschau nicht möglich." }),
     rlIniSpeichern: async () => { download(RL_INI_DATEI, rlIni({ webPort: cfg.gamepc.rlPort })); return { ok: true, pfad: RL_INI_DATEI }; },
     cfgSpeichern: async () => { download(CFG_DATEI, gsiCfg({ port: cfg.gamepc.gsiPort, token: cfg.gamepc.gsiToken })); return { ok: true, pfad: CFG_DATEI }; },

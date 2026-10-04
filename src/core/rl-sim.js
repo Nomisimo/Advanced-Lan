@@ -21,6 +21,7 @@ class RlSimMatch {
   }
 
   vorbei() { return this.ende; }
+  anzeige() { return { teams: [["BLUE", this.score[0]], ["ORANGE", this.score[1]]], einheit: "Anstößen" }; }
   get blau() { return this.score[0]; }
   get orange() { return this.score[1]; }
 

@@ -5,6 +5,7 @@
 const { Dedupe } = require("./events");
 const { befehleFuer, zeigeNachricht } = require("./signal");
 const { Statistik } = require("./statistik");
+const { SPIEL_BY_ID } = require("./spiele");
 
 const LOG_MAX = 300;
 // Zählen dasselbe wie die Filter im Event-Log, nur ohne dessen Grenze von LOG_MAX Einträgen.
@@ -105,7 +106,7 @@ class Regie {
   // Test-Knopf einer Zuweisung im Tab „Signale“: sendet sofort, auch wenn die Ausgabe aus ist
   testeZuweisung(spiel, type, zuweisung) {
     const cfg = this.getConfig();
-    const ev = { type, spiel, team: zuweisung.team || (spiel === "rl" ? "BLUE" : "CT"), player: "Testspieler", pc: zuweisung.pc || "Regie", pcId: zuweisung.pc || "Regie", round: 1 };
+    const ev = { type, spiel, team: zuweisung.team || SPIEL_BY_ID[spiel]?.teams?.[0] || "", player: "Testspieler", pc: zuweisung.pc || "Regie", pcId: zuweisung.pc || "Regie", round: 1 };
     const [b] = befehleFuer({ ...cfg, signale: { [spiel]: { [type]: [{ ...zuweisung, aus: false }] } } }, ev);
     const k = { nachrichten: b ? b.nachrichten.map(zeigeNachricht) : [], ziel: b?.ziel?.name || "", fehler: b?.fehler ? [b.fehler] : [] };
     if (b && !b.fehler) this.ausgeben(b, k);

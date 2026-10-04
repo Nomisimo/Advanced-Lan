@@ -1,16 +1,19 @@
 "use strict";
 // Prüft, ob die Game-PCs im selben Match sind. Verglichen wird der Spielstand, den jeder PC meldet:
 // Rocket League hat eine eindeutige MatchGuid, CS2 liefert keine Match-ID, dort zählen Map und Spielstand.
+// Dota 2 und die Overwolf-Spiele melden eine Match-ID (sonst zählt die Map).
 
 // CS2: gleiche Map und höchstens eine Runde Unterschied (Meldungen kommen gedrosselt, am Rundenende kurz versetzt)
 const csGleich = (a, b) => a.map === b.map && Math.abs(a.ct - b.ct) + Math.abs(a.tt - b.tt) <= 1;
 const rlGleich = (a, b) => (a.match || b.match ? a.match === b.match : a.arena === b.arena);
+const idGleich = (a, b) => (a.match || b.match ? a.match === b.match : a.map === b.map);
+const hatStand = (spiel, s) => (spiel === "rl" ? s.match || s.arena : spiel === "cs2" ? s.map : s.match || s.map);
 
 // pcs: [{ pcId, spiel, stand, verbunden }]. Gibt pcId → "gleich" | "anders" | "" (kein Spielstand) zurück
 // und die Referenz: der Spielstand, den die meisten PCs teilen.
 function matchCheck(pcs, aktiv) {
-  const gleich = aktiv === "rl" ? rlGleich : csGleich;
-  const mit = pcs.filter((p) => p.verbunden && p.spiel === aktiv && p.stand && (aktiv === "rl" ? p.stand.match || p.stand.arena : p.stand.map));
+  const gleich = aktiv === "rl" ? rlGleich : aktiv === "cs2" ? csGleich : idGleich;
+  const mit = pcs.filter((p) => p.verbunden && p.spiel === aktiv && p.stand && hatStand(aktiv, p.stand));
   let ref = null, best = 0;
   for (const p of mit) {
     const n = mit.filter((q) => gleich(p.stand, q.stand)).length;

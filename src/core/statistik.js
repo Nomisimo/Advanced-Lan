@@ -4,7 +4,9 @@
 const neueRunde = (nr) => ({ nr: nr ?? null, phase: "", kills: 0, headshots: 0, tode: 0, bombe: "", sieger: "", mvp: "", vorbei: false });
 const neuesMatch = () => ({ runden: 0, kills: 0, headshots: 0, tode: 0, multikills: 0, aces: 0, bomben: 0, siege: { CT: 0, T: 0 }, vorbei: false, sieger: "",
   // Rocket League
-  tore: { BLUE: 0, ORANGE: 0 }, schuesse: 0, paraden: 0, demos: 0, anstoesse: 0, overtime: false, letztesTor: null });
+  tore: { BLUE: 0, ORANGE: 0 }, schuesse: 0, paraden: 0, demos: 0, anstoesse: 0, overtime: false, letztesTor: null,
+  // Dota 2 und Overwolf-Spiele
+  assists: 0, knocks: 0, tuerme: 0, roshan: 0, siegerSpieler: "" });
 
 class Statistik {
   constructor() { this.reset(""); }
@@ -20,16 +22,17 @@ class Statistik {
 
   sp(ev) {
     const name = ev.player || ev.pc || "?";
-    if (!this.spieler.has(name)) this.spieler.set(name, { name, team: "", kills: 0, tode: 0, headshots: 0, mvps: 0, tore: 0, vorlagen: 0, paraden: 0, schuesse: 0, demos: 0 });
+    if (!this.spieler.has(name)) this.spieler.set(name, { name, team: "", kills: 0, tode: 0, headshots: 0, mvps: 0, tore: 0, vorlagen: 0, paraden: 0, schuesse: 0, demos: 0, assists: 0 });
     const s = this.spieler.get(name);
     if (ev.team) s.team = ev.team;
     return s;
   }
 
   add(ev) {
-    if (ev.spiel !== this.spiel || ev.type === "match_live" || (ev.spiel === "rl" && ev.type === "match_start")) this.reset(ev.spiel);
+    if (ev.spiel !== this.spiel || ev.type === "match_live" || ev.type === "match_start") this.reset(ev.spiel);
     const r = this.runde, m = this.match;
     if (ev.spiel === "rl") return this.addRl(ev, m);
+    if (ev.spiel !== "cs2") return this.addAllgemein(ev, m);
     switch (ev.type) {
       case "freezetime":
       case "round_live": {
@@ -77,6 +80,33 @@ class Statistik {
       case "demolition": m.demos++; this.sp(ev).demos++; break;
       case "mvp": this.sp(ev).mvps++; break;
       case "match_end": m.vorbei = true; m.sieger = ev.team || ""; break;
+    }
+  }
+
+  // Dota 2 und Overwolf-Spiele: jedes Event zählt einmal (Kill-Events dort sind einzelne Kills)
+  addAllgemein(ev, m) {
+    const r = this.runde;
+    switch (ev.type) {
+      case "round_start": if (r.vorbei || r.nr != null) { this.letzteRunde = r; this.runde = neueRunde((r.nr ?? 0) + 1); } else r.nr = ev.round || 1; this.runde.phase = "live"; break;
+      case "round_end":
+        if (r.vorbei) break;
+        Object.assign(r, { vorbei: true, phase: "over", sieger: ev.team || "" });
+        m.runden++;
+        if (ev.team) m.siege[ev.team] = (m.siege[ev.team] || 0) + 1;
+        break;
+      case "bomb_planted": case "bomb_defused": r.bombe = ev.type === "bomb_planted" ? "planted" : "defused"; if (ev.type === "bomb_planted") m.bomben++; break;
+      case "kill": r.kills++; m.kills++; this.sp(ev).kills++; break;
+      case "headshot": r.headshots++; m.headshots++; this.sp(ev).headshots++; break;
+      case "death": r.tode++; m.tode++; this.sp(ev).tode++; break;
+      case "assist": m.assists++; this.sp(ev).assists++; break;
+      case "knockdown": case "knockout": m.knocks++; break;
+      case "double_kill": case "triple_kill": case "ultra_kill": m.multikills++; break;
+      case "rampage": m.multikills++; m.aces++; break;
+      case "tower_destroyed": case "barracks_destroyed": m.tuerme++; break;
+      case "roshan_killed": m.roshan++; break;
+      case "match_end": m.vorbei = true; if (ev.team) m.sieger = ev.team; break;
+      case "match_won": m.vorbei = true; m.sieger = ev.team || m.sieger; break;
+      case "victory": m.vorbei = true; m.siegerSpieler = ev.player || ""; break;
     }
   }
 

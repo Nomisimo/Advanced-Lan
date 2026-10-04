@@ -9,7 +9,7 @@
 
 <p align="center"><img src="docs/screenshots/ablauf.jpg" alt="Ablauf: Game-PCs melden Events, die Regie schickt OSC-Befehle an Licht, Audio und Video" width="820"></p>
 
-Eine App für die LAN-Party: Die Game-PCs melden Spielereignisse, die Regie sendet daraus OSC-Befehle an Lichtpulte, Audio- und Videosoftware (z. B. grandMA3, QLab, Reaper, Resolume). Design und Aufbau wie [Netzwerkplaner](https://github.com/Nomisimo/Netzwerkplaner) und Stromplaner, Akzentfarbe Lila.
+Eine App für die LAN-Party: Die Game-PCs melden Spielereignisse aus CS2, Rocket League, Dota 2, Overwatch 2, Rainbow Six Siege, Marvel Rivals, Fortnite, Apex Legends und PUBG, die Regie sendet daraus OSC-Befehle an Lichtpulte, Audio- und Videosoftware (z. B. grandMA3, QLab, Reaper, Resolume). Design und Aufbau wie [Netzwerkplaner](https://github.com/Nomisimo/Netzwerkplaner) und Stromplaner, Akzentfarbe Lila.
 
 Gebaut mit **Overwolf Electron** (`@overwolf/ow-electron`), React 18 und esbuild. Die Oberfläche wird zu einer einzelnen Datei `dist-app/index.html` gebündelt.
 
@@ -17,7 +17,7 @@ Gebaut mit **Overwolf Electron** (`@overwolf/ow-electron`), React 18 und esbuild
 
 | Modus | Läuft auf | Tabs |
 |---|---|---|
-| **Game-PC** | jedem PC, auf dem gespielt wird | Session (PC-ID, Sessions im Netz, beitreten), Setup (CS2 und Rocket League einrichten, „Ist korrekt aufgesetzt?“-Check, Mini-Overlay, Netzwerkkarte), Events, Simulator (nur mit Session), Anleitung |
+| **Game-PC** | jedem PC, auf dem gespielt wird | Session (PC-ID, Sessions im Netz, beitreten), Setup (CS2, Dota 2 und Rocket League einrichten, Overwolf-Spiele, „Ist korrekt aufgesetzt?“-Check, Mini-Overlay, Netzwerkkarte), Events, Simulator (nur mit Session), Anleitung |
 | **Regie** | dem Regie-PC (ohne Spiel) | Control (aktives Spiel, Ausgabe, Verbindungscheck, Statistik, Events), Signale, Ziele, Session (mit Übersicht: PC-ID, Hostname, IP, MAC, Ping, App-Version), Setup (genutzte Spiele, Check, Netzwerkkarten), Simulator, Anleitung |
 
 Der Modus wird beim ersten Start gewählt und lässt sich oben rechts wechseln. Alle Erklärungen stehen im Tab „Anleitung“.
@@ -28,14 +28,30 @@ Der Modus wird beim ersten Start gewählt und lässt sich oben rechts wechseln. 
 - Game-PCs melden immer alle Spiele, die die App kennt. Nur die Regie entscheidet: Im Tab „Setup“ werden die genutzten Spiele gewählt, im Tab „Control“ (und nur dort) das aktive Spiel. Events anderer Spiele werden verworfen.
 - Mehrere PCs melden dieselbe Runde oder Bombe: die Regie wertet jedes Event nur einmal aus.
 - Die Ausgabe ist nach jedem Start **aus** (roter Knopf). Erst „AUSGABE AN“ (grün, pulsierend) schickt OSC.
-- Die Zähler im Control-Tab entsprechen den Filtern im Event-Log und lassen sich zurücksetzen. Der Verbindungscheck zeigt, ob alle PCs im selben Match sind (Rocket League: Match-ID, CS2: Map und Spielstand).
+- Die Zähler im Control-Tab entsprechen den Filtern im Event-Log und lassen sich zurücksetzen. Der Verbindungscheck zeigt, ob alle PCs im selben Match sind (CS2: Map und Spielstand, alle anderen: Match-ID).
 
 - **Mini-Overlay (Game-PC):** Ist die App minimiert, zeigt ein kleines App-Icon mit Statuspunkt über allen Fenstern, ob alles läuft (grün: Session und Spieldaten ok, orange: verbindet oder keine Spieldaten, rot: keine Session oder Fehler). Verschiebbar, Klick öffnet die App, abschaltbar im Tab „Setup“. Über exklusivem Vollbild erscheint es nicht (in CS2 „Vollbild (Fenster)“ nutzen).
 - **Simulator auf dem Game-PC:** spielt mit verbundener Session das aktive Spiel der Regie, als liefe es auf diesem PC, und schickt die Events wirklich an die Regie.
 - **Netzwerkkarten:** Die Regie wählt getrennt, über welche Karte sie Game-PCs empfängt und über welche sie OSC sendet, jedes Ziel kann eine eigene Karte haben; der Game-PC wählt seine Karte für die Session. Die App bindet Empfang bzw. Absender an die IP der Karte (eindeutig, wenn jede Karte in einem eigenen Subnetz liegt). Netzwerk-Anforderungen (IGMP, EEE, QoS …) stehen in der Anleitung.
 - **Updates wie im Netzwerkplaner:** Die App prüft beim Start die GitHub-Releases und zeigt eine neuere Version als grünen Knopf neben der Versionsnummer. Mac: Klick lädt das DMG in den Download-Ordner und öffnet es, dann die App nach „Programme“ ziehen (unsigniert, deshalb kein Austausch im Hintergrund). Windows: `electron-updater` lädt und installiert selbst, sobald es Windows-Releases gibt. Klick auf die Versionsnummer öffnet „Was ist neu?“ (`src/core/version.js`, dort bei jeder Version die Änderungen eintragen).
 - **Startanimation** wie im Netzwerkplaner: Controller, dessen Knöpfe nacheinander gedrückt werden.
-- CS2 und Rocket League gibt es nur für Windows. Auf dem Mac läuft die Regie; der Game-PC-Modus meldet dort, dass die Spiele fehlen.
+- CS2, Rocket League und die Overwolf-Spiele gibt es als Game-PC nur unter Windows, Dota 2 auch auf dem Mac. Auf dem Mac läuft vor allem die Regie; der Game-PC-Modus meldet dort, welche Spiele fehlen.
+
+## Spiele
+
+| Spiel | Datenquelle | Teams | Simulator |
+|---|---|---|---|
+| Counter-Strike 2 | Valve Game State Integration | CT, T | 10 PCs, Runde |
+| Rocket League | Psyonix Stats API | BLUE, ORANGE | 6 PCs, bis zum Tor |
+| Dota 2 | Valve Game State Integration | RADIANT, DIRE | 10 PCs, 5 Minuten |
+| Overwatch 2 | Overwolf GEP | TEAM 1, TEAM 2 | 10 PCs, Runde |
+| Rainbow Six Siege | Overwolf GEP | ATK, DEF (Seite der Runde) | 10 PCs, Runde |
+| Marvel Rivals | Overwolf GEP | TEAM 1, TEAM 2 | 12 PCs, Runde |
+| Fortnite | Overwolf GEP | – (Battle Royale) | 8 PCs (2 Squads), Zone |
+| Apex Legends | Overwolf GEP | – (Battle Royale) | 6 PCs (2 Trios), Zone |
+| PUBG: Battlegrounds | Overwolf GEP | – (Battle Royale) | 8 PCs (2 Squads), Zone |
+
+Riot-Spiele (Valorant, League of Legends, TFT) bleiben draußen: Riot gibt keine Live-Daten frei.
 
 ## Screenshots
 
@@ -61,7 +77,17 @@ Rocket League liefert seine Daten über die offizielle [Stats API](https://www.r
 
 Erkannte Ereignisse: Match startet/vorbei, Anstoß, Verlängerung, Siegerehrung, Tor, Vorlage, Hattrick, Tor-Wiederholung, Torschuss, Parade, Glanzparade, Demolition, Latte, MVP. Teams heißen `BLUE` und `ORANGE`. Die Stats API meldet alle Spieler des Matches; deshalb gibt es bei Rocket League keinen PC-Filter, nur den Team-Filter.
 
-Valorant ist als Spiel schon wählbar, seine Datenquelle fehlt noch.
+## Dota 2
+
+Dota 2 liefert seine Daten wie CS2 über Valves [Game State Integration](https://developer.valvesoftware.com/wiki/Dota_2_Workshop_Tools/Scripting/Game_State_Integration): `gamestate_integration_advancedlan.cfg` in `…\dota 2 beta\game\dota\cfg\gamestate_integration\` schickt den Zustand an denselben Empfang wie CS2 (`127.0.0.1:3000`, erkannt an `provider.appid` 570). Zusätzlich braucht Dota die Startoption `-gamestateintegration`; der Setup-Check liest sie aus Steams `localconfig.vdf`. Ein spielender PC meldet seinen eigenen Helden und die Gebäude seines Teams.
+
+Erkannte Ereignisse: Heldenwahl, Vorbereitung, Horn, Ancient zerstört (mit Sieger), Tag, Nacht, Roshan getötet, Aegis, Turm und Kaserne zerstört (Team = wer zerstört hat), Kill, Double Kill, Triple Kill, Ultra Kill, Rampage, Assist, Tod.
+
+## Overwolf-Spiele (GEP)
+
+Overwatch 2, Rainbow Six Siege, Marvel Rivals, Fortnite, Apex Legends und PUBG liefern ihre Events über [Overwolf Game Events](https://dev.overwolf.com/ow-electron/live-game-data-gep/live-game-data-gep-intro/) (`"overwolf": { "packages": ["gep"] }` in `package.json`, Anbindung in `src/main/gep.js`, Events je Spiel in `src/core/gep-spiele.js`). Die App erkennt das laufende Spiel selbst; jeder PC meldet, was sein Spieler erlebt.
+
+Overwolf liefert GEP nur an freigegebene Apps und in verteilten Builds nur mit Code-Signatur. Bis dahin kommen keine echten Events, der Simulator läuft aber mit denselben GEP-Nachrichten. Spiele, die Overwolf noch nicht in PROD hat, zum Testen mit `--owepm-packages-url=https://electronapi-qa.overwolf.com/v2/packages` starten. Rainbow Six: Die App zeigt nur den Namen, den das Spiel gerade zeigt (Overwolf-Regeln für R6).
 
 ## OSC: Ziele und Signale
 
@@ -91,6 +117,6 @@ npm run dist:mac   # macOS Intel (dmg), nur auf einem Mac
 
 | Ordner | Inhalt |
 |---|---|
-| `src/core` | Logik ohne Electron: Ereigniserkennung CS2 und Rocket League, Regie, Ziel-Datenbank, Signale, Statistik, Simulator, Protokoll |
-| `src/main` | Hauptprozess: Session-Server, Game-PC-Verbindung, GSI-Empfang, OSC |
+| `src/core` | Logik ohne Electron: Ereigniserkennung je Spiel (CS2, Rocket League, Dota 2, Overwolf-Spiele), Regie, Ziel-Datenbank, Signale, Statistik, Simulator, Protokoll |
+| `src/main` | Hauptprozess: Session-Server, Game-PC-Verbindung, GSI-Empfang, Overwolf GEP, OSC |
 | `src/renderer` | Oberfläche (React): Modus-Wahl, `regie/`, `gamepc/` |

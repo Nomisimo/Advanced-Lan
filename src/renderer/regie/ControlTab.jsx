@@ -4,7 +4,7 @@ import { Section, TeamChip, Dot, EventIcon, eventLabel, zeit, Leer, SpielChip, t
 import { api } from "../api.js";
 import { SPIELE, SPIEL_BY_ID } from "../../core/spiele.js";
 import { matchCheck } from "../../core/match-check.js";
-import { Bomb, CircleCheck, CircleX, CircleMinus, Unplug, Crown, RotateCcw } from "lucide-react";
+import { Bomb, CircleCheck, CircleX, CircleMinus, Unplug, Crown, RotateCcw, Sun, Moon } from "lucide-react";
 
 const PHASEN = { warmup: "Aufwärmen", live: "Live", intermission: "Halbzeit", gameover: "Match vorbei" };
 const RUNDEN = { freezetime: "Freezetime", live: "Runde läuft", over: "Runde vorbei" };
@@ -21,7 +21,7 @@ function SpielWahl({ cfg, mutate }) {
           const an = s.id === cfg.aktivesSpiel;
           return (
             <button key={s.id} onClick={() => !an && mutate((d) => { d.aktivesSpiel = s.id; })}
-              style={{ flex: 1, minWidth: 140, padding: "14px 16px", borderRadius: 10, cursor: "pointer", textAlign: "left", border: `1px solid ${an ? s.farbe : LINE}`,
+              style={{ flex: 1, minWidth: genutzt.length > 4 ? 104 : 140, padding: genutzt.length > 4 ? "9px 12px" : "14px 16px", borderRadius: 10, cursor: "pointer", textAlign: "left", border: `1px solid ${an ? s.farbe : LINE}`,
                 background: an ? s.farbe + "22" : "#1e1c26", color: "#ece9f2", boxShadow: an ? `0 0 16px ${s.farbe}66` : "none" }}>
               <div style={{ fontSize: 20, fontWeight: 800, color: an ? s.farbe : SUB, letterSpacing: 1 }}>{s.kurz}</div>
               <div style={{ fontSize: 12, color: an ? "#fff" : MUTED }}>{s.name}</div>
@@ -67,7 +67,7 @@ const Zahl = ({ label, wert, farbe }) => (
 function Statistik({ cfg, status }) {
   const st = status.statistik;
   if (cfg.aktivesSpiel === "rl") return <RlStatistik status={status} />;
-  if (cfg.aktivesSpiel !== "cs2") return <Section title="Statistik"><Leer>Keine Daten.</Leer></Section>;
+  if (cfg.aktivesSpiel !== "cs2") return SPIEL_BY_ID[cfg.aktivesSpiel]?.quelle ? <AllgemeinStatistik spiel={SPIEL_BY_ID[cfg.aktivesSpiel]} status={status} /> : <Section title="Statistik"><Leer>Keine Daten.</Leer></Section>;
   const daten = st && st.spiel === "cs2" && (st.match.runden || st.runde.nr != null || st.runde.kills);
   const stand = status.stand?.spiel === "cs2" ? status.stand : null;
   if (!daten && !stand) return <Section title="Statistik"><Leer>Noch keine Daten.</Leer></Section>;
@@ -175,6 +175,73 @@ function RlStatistik({ status }) {
   );
 }
 
+// Dota 2 und Overwolf-Spiele: Spielstand, Zahlen des Matches, beste Spieler
+const DOTA_PHASE = { HERO_SELECTION: "Heldenwahl", STRATEGY_TIME: "Strategiezeit", PRE_GAME: "Vorbereitung", GAME_IN_PROGRESS: "Live", POST_GAME: "Match vorbei" };
+function AllgemeinStatistik({ spiel, status }) {
+  const st = status.statistik?.spiel === spiel.id ? status.statistik : null;
+  const stand = status.stand?.spiel === spiel.id ? status.stand : null;
+  if (!st && !stand) return <Section title="Statistik"><Leer>Noch keine Daten.</Leer></Section>;
+  const m = st?.match || { siege: {} }, r = st?.runde || {};
+  const dota = spiel.id === "dota2", br = spiel.art === "br", [t1, t2] = spiel.teams;
+  const mitAssists = spiel.events.some((e) => e.id === "assist");
+  const punkte = (t) => (dota ? stand?.score?.[t] : m.siege?.[t]) ?? 0;
+  const zahlen = [
+    ["Kills", m.kills], ["Tode", m.tode],
+    ...(mitAssists ? [["Assists", m.assists]] : []),
+    ...(spiel.events.some((e) => e.id === "headshot") ? [["Headshots", m.headshots]] : []),
+    ...(br && spiel.events.some((e) => /knock/.test(e.id)) ? [["Niedergeschl.", m.knocks]] : []),
+    ...(dota ? [["Multikills", m.multikills], ["Türme", m.tuerme], ["Roshan", m.roshan]] : []),
+    ...(!dota && !br ? [["Runden", m.runden]] : []),
+  ];
+  return (
+    <Section title="Statistik" right={<span style={{ display: "flex", gap: 6 }}>
+      {stand?.map && !dota && <span style={S.chip}>{stand.map}</span>}
+      {dota && stand?.phase && <span style={S.chip}>{DOTA_PHASE[stand.phase] || stand.phase}</span>}
+      {dota && stand?.phase === "GAME_IN_PROGRESS" && <span style={S.chip}>{stand.tag ? <Sun size={11} /> : <Moon size={11} />} {stand.tag ? "Tag" : "Nacht"}</span>}
+      {m.vorbei && !(dota && stand?.phase === "POST_GAME") && <span style={S.chip}>Match vorbei</span>}
+    </span>}>
+      {t1 && t2 ? (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 22, marginBottom: 14 }}>
+          <Team name={t1} score={punkte(t1)} farbe={teamFarbe(t1)} sieger={m.sieger === t1} />
+          <div style={{ textAlign: "center", minWidth: 70 }}>
+            {dota ? <><div style={{ fontSize: 22, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>{uhr(Math.max(0, stand?.zeit ?? 0))}</div><div style={{ fontSize: 10, color: SUB }}>Kills · Spielzeit</div></>
+              : <><div style={{ fontSize: 24, color: MUTED }}>:</div><div style={{ fontSize: 10, color: SUB }}>Runden{r.nr ? ` · Runde ${r.nr}` : ""}</div></>}
+          </div>
+          <Team name={t2} score={punkte(t2)} farbe={teamFarbe(t2)} sieger={m.sieger === t2} />
+        </div>
+      ) : (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 30, marginBottom: 14 }}>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 44, fontWeight: 800, lineHeight: 1.05 }}>{stand?.uebrig ?? "–"}</div>
+            <div style={{ fontSize: 11, color: SUB }}>Spieler übrig</div>
+          </div>
+          {m.siegerSpieler && <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: spiel.farbe, textShadow: `0 0 14px ${spiel.farbe}` }}><Crown size={18} style={{ verticalAlign: -2 }} /> {m.siegerSpieler}</div>
+            <div style={{ fontSize: 11, color: SUB }}>Squad gewinnt</div>
+          </div>}
+        </div>
+      )}
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(zahlen.length, 5)},1fr)`, gap: 8, marginBottom: 14 }}>
+        {zahlen.map(([label, w]) => <Zahl key={label} label={label} wert={w || 0} />)}
+      </div>
+      {st?.top?.length > 0 && (
+        <table style={{ ...S.table, marginTop: 0 }}>
+          <thead><tr><th style={th()}>Spieler</th>{t1 && <th style={th()}>Team</th>}<th style={th({ textAlign: "right" })}>K</th><th style={th({ textAlign: "right" })}>D</th>{mitAssists && <th style={th({ textAlign: "right" })}>A</th>}</tr></thead>
+          <tbody>{st.top.map((p, i) => (
+            <tr key={p.name}>
+              <td style={td({ fontWeight: i === 0 ? 700 : 400 })}>{i === 0 && <Crown size={12} color={ACCENT_HI} style={{ marginRight: 5, verticalAlign: -1 }} />}{p.name}</td>
+              {t1 && <td style={td()}><TeamChip team={p.team} /></td>}
+              <td style={td({ textAlign: "right", fontWeight: 700 })}>{p.kills}</td>
+              <td style={td({ textAlign: "right", color: SUB })}>{p.tode}</td>
+              {mitAssists && <td style={td({ textAlign: "right", color: SUB })}>{p.assists}</td>}
+            </tr>
+          ))}</tbody>
+        </table>
+      )}
+    </Section>
+  );
+}
+
 const Team = ({ name, score, farbe, sieger }) => (
   <div style={{ textAlign: "center", minWidth: 80 }}>
     <div style={{ fontSize: 12, fontWeight: 700, color: farbe, letterSpacing: 1 }}>{name}</div>
@@ -183,6 +250,17 @@ const Team = ({ name, score, farbe, sieger }) => (
 );
 
 /* ── Verbindungscheck ─────────────────────────────────────────────────── */
+// Welche Spiele ein PC erkennt: das aktive (falls dabei) und die Zahl der übrigen
+const Erkennt = ({ spiele, aktiv }) => {
+  const rest = spiele.filter((x) => x !== aktiv).length;
+  return (
+    <span style={{ display: "inline-flex", gap: 4, alignItems: "center" }}>
+      {spiele.includes(aktiv) ? <SpielChip spiel={aktiv} /> : <span style={{ color: ERR, fontSize: 11 }}>nicht {SPIEL_BY_ID[aktiv]?.kurz || aktiv}</span>}
+      {rest > 0 && <span style={{ fontSize: 11, color: MUTED }}>+{rest}</span>}
+    </span>
+  );
+};
+
 const Ampel = ({ ok, teil, title }) => (
   <span title={title} style={{ display: "inline-flex", color: ok ? OK : teil ? WARN : ERR }}>
     {ok ? <CircleCheck size={15} /> : teil ? <CircleMinus size={15} /> : <CircleX size={15} />}
@@ -199,16 +277,18 @@ function Verbindungscheck({ cfg, status, jetzt }) {
   };
   const ok = pcs.filter((p) => pruefen(p).ok).length;
   const mc = matchCheck(pcs, cfg.aktivesSpiel);
-  const standText = (st) => !st ? "" : cfg.aktivesSpiel === "rl" ? `${st.arena || "Arena"} · ${st.blau}:${st.orange}${st.match ? ` · Match ${st.match}` : ""}` : `${st.map} · ${st.ct}:${st.tt}`;
+  const standText = (st) => !st ? "" : cfg.aktivesSpiel === "rl" ? `${st.arena || "Arena"} · ${st.blau}:${st.orange}${st.match ? ` · Match ${st.match}` : ""}`
+    : cfg.aktivesSpiel === "cs2" ? `${st.map} · ${st.ct}:${st.tt}` : [st.map, st.match && `Match ${st.match}`].filter(Boolean).join(" · ");
   return (
     <Section title="Verbindungscheck" right={pcs.length > 0 && <span style={{ display: "inline-flex", gap: 12, fontSize: 12, fontWeight: 700 }}>
       {mc.gesamt > 1 && <span style={{ color: mc.anzahl === mc.gesamt ? OK : WARN }} title={`Die meisten: ${standText(mc.ref)}`}>{mc.anzahl === mc.gesamt ? "alle im selben Match" : `${mc.gesamt - mc.anzahl} in anderem Match`}</span>}
       <span style={{ color: ok === pcs.length ? OK : WARN }}>{ok} / {pcs.length} PCs ok</span>
     </span>}>
       {pcs.length === 0 ? <Leer>Kein PC in der Session.</Leer> : (
+        <div style={{ overflowX: "auto" }}>
         <table style={{ ...S.table, marginTop: 0 }}>
           <thead><tr>
-            <th style={th()}>PC</th><th style={th({ textAlign: "center" })}>Verbindung</th><th style={th({ textAlign: "center" })}>Daten</th><th style={th({ textAlign: "center" })}>Spiel</th><th style={th({ textAlign: "center" })} title="Gleiches Match wie die meisten PCs (RL: Match-ID, CS2: Map und Spielstand)">Match</th>
+            <th style={th()}>PC</th><th style={th({ textAlign: "center" })}>Verbindung</th><th style={th({ textAlign: "center" })}>Daten</th><th style={th({ textAlign: "center" })}>Spiel</th><th style={th({ textAlign: "center" })} title="Gleiches Match wie die meisten PCs (CS2: Map und Spielstand, sonst Match-ID)">Match</th>
             <th style={th()}>Ping</th><th style={th()}>Spieler</th><th style={th()}>Erkennt</th><th style={th()}>Zuletzt</th><th style={th()}></th>
           </tr></thead>
           <tbody>
@@ -224,7 +304,7 @@ function Verbindungscheck({ cfg, status, jetzt }) {
                     title={mc.ergebnis[p.pcId] === "gleich" ? `gleiches Match: ${standText(p.stand)}` : `anderes Match: ${standText(p.stand)}, die meisten: ${standText(mc.ref)}`} /> : <span style={{ color: MUTED }} title="kein Spielstand vom aktiven Spiel">–</span>}</td>
                   <td style={td({ color: p.ping == null ? MUTED : p.ping > 50 ? WARN : SUB, fontSize: 12, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" })}>{p.sim ? "–" : p.ping == null ? "–" : `${p.ping} ms`}</td>
                   <td style={td({ fontSize: 12 })}>{s.spieler ? <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>{s.spieler} <TeamChip team={s.team} /></span> : <span style={{ color: MUTED }}>–</span>}</td>
-                  <td style={td()}><span style={{ display: "inline-flex", gap: 4 }}>{(p.spiele || []).map((x) => <SpielChip key={x} spiel={x} aktiv={x === cfg.aktivesSpiel} />)}</span></td>
+                  <td style={td({ whiteSpace: "nowrap" })} title={(p.spiele || []).map((x) => SPIEL_BY_ID[x]?.name || x).join(", ")}><Erkennt spiele={p.spiele || []} aktiv={cfg.aktivesSpiel} /></td>
                   <td style={td({ color: SUB, fontSize: 12, whiteSpace: "nowrap" })}>{p.t ? `${Math.max(0, Math.round((jetzt - p.t) / 1000))} s` : "–"}</td>
                   <td style={td({ textAlign: "right" })}>{p.verbunden && !p.sim && <button style={S.dangerBtn} title="Trennen" onClick={() => confirm(`${p.pcId} trennen?`) && api.pcTrennen(p.pcId)}><Unplug size={12} /></button>}</td>
                 </tr>
@@ -232,6 +312,7 @@ function Verbindungscheck({ cfg, status, jetzt }) {
             })}
           </tbody>
         </table>
+        </div>
       )}
     </Section>
   );
@@ -311,11 +392,11 @@ function Log({ log, status }) {
 export default function ControlTab({ cfg, mutate, status, log, jetzt, zuruecksetzen, notify }) {
   return (
     <>
-      <div style={{ display: "grid", gridTemplateColumns: "1.25fr 1fr", gap: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.25fr) minmax(0,1fr)", gap: 20 }}>
         <SpielWahl cfg={cfg} mutate={mutate} />
         <Ausgabe cfg={cfg} status={status} zuruecksetzen={zuruecksetzen} notify={notify} />
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1.25fr 1fr", gap: 20, alignItems: "start" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.25fr) minmax(0,1fr)", gap: 20, alignItems: "start" }}>
         <div>
           <Verbindungscheck cfg={cfg} status={status} jetzt={jetzt} />
           <Statistik cfg={cfg} status={status} />

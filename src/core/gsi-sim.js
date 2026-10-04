@@ -50,6 +50,7 @@ class SimMatch {
   bild(t) { return this.spieler.map((p) => this.payload(p, t)); }
 
   vorbei() { return this.phase === "gameover"; }
+  anzeige() { return { teams: [["CT", this.score.CT], ["T", this.score.T]], einheit: "Runden" }; }
 
   // Schritte einer Runde: [{ dt, payloads }], dt = Abstand zum vorigen Schritt in ms
   naechsteRunde() {

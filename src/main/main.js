@@ -6,12 +6,16 @@ const { GsiServer } = require('./gsi-server');
 const { OscSender } = require('./osc-out');
 const { SessionServer } = require('./session-server');
 const { Discovery, SessionClient } = require('./session-client');
-const { findeCs2CfgOrdner, findeRlConfigOrdner } = require('./cs2-pfad');
+const { findeCs2CfgOrdner, findeRlConfigOrdner, findeDotaCfgOrdner, steamLocalConfigs } = require('./cs2-pfad');
+const { GepAnbindung } = require('./gep');
 const { RlClient } = require('./rl-client');
 const { Regie } = require('../core/regie');
 const { RegieSim } = require('../core/regie-sim');
 const { CsQuelle } = require('../core/cs-quelle');
 const { RlQuelle } = require('../core/rl-quelle');
+const { DotaQuelle, DOTA_APPID, dotaCfg, dotaStartoptionen, DOTA_CFG_DATEI, DOTA_STARTOPTION } = require('../core/dota');
+const { GepQuelle, GEP_SPIELE, GEP_BY_ID } = require('../core/gep-spiele');
+const { QUELLEN, SPIEL_BY_ID } = require('../core/spiele');
 const { rlIni, leseRlIni, RL_INI_DATEI } = require('../core/rl-ini');
 const { migrateKonfig } = require('../core/defaults');
 const { gsiCfg, CFG_DATEI } = require('../core/cfg');
@@ -21,6 +25,8 @@ const { kartenListe, lokaleIp } = require('../core/netzwerk');
 const { SimRunner } = require('../core/sim-runner');
 const { SimMatch } = require('../core/gsi-sim');
 const { RlSimMatch } = require('../core/rl-sim');
+const { DotaSimMatch } = require('../core/dota-sim');
+const { GepSimMatch } = require('../core/gep-sim');
 const { einrichtenUpdates } = require('./updates');
 const os = require('os');
 
@@ -51,7 +57,7 @@ const meldung = (text, art = 'ok') => an('meldung', { text, art });
 let statusTimer = null;
 const statusMelden = () => {
   if (statusTimer) return;
-  statusTimer = setTimeout(() => { statusTimer = null; an('status', gesamtStatus()); overlayMelden(); }, 120);
+  statusTimer = setTimeout(() => { statusTimer = null; if (!cfg) return; an('status', gesamtStatus()); overlayMelden(); }, 120);
 };
 
 /* ── Modus Regie: Session, aktives Spiel, Cues → OSC ──────────────────── */
@@ -74,7 +80,8 @@ const session = new SessionServer({ regie, getConfig: () => cfg.regie, onChange:
 const regieSim = new RegieSim({ regie, onChange: statusMelden });
 
 // Auf dem Regie-PC darf kein Spiel laufen (Windows: Prozessliste prüfen)
-const SPIEL_PROZESSE = { 'cs2.exe': 'CS2', 'valorant-win64-shipping.exe': 'Valorant', 'rocketleague.exe': 'Rocket League' };
+const SPIEL_PROZESSE = { 'cs2.exe': 'CS2', 'valorant-win64-shipping.exe': 'Valorant', 'rocketleague.exe': 'Rocket League', 'dota2.exe': 'Dota 2', 'r5apex_dx12.exe': 'Apex Legends', 'rainbowsix_vulkan.exe': 'Rainbow Six Siege', 'rainbowsix_be.exe': 'Rainbow Six Siege',
+  ...Object.fromEntries(GEP_SPIELE.map((s) => [s.exe, s.name])) };
 let spielAufRegie = '', spielCheck = null;
 function pruefeSpielProzesse() {
   if (process.platform !== 'win32') return;
@@ -87,11 +94,18 @@ function pruefeSpielProzesse() {
 }
 
 /* ── Modus Game-PC: alle bekannten Spiele → Ereignisse → Regie ─────────── */
-const QUELLEN = ['cs2', 'rl']; // Spiele mit Datenquelle auf dem Game-PC
+// QUELLEN (core/spiele.js): Spiele mit Datenquelle auf dem Game-PC
 let quelle = new CsQuelle();
 const gp = { letzte: 0, status: null, stand: null, fremd: 0, log: [], nr: 0, statusGesendet: 0 };
 let rlQuelle = new RlQuelle();
 const rl = { letzte: 0, stand: null, statusGesendet: 0 };
+// Dota 2 (Valve GSI) und Overwolf-Spiele (GEP): je Spiel eine Quelle und der letzte Stand
+let quellen = {};
+const neueQuellen = () => { quellen = { dota2: new DotaQuelle(), ...Object.fromEntries(GEP_SPIELE.map((d) => [d.id, new GepQuelle(d.id)])) }; };
+neueQuellen();
+const daten = {}; // spiel → { letzte, stand, status, statusGesendet }
+const gep = new GepAnbindung({ app, onNachricht: (spiel, m) => gepNachricht(spiel, m), onChange: statusMelden });
+gep.start(); // vor app.whenReady: das Paket meldet sich, sobald ow-electron es geladen hat
 const rlClient = new RlClient({ onNachricht: (m) => rlNachricht(m), onChange: statusMelden });
 const client = new SessionClient({
   onChange: () => { if (client.zustand !== 'verbunden') gpSim.stop(); statusMelden(); },
@@ -105,6 +119,7 @@ const gsi = new GsiServer({ onPayload: (b) => gamePcPayload(b), onStatus: status
 function gamePcPayload(body, sim = false) {
   if (cfg.modus !== 'gamepc') return;
   if (body?.auth?.token !== cfg.gamepc.gsiToken) { gp.fremd++; return statusMelden(); }
+  if (body?.provider?.appid === DOTA_APPID) return quelleMelden('dota2', quellen.dota2.ingest(body), sim); // Dota 2 schickt an denselben Empfang
   const r = quelle.ingest(body);
   Object.assign(gp, { letzte: Date.now(), status: r.status, stand: r.stand });
   const spiel = 'cs2'; // Game-PC sendet immer alles, was er erkennt. Was davon genutzt wird, entscheidet die Regie.
@@ -114,6 +129,21 @@ function gamePcPayload(body, sim = false) {
   }
   if (r.events.length || Date.now() - gp.statusGesendet > 500) { client.status(spiel, r.status, r.stand); gp.statusGesendet = Date.now(); }
   statusMelden();
+}
+
+// Ergebnis einer Quelle (Dota 2, Overwolf-Spiele) → Log, Regie, Status
+function quelleMelden(spiel, r, sim = false) {
+  const d = daten[spiel] = daten[spiel] || { letzte: 0, statusGesendet: 0 };
+  Object.assign(d, { letzte: Date.now(), stand: r.stand, status: r.status });
+  for (const ev of r.events) gamePcLog({ spiel, ev, gesendet: client.event(spiel, ev), sim });
+  if (r.events.length || Date.now() - d.statusGesendet > 500) { client.status(spiel, r.status, r.stand); d.statusGesendet = Date.now(); }
+  statusMelden();
+}
+
+// Overwolf-Spiele: GEP-Nachrichten des Spiels auf diesem PC
+function gepNachricht(spiel, m, sim = false) {
+  if (cfg?.modus !== 'gamepc' || !quellen[spiel]) return;
+  quelleMelden(spiel, quellen[spiel].ingest(m), sim);
 }
 
 function gamePcLog(x) {
@@ -130,6 +160,10 @@ const gpSim = new SimRunner({
   onChange: () => statusMelden(),
   neuesMatch: () => {
     if (gpSimSpiel === 'rl') return new RlSimMatch();
+    // Dota 2 und Overwolf-Spiele: dieser PC ist Spieler 1, nur dessen Daten kommen hier an
+    const clients = (n, ich) => Array.from({ length: n }, (_, i) => ({ token: i === 0 ? ich : `sim${i}` }));
+    if (gpSimSpiel === 'dota2') { const m = new DotaSimMatch({ clients: clients(10, cfg.gamepc.gsiToken) }); m.spieler[0].name = cfg.gamepc.pcId || m.spieler[0].name; return m; }
+    if (GEP_BY_ID[gpSimSpiel]) { const m = new GepSimMatch({ spiel: gpSimSpiel, clients: clients(GEP_BY_ID[gpSimSpiel].spieler, 'ich') }); m.spieler[0].name = cfg.gamepc.pcId || m.spieler[0].name; return m; }
     // 5 gegen 5, dieser PC ist Spieler 1 (CT): nur dessen Daten kommen hier an, wie bei echtem CS2
     const m = new SimMatch({ clients: Array.from({ length: 10 }, (_, i) => ({ token: i === 0 ? cfg.gamepc.gsiToken : `sim${i}` })) });
     m.spieler[0].name = cfg.gamepc.pcId || m.spieler[0].name;
@@ -137,16 +171,18 @@ const gpSim = new SimRunner({
   },
   deliver: (p) => {
     if (gpSimSpiel === 'rl') rlNachricht(p, true);
+    else if (p.gep) { if (p.an == null || p.an === 'ich') gepNachricht(gpSimSpiel, p, true); }
     else if (p.auth?.token === cfg.gamepc.gsiToken) gamePcPayload(p, true);
   },
 });
 function gamePcSimStart(modus) {
   if (client.zustand !== 'verbunden') return { fehler: 'Nur mit verbundener Session' };
   const spiel = client.aktivesSpiel;
-  if (spiel !== 'cs2' && spiel !== 'rl') return { fehler: 'Für das aktive Spiel der Session gibt es keinen Simulator' };
+  if (!RegieSim.kann(spiel)) return { fehler: 'Für das aktive Spiel der Session gibt es keinen Simulator' };
   if (spiel !== gpSimSpiel) { gpSim.neu(); gpSimSpiel = spiel; }
   if (spiel === 'cs2' && !gpSim.match) quelle = new CsQuelle();
   if (spiel === 'rl' && !gpSim.match) rlQuelle = new RlQuelle();
+  if (quellen[spiel] && !gpSim.match) quellen[spiel] = spiel === 'dota2' ? new DotaQuelle() : new GepQuelle(spiel);
   gpSim.start(modus);
   return { ok: true };
 }
@@ -201,6 +237,45 @@ async function rlCheck() {
   ];
 }
 
+const alterVon = (t) => (t ? Math.round((Date.now() - t) / 1000) : null);
+
+// Dota 2: wie CS2 eine cfg-Datei, dazu die Startoption -gamestateintegration in Steam
+async function dotaCheck() {
+  const g = cfg.gamepc, gs = gsi.status();
+  const ordner = await findeDotaCfgOrdner();
+  const datei = ordner ? path.join(ordner, DOTA_CFG_DATEI) : '';
+  let inhalt = null;
+  try { if (datei) inhalt = fs.readFileSync(datei, 'utf8'); } catch {}
+  const norm = (x) => String(x).replace(/\r\n/g, '\n').trim();
+  const passt = inhalt != null && norm(inhalt) === norm(dotaCfg({ port: g.gsiPort, token: g.gsiToken }));
+  const optionen = (await steamLocalConfigs()).map(dotaStartoptionen).filter((x) => x != null);
+  const mitOption = optionen.some((o) => o.split(/\s+/).includes(DOTA_STARTOPTION));
+  const alter = alterVon(daten.dota2?.letzte);
+  return [
+    { id: 'dota-installiert', label: 'Dota 2 gefunden', ok: !!ordner, detail: ordner ? path.dirname(ordner) : 'nicht in den Steam-Bibliotheken' },
+    { id: 'dota-cfg', label: 'cfg-Datei installiert', ok: inhalt != null, detail: inhalt != null ? DOTA_CFG_DATEI : 'fehlt' },
+    { id: 'dota-aktuell', label: 'cfg-Datei passt zu dieser App', ok: passt, detail: inhalt == null ? '–' : passt ? 'Port und Token stimmen' : 'veraltet, neu installieren' },
+    { id: 'dota-start', label: `Startoption ${DOTA_STARTOPTION}`, ok: mitOption, warn: !optionen.length, detail: mitOption ? 'in Steam eingetragen' : optionen.length ? 'fehlt: Steam → Dota 2 → Eigenschaften → Startoptionen' : 'nicht prüfbar, in Steam selbst nachsehen' },
+    { id: 'dota-empfang', label: 'Empfang bereit', ok: !!gs.laeuft, detail: gs.fehler || `127.0.0.1:${gs.port} (wie CS2)` },
+    { id: 'dota-daten', label: 'Dota 2 sendet Daten', ok: alter != null && alter < 15, detail: alter == null ? 'noch nichts empfangen, Dota 2 starten' : `zuletzt vor ${alter} s` },
+  ];
+}
+
+// Overwolf-Spiele: GEP geladen? Welches Spiel läuft, kommen Daten?
+function gepCheck() {
+  const st = gep.status();
+  const punkte = [
+    { id: 'gep-geladen', label: 'Overwolf-Spieldaten (GEP) geladen', ok: st.geladen, detail: st.geladen ? `GEP ${st.version || ''}`.trim() : st.fehler || (st.laedt ? 'wird geladen …' : 'nicht geladen: braucht Overwolf-Freigabe und signierte App') },
+    ...(st.admin ? [{ id: 'gep-admin', label: 'Spiel läuft als Administrator', ok: false, detail: 'Advanced LAN auch als Administrator starten' }] : []),
+    ...(st.geladen && st.fehler ? [{ id: 'gep-fehler', label: 'GEP meldet einen Fehler', ok: false, warn: true, detail: st.fehler }] : []),
+  ];
+  const spiele = GEP_SPIELE.map((d) => {
+    const alter = alterVon(daten[d.id]?.letzte), laeuft = st.spiel?.id === d.id;
+    return { id: `gep-${d.id}`, spiel: d.id, label: d.name, ok: alter != null && alter < 15, warn: true, detail: alter != null && alter < 15 ? `Daten vor ${alter} s` : laeuft ? 'läuft, wartet auf Daten' : 'nicht gestartet' };
+  });
+  return { punkte, spiele };
+}
+
 // „Ist korrekt aufgesetzt“-Check des Game-PCs
 // CS2 und Rocket League gibt es nicht für macOS: dort nicht suchen, sondern das sagen
 const OHNE_MAC = (spiel) => [{ id: 'plattform', label: `${spiel} gibt es nicht für macOS`, ok: false, warn: true, nichtVerfuegbar: true, detail: 'Game-PC mit diesem Spiel nur unter Windows' }];
@@ -211,7 +286,9 @@ async function setupCheck() {
     { id: 'pcid', label: 'PC-ID eingetragen', ok: !!g.pcId.trim(), detail: g.pcId.trim() || 'fehlt' },
     { id: 'session', label: 'Mit einer Session verbunden', ok: c.zustand === 'verbunden', detail: c.zustand === 'verbunden' ? c.session : c.grund || 'nicht verbunden' },
   ];
-  if (process.platform === 'darwin') return { allgemein, cs2: OHNE_MAC('Counter-Strike 2'), rl: OHNE_MAC('Rocket League'), plattform: 'darwin' };
+  // GEP gibt es nur unter Windows (Overwolf); Dota 2 läuft auch auf dem Mac
+  const gepMac = { punkte: [{ id: 'gep-plattform', label: 'Overwolf-Spieldaten nur unter Windows', ok: false, warn: true, nichtVerfuegbar: true, detail: 'Overwatch 2, R6, Marvel Rivals, Fortnite, Apex und PUBG nur auf Windows-PCs' }], spiele: [] };
+  if (process.platform === 'darwin') return { allgemein, cs2: OHNE_MAC('Counter-Strike 2'), rl: OHNE_MAC('Rocket League'), dota2: await dotaCheck(), gep: gepMac, plattform: 'darwin' };
   const ordner = await findeCs2CfgOrdner();
   const datei = ordner ? path.join(ordner, CFG_DATEI) : '';
   let inhalt = null;
@@ -231,6 +308,8 @@ async function setupCheck() {
       ...(gp.fremd ? [{ id: 'token', label: 'Kein fremder Token', ok: false, detail: `${gp.fremd} Nachrichten mit falschem Token` }] : []),
     ],
     rl: await rlCheck(),
+    dota2: await dotaCheck(),
+    gep: process.platform === 'win32' ? gepCheck() : gepMac,
   };
 }
 
@@ -253,6 +332,7 @@ async function modusStarten() {
     quelle = new CsQuelle();
     await gsi.start(Number(cfg.gamepc.gsiPort));
     rlQuelle = new RlQuelle();
+    neueQuellen();
     rlClient.start(Number(cfg.gamepc.rlPort));
     discovery.start();
     autoWartet = !!(cfg.gamepc.autoVerbinden && cfg.gamepc.regie.id && cfg.gamepc.passwort && cfg.gamepc.pcId);
@@ -263,7 +343,7 @@ async function modusStarten() {
 function gesamtStatus() {
   const s = { modus: cfg.modus, jetzt: Date.now() };
   if (cfg.modus === 'regie') s.regie = { ...regie.snapshot(), session: session.status(), sim: regieSim.status(), armed: cfg.regie.armed, spielAufRegie };
-  if (cfg.modus === 'gamepc') s.gamepc = { client: client.info(), sessions: discovery.liste(), discoveryFehler: discovery.fehler, gsi: gsi.status(), letzte: gp.letzte, status: gp.status, stand: gp.stand, fremd: gp.fremd, sim: { ...gpSim.status(), spiel: gpSimSpiel }, rl: { ...rlClient.status(), letzte: rl.letzte, stand: rl.stand } };
+  if (cfg.modus === 'gamepc') s.gamepc = { client: client.info(), sessions: discovery.liste(), discoveryFehler: discovery.fehler, gsi: gsi.status(), letzte: gp.letzte, status: gp.status, stand: gp.stand, fremd: gp.fremd, sim: { ...gpSim.status(), spiel: gpSimSpiel }, rl: { ...rlClient.status(), letzte: rl.letzte, stand: rl.stand }, daten, gep: gep.status() };
   return s;
 }
 
@@ -342,7 +422,8 @@ function overlayAktualisieren() {
 
 function overlayMelden() {
   if (!overlayWin || overlayWin.isDestroyed() || cfg.modus !== 'gamepc') return;
-  overlayWin.webContents.send('overlay-status', overlayStatus({ client: client.info(), gsi: gsi.status(), letzteCs2: gp.letzte, letzteRl: rl.letzte, jetzt: Date.now() }));
+  const weitere = Object.fromEntries(Object.entries(daten).map(([id, d]) => [SPIEL_BY_ID[id]?.name || id, d.letzte]));
+  overlayWin.webContents.send('overlay-status', overlayStatus({ client: client.info(), gsi: gsi.status(), letzteCs2: gp.letzte, letzteRl: rl.letzte, weitere, jetzt: Date.now() }));
 }
 
 ipcMain.on('overlay-ziehen', (_, dx, dy) => {
@@ -459,9 +540,22 @@ ipcMain.handle('cfg-speichern', async () => {
   fs.writeFileSync(r.filePath, gsiCfg({ port: cfg.gamepc.gsiPort, token: cfg.gamepc.gsiToken }));
   return { ok: true, pfad: r.filePath };
 });
+ipcMain.handle('dota-cfg-installieren', async () => {
+  const ordner = await findeDotaCfgOrdner();
+  if (!ordner) return { fehler: 'Dota-2-Ordner nicht gefunden. Bitte „Speichern unter …“ nehmen.' };
+  try { fs.mkdirSync(ordner, { recursive: true }); fs.writeFileSync(path.join(ordner, DOTA_CFG_DATEI), dotaCfg({ port: cfg.gamepc.gsiPort, token: cfg.gamepc.gsiToken })); }
+  catch (e) { return { fehler: e.message }; }
+  return { ok: true, pfad: path.join(ordner, DOTA_CFG_DATEI) };
+});
+ipcMain.handle('dota-cfg-speichern', async () => {
+  const r = await dialog.showSaveDialog(mainWin, { defaultPath: DOTA_CFG_DATEI, filters: [{ name: 'Dota-2-Konfiguration', extensions: ['cfg'] }] });
+  if (r.canceled || !r.filePath) return { abgebrochen: true };
+  fs.writeFileSync(r.filePath, dotaCfg({ port: cfg.gamepc.gsiPort, token: cfg.gamepc.gsiToken }));
+  return { ok: true, pfad: r.filePath };
+});
 // Einzelnes Event von diesem PC an die Regie (Tab „Simulator“)
 ipcMain.handle('test-event', (_, type, spiel = 'cs2', team = '', kills = 1) => {
-  const stand = spiel === 'rl' ? rl.stand : gp.stand;
+  const stand = spiel === 'rl' ? rl.stand : spiel === 'cs2' ? gp.stand : daten[spiel]?.stand;
   const ev = { type: String(type), team: String(team || ''), player: cfg.gamepc.pcId, kills: Number(kills) || 1, round: stand?.runde ?? 0, map: stand?.map || '', test: true };
   const ok = client.event(spiel, ev);
   gamePcLog({ spiel, ev, gesendet: ok, sim: true });

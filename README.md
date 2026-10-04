@@ -113,7 +113,7 @@ npm run dist:win   # Windows-Installer mit ow-electron-builder
 npm run dist:mac   # macOS Intel (dmg), nur auf einem Mac
 ```
 
-**Beta-Releases:** Ein Tag `v*` (z. B. `v0.1.0-beta.1`) startet `.github/workflows/release.yml`: Build für macOS Intel auf einem GitHub-Mac, Ergebnis als Vorabversion unter Releases. Unsigniert, deshalb beim ersten Start Rechtsklick → Öffnen. Apple Silicon und Windows folgen.
+**Beta-Releases:** Ein Tag `v*` (z. B. `v0.1.0-beta.1`) oder Actions → Release startet `.github/workflows/release.yml`: Builds für Windows (x64) und macOS Intel auf GitHub-Runnern, Ergebnis als Vorabversion unter Releases. Beide sind noch unsigniert: Windows warnt mit SmartScreen (Weitere Informationen → Trotzdem ausführen), auf dem Mac beim ersten Start Rechtsklick → Öffnen. Overwolf-Spiele (GEP) laden erst in einer signierten Windows-Version, siehe [docs/zertifikat.md](docs/zertifikat.md). Apple Silicon folgt.
 
 `dist-app/index.html` lässt sich auch direkt im Browser öffnen: Dann läuft eine Vorschau ohne Netzwerk, mit derselben Regie-Logik und dem Simulator.
 
@@ -122,3 +122,7 @@ npm run dist:mac   # macOS Intel (dmg), nur auf einem Mac
 | `src/core` | Logik ohne Electron: Ereigniserkennung je Spiel (CS2, Rocket League, Dota 2, Overwolf-Spiele), Regie, Ziel-Datenbank, Signale, Statistik, Simulator, Protokoll |
 | `src/main` | Hauptprozess: Session-Server, Game-PC-Verbindung, GSI-Empfang, Overwolf GEP, OSC, Game-Stats-Screen (Fenster, NDI) |
 | `src/renderer` | Oberfläche (React): Modus-Wahl, `regie/`, `gamepc/`, `StatsScreen.jsx` (`index.html#stats`) |
+
+## Lizenz
+
+[MIT](LICENSE). Nutzungsbedingungen: [docs/TERMS.md](docs/TERMS.md), Datenschutz: [docs/PRIVACY.md](docs/PRIVACY.md).

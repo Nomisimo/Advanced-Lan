@@ -99,7 +99,7 @@ jobs:
           body: |
             Beta von Advanced LAN für Windows und macOS mit Intel-Prozessor.
 
-            **Windows:** `Advanced LAN-…-win-x64.exe` ausführen. Die App ist noch nicht signiert, deshalb warnt Windows SmartScreen:
+            **Windows:** `Advanced-LAN-…-win-x64.exe` ausführen. Die App ist noch nicht signiert, deshalb warnt Windows SmartScreen:
             **Weitere Informationen** → **Trotzdem ausführen**. Overwolf-Spiele (GEP) laden erst in einer signierten Version, CS2, Rocket League und Dota 2 gehen schon.
 
             **macOS:** `.dmg` öffnen und Advanced LAN in den Programme-Ordner ziehen. Beim ersten Start im Finder mit Rechtsklick → **Öffnen** starten

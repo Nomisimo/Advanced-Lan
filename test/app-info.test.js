@@ -64,3 +64,8 @@ test("Overwolf-Release: Lizenz, Zustimmung im Installer, Links zu Terms und Priv
   assert.ok(fs.existsSync("docs/TERMS.md") && fs.existsSync("docs/PRIVACY.md"));
   assert.ok(LINKS.terms.endsWith("docs/TERMS.md") && LINKS.privacy.endsWith("docs/PRIVACY.md"));
 });
+
+test("Dateinamen der Installer ohne Leerzeichen (GitHub ersetzt sie, latest.yml nicht)", () => {
+  assert.ok(!/\s/.test(pkg.build.artifactName), pkg.build.artifactName);
+  assert.ok(!/\$\{productName\}/.test(pkg.build.artifactName), "productName enthält ein Leerzeichen");
+});

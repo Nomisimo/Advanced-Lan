@@ -112,12 +112,12 @@ npm ci
 npm run dist:win
 ```
 
-Ergebnis: `dist\Advanced LAN-<Version>-win-x64.exe`, signiert von dir und von Overwolf.
+Ergebnis: `dist\Advanced-LAN-<Version>-win-x64.exe`, signiert von dir und von Overwolf.
 
 ## 7. Prüfen und hochladen
 
 ```powershell
-& "C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\signtool.exe" verify /pa /v "dist\Advanced LAN-0.1.0-win-x64.exe"
+& "C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\signtool.exe" verify /pa /v "dist\Advanced-LAN-0.1.0-win-x64.exe"
 ```
 
 Oder: Rechtsklick auf die `.exe` → **Eigenschaften** → Reiter **Digitale Signaturen** → dein Name steht dort.

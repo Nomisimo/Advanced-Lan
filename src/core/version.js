@@ -7,6 +7,10 @@ const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
   "0.1.0-beta.4": [
+    "Windows: erster Installer für Windows (x64), noch unsigniert. Windows SmartScreen warnt deshalb: Weitere Informationen → Trotzdem ausführen",
+    "Einführung beim ersten Start: was die App macht, die drei Modi, das Tastenkürzel und Datenschutz mit Zustimmung zu Nutzungsbedingungen und Datenschutzerklärung",
+    "Tastenkürzel Strg+Umschalt+A (Mac: ⌘⇧A) blendet die App ein und aus, auch mitten im Spiel; änderbar unter Setup → App",
+    "Setup → App: Tastenkürzel, Einführung erneut zeigen, Overwolf-Datenschutz-Einstellungen, Nutzungsbedingungen, Datenschutzerklärung und „Fehler melden“ (öffnet GitHub mit Version und System)",
     "Standalone: Regie und Spiel auf einem PC (Knopf unten in der Modus-Wahl). Die Spiele hier melden direkt an die Regie, ohne Session; Tab „Spiele“ richtet sie ein wie auf einem Game-PC",
     "Game-Stats-Screen für Publikum und Stream: Spielstand, Zahlen des Matches, beste Spieler und letzte Events des aktiven Spiels. Als Pop-out-Fenster (Knopf „Stats“ oben) oder als NDI-Quelle in 1920×1080, einzuschalten in Regie → Setup",
     "Sieben neue Spiele: Dota 2, Overwatch 2, Rainbow Six Siege, Marvel Rivals, Fortnite, Apex Legends und PUBG, jedes mit eigenen Events in „Signale“, Simulator, Statistik und Match-Check",

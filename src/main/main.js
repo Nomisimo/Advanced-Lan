@@ -120,12 +120,13 @@ const bildQuelle = (id) => new BildQuelle(id, { team: cfg?.gamepc.bild.spiele[id
 const neueQuellen = () => { quellen = { dota2: new DotaQuelle(), ...Object.fromEntries(BILD_SPIELE.map((d) => [d.id, bildQuelle(d.id)])) }; };
 neueQuellen();
 const daten = {}; // spiel → { letzte, stand, status, statusGesendet }
-// Bilderkennung: läuft für das Bild-Spiel, das gerade aktiv ist (Session der Regie, im Standalone die eigene Regie)
+// Bilderkennung: läuft für jedes Bild-Spiel, dessen Fenster offen ist (mehrere gleichzeitig möglich).
+// Mit Quelle „Bildschirm“ auch für das Spiel, das gerade aktiv ist (Session der Regie, im Standalone die eigene Regie).
 const aktivesSpielHier = () => (cfg.modus === 'standalone' ? cfg.regie.aktivesSpiel : client.zustand === 'verbunden' ? client.aktivesSpiel : null);
 const bild = new BildDienst({
   root, preload: path.join(root, 'src', 'preload', 'erkennung-preload.js'),
-  getCfg: () => cfg?.gamepc.bild,
-  spiel: () => (hatSpiele() && BILD_BY_ID[aktivesSpielHier()] ? aktivesSpielHier() : null),
+  getCfg: () => (cfg && hatSpiele() ? cfg.gamepc.bild : null),
+  aktiv: aktivesSpielHier,
   onTreffer: (spiel, a) => bildNachricht(spiel, { bild: true, event: a.event, seite: a.seite, aktion: a.name }),
   onChange: statusMelden,
 });
@@ -303,15 +304,18 @@ async function dotaCheck() {
   ];
 }
 
-// Bild-Spiele: Aktionen eingerichtet, Bild kommt an, nicht schwarz
+// Bild-Spiele: Aktionen eingerichtet, Spiel offen, Bild kommt an, nicht schwarz
 function bildCheck() {
   const c = cfg.gamepc.bild, st = bild.status();
   return BILD_SPIELE.map((d) => {
     const n = c.spiele[d.id].aktionen.filter((a) => a.an && (a.vorlagen.length || a.text)).length;
-    const aktiv = st.spiel === d.id;
+    const l = st.spiele[d.id];
+    const q = c.spiele[d.id].quelle;
+    const wo = q === 'bildschirm' ? 'Bildschirm' : q.startsWith('fenster:') ? `Fenster „${q.slice(8)}“` : 'Spielfenster';
     return [
       { id: `${d.id}-aktionen`, spiel: d.id, label: `${d.name}: Aktionen eingerichtet`, ok: n > 0, warn: true, detail: n ? `${n} Aktionen, Team ${c.spiele[d.id].team}` : 'noch keine: im Tab „Bilderkennung“ anlegen oder importieren' },
-      ...(aktiv ? [{ id: `${d.id}-bild`, spiel: d.id, label: `${d.name}: Bild kommt an`, ok: st.laeuft && !st.leer, detail: st.fehler || (st.leer ? 'Bild ist schwarz: Spiel im randlosen Fenstermodus starten' : st.laeuft ? `${st.b}×${st.h}, ${c.fps} Bilder/s` : 'startet …') }] : []),
+      ...(n && c.an ? [{ id: `${d.id}-bild`, spiel: d.id, label: `${d.name}: Bild kommt an`, ok: !!l?.laeuft && !l.leer, warn: !l,
+        detail: !l ? `wartet: ${d.name} ist nicht offen (Quelle: ${wo})` : l.fehler || (l.leer ? 'Bild ist schwarz: Spiel im randlosen Fenstermodus starten' : l.laeuft ? `${l.quelle.name}, ${l.b}×${l.h}, ${c.fps} Bilder/s` : 'startet …') }] : []),
     ];
   }).flat();
 }
@@ -666,7 +670,11 @@ ipcMain.handle('gamepc-sim-start', (_, modus) => gamePcSimStart(modus));
 // Bilderkennung: Bildschirme, Texterkennung für den Editor, Aufnahme im Hintergrund, Export und Import der Spiel-Konfiguration
 ipcMain.handle('bild-bildschirme', () => bild.bildschirme());
 ipcMain.handle('bild-lesen', async (_, png) => { try { return { text: await bild.lesen(png) }; } catch (e) { return { fehler: e?.message || String(e) }; } });
-ipcMain.handle('bild-aufnahme', (_, an) => { if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.setBackgroundThrottling(!an); });
+// Editor-Aufnahme: nimmt die Quelle des Spiels auf, das gerade bearbeitet wird (sein Fenster oder den Bildschirm)
+ipcMain.handle('bild-aufnahme', async (_, an, spiel) => {
+  if (an === 'vorbereiten') { bild.editorSpiel = BILD_BY_ID[spiel] ? spiel : null; await bild.anwenden(); return bild.plan()[spiel] || { art: 'bildschirm', name: 'Bildschirm' }; }
+  if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.setBackgroundThrottling(!an);
+});
 ipcMain.handle('bild-export', async (_, spiel) => {
   if (!BILD_BY_ID[spiel]) return { fehler: 'Unbekanntes Spiel' };
   const r = await dialog.showSaveDialog(mainWin, { defaultPath: `advanced-lan-${spiel}.json`, filters: [{ name: 'Advanced LAN Spiel-Konfiguration', extensions: ['json'] }] });
@@ -687,9 +695,9 @@ ipcMain.handle('bild-import', async () => {
   statusMelden();
   return { ok: true, spiel: d.spiel, anzahl: d.aktionen.length, korrigiert: d.korrigiert, cfg };
 });
-ipcMain.on('erkennung-frame', (_, d) => bild.frame(d));
-ipcMain.on('erkennung-text', (_, id, png) => bild.text(id, png));
-ipcMain.on('erkennung-status', (_, s) => bild.meldung(s));
+ipcMain.on('erkennung-frame', (e, d) => bild.frame(e.sender, d));
+ipcMain.on('erkennung-text', (e, id, png) => bild.text(e.sender, id, png));
+ipcMain.on('erkennung-status', (e, s) => bild.meldung(e.sender, s));
 ipcMain.handle('gamepc-sim-stop', () => { gpSim.stop(); });
 ipcMain.handle('gamepc-sim-neu', () => { gpSim.neu(); });
 ipcMain.handle('open-external', (_, url) => { if (/^https?:\/\//i.test(url)) shell.openExternal(url); });

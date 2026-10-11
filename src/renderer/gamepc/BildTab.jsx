@@ -36,16 +36,24 @@ export default function BildTab({ cfg, mutate, g, notify }) {
     if (r?.fehler) notify(r.fehler, "err"); else if (r?.ok) notify(`Exportiert: ${r.pfad}`);
   };
 
-  const statusText = !b.an ? "aus" : st.spiel ? (st.fehler || (st.leer ? "Bild ist schwarz: Spiel im randlosen Fenstermodus starten" : st.laeuft ? `läuft für ${BILD_BY_ID[st.spiel].name}, ${st.b}×${st.h}` : "startet …"))
-    : st.fehler || "wartet: läuft, sobald die Regie Valorant oder The Finals aktiv hat";
-  const statusFarbe = !b.an ? MUTED : st.laeuft && !st.leer ? OK : st.fehler || st.leer ? ERR : WARN;
+  // Je Spiel: läuft die Erkennung, woher kommt das Bild?
+  const spielStatus = (d) => {
+    const l = st.spiele?.[d.id], q = b.spiele[d.id].quelle;
+    if (!b.an) return [MUTED, "aus"];
+    if (!b.spiele[d.id].aktionen.some((a) => a.an)) return [MUTED, "noch keine Aktionen"];
+    if (!l) return [MUTED, q === "bildschirm" ? "wartet: läuft, wenn das Spiel offen oder in der Regie aktiv ist" : `wartet, bis ${q.startsWith("fenster:") ? `das Fenster „${q.slice(8)}“` : "das Spiel"} offen ist`];
+    if (l.fehler) return [ERR, l.fehler];
+    if (l.leer) return [ERR, "Bild ist schwarz: Spiel im randlosen Fenstermodus starten"];
+    return l.laeuft ? [OK, `läuft · ${l.quelle?.name || "Bildschirm"} · ${l.b}×${l.h}`] : [WARN, `startet · ${l.quelle?.name || "Bildschirm"}`];
+  };
+  const fensterListe = [...new Set([...(st.fenster || []), ...(sc.quelle.startsWith("fenster:") ? [sc.quelle.slice(8)] : [])])];
 
   return (
     <>
-      <Section title="Bilderkennung" subtitle="Für Spiele ohne offizielle Schnittstelle: Die App schaut auf den Bildschirm dieses PCs und erkennt die Aktionen, die du im Editor angelegt hast. Die Erkennung läuft hier, die Events gehen wie bei allen Spielen an die Regie. Sie läuft für das Spiel, das die Regie gerade aktiv hat."
+      <Section title="Bilderkennung" subtitle="Für Spiele ohne offizielle Schnittstelle: Die App schaut auf das Spielfenster und erkennt die Aktionen, die du im Editor angelegt hast. Sie merkt selbst, wenn ein Spiel geöffnet wird, und nimmt sein Fenster als Quelle. Sind mehrere Spiele offen, läuft für jedes eine eigene Erkennung. Die Events gehen wie bei allen Spielen an die Regie."
         right={<Toggle checked={b.an} label="Erkennung an" onChange={(v) => mutate((d) => { d.bild.an = v; })} />}>
         <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-end" }}>
-          <Field label="Bildschirm mit dem Spiel">
+          <Field label="Bildschirm (für Quelle „Bildschirm“)">
             <select style={S.select} value={b.display} onChange={(e) => mutate((d) => { d.bild.display = e.target.value; })}>
               <option value="">Hauptbildschirm</option>
               {schirme.map((s) => <option key={s.id} value={s.id}>{s.name} · {s.b}×{s.h}</option>)}
@@ -56,7 +64,12 @@ export default function BildTab({ cfg, mutate, g, notify }) {
               {FPS.map((f) => <option key={f} value={f}>{f}</option>)}
             </select>
           </Field>
-          <div style={{ flex: 1, minWidth: 200, fontSize: 13, color: statusFarbe, paddingBottom: 9 }}>● {statusText}</div>
+        </div>
+        <div style={{ marginTop: 12, display: "grid", gap: 4 }}>
+          {BILD_SPIELE.map((d) => { const [farbe, text] = spielStatus(d); return (
+            <div key={d.id} style={{ fontSize: 13, display: "flex", gap: 8 }}><b style={{ minWidth: 90, color: d.farbe }}>{d.name}</b><span style={{ color: farbe }}>● {text}</span></div>
+          ); })}
+          {st.fehler && <div style={{ fontSize: 12, color: ERR }}>{st.fehler}</div>}
         </div>
         <p style={S.hint}>Spiel im <b>randlosen Fenstermodus</b> starten: Im exklusiven Vollbild bleibt die Bildschirmaufnahme oft schwarz. Mehr Bilder pro Sekunde erkennen kurze Einblendungen sicherer und kosten etwas mehr Rechenzeit.</p>
       </Section>
@@ -66,6 +79,13 @@ export default function BildTab({ cfg, mutate, g, notify }) {
           <button key={s.id} onClick={() => setSpiel(s.id)} style={{ ...S.smallBtn, padding: "6px 12px", fontSize: 13, fontWeight: 700, background: spielId === s.id ? s.farbe : "transparent", color: spielId === s.id ? "#14121a" : SUB }}>{s.name}</button>
         ))}
       </span>} right={<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <Field label="Bildquelle">
+          <select style={{ ...S.selectSm, width: 200 }} value={sc.quelle} onChange={(e) => setzeSpiel((s) => { s.quelle = e.target.value; })}>
+            <option value="auto">Automatisch: Fenster „{def.fenster}“</option>
+            <option value="bildschirm">Bildschirm</option>
+            {fensterListe.map((f) => <option key={f} value={`fenster:${f}`}>Fenster: {f}</option>)}
+          </select>
+        </Field>
         <Field label="Team dieses PCs">
           <select style={{ ...S.selectSm, width: 130, color: teamFarbe(sc.team) }} value={sc.team} onChange={(e) => setzeSpiel((s) => { s.team = e.target.value; })}>
             {def.teams.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -78,7 +98,7 @@ export default function BildTab({ cfg, mutate, g, notify }) {
           Einmal auf einem PC einrichten, exportieren und auf den anderen Game-PCs importieren. Das Team stellt jeder PC selbst ein.
           Hat ein PC ein anderes Seitenverhältnis, verschiebt der Import die Bereiche passend zu ihrem Anker.
         </p>
-        <Editor key={spielId} def={def} sc={sc} setzeSpiel={setzeSpiel} notify={notify} werteLive={st.spiel === spielId ? st.werte : null} letzteLive={st.letzte} />
+        <Editor key={spielId} def={def} sc={sc} setzeSpiel={setzeSpiel} notify={notify} werteLive={st.spiele?.[spielId]?.werte || null} letzteLive={st.spiele?.[spielId]?.letzte} />
       </Section>
     </>
   );
@@ -108,6 +128,7 @@ function Editor({ def, sc, setzeSpiel, notify, werteLive, letzteLive }) {
   /* Aufnahme: läuft weiter, während du spielst. Nur im Arbeitsspeicher, beim Schließen oder „Löschen“ weg. */
   const aufnehmen = async () => {
     let stream;
+    const q = await api.bildAufnahme("vorbereiten", def.id); // nimmt die Bildquelle dieses Spiels auf
     try { stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30 }, audio: false }); }
     catch (e) { return notify(`Aufnahme nicht möglich: ${e?.message || e}`, "err"); }
     const mime = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"].find((m) => MediaRecorder.isTypeSupported(m));
@@ -127,7 +148,7 @@ function Editor({ def, sc, setzeSpiel, notify, werteLive, letzteLive }) {
     const timer = setTimeout(() => rec.state === "recording" && rec.stop(), MAX_AUFNAHME);
     rec.addEventListener("stop", () => clearTimeout(timer));
     setAufnahme({ rec, start: Date.now() });
-    notify("Aufnahme läuft. Jetzt ins Spiel wechseln und die Momente spielen, die erkannt werden sollen.");
+    notify(`Aufnahme läuft (${q?.art === "fenster" ? `Fenster „${q.name}“` : "Bildschirm"}). Jetzt ins Spiel wechseln und die Momente spielen, die erkannt werden sollen.`);
   };
   const laden = (url, name) => {
     if (quelle?.url) URL.revokeObjectURL(quelle.url);

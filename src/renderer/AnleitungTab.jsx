@@ -164,9 +164,9 @@ const Dota = () => (
 const Bild = () => (
   <Section title="Valorant und The Finals (Bilderkennung)">
     <P>
-      Beide Spiele haben keine offizielle Live-Schnittstelle. Die App schaut deshalb auf den Bildschirm des Game-PCs und vergleicht Bereiche, die du festlegst,
+      Beide Spiele haben keine offizielle Live-Schnittstelle. Die App schaut deshalb auf das Spielfenster des Game-PCs und vergleicht Bereiche, die du festlegst,
       mit Frames aus deinem eigenen Gameplay. Optional muss dort zusätzlich ein Wort stehen (Texterkennung auf Englisch und Deutsch, läuft lokal ohne Internet).
-      Die Erkennung läuft auf dem Game-PC, die Events gehen wie bei allen Spielen an die Regie. Sie läuft nur, wenn die Regie das Spiel aktiv hat.
+      Die Erkennung läuft auf dem Game-PC, die Events gehen wie bei allen Spielen an die Regie. Die App merkt selbst, wenn Valorant oder The Finals geöffnet wird, und nimmt das Spielfenster als Quelle. Sind beide offen, laufen zwei Erkennungen gleichzeitig. Unter „Bildquelle“ lässt sich je Spiel auch ein bestimmtes Fenster oder der Bildschirm wählen; mit „Bildschirm“ läuft die Erkennung zusätzlich, wenn die Regie das Spiel aktiv hat.
       Die App liest keinen Speicher und greift nicht ins Spiel ein.
     </P>
     <L>

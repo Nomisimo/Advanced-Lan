@@ -211,6 +211,7 @@ function browserApi() {
     onGamePcEvent: abo("gamePcEvent"),
     // Bilderkennung: in der Vorschau nimmt der Browser selbst auf (getDisplayMedia fragt nach), Texterkennung gibt es nur in der App
     bildBildschirme: async () => [VORSCHAU_BILDSCHIRM],
+    bildFenster: async () => ["OBS 31.0.2 - Profil: LAN", "Discord", "VALORANT"],
     bildLesen: async () => ({ fehler: "Texterkennung nur in der App" }),
     bildAufnahme: async (an) => (an === "vorbereiten" ? { art: "bildschirm", name: "Bildschirm" } : undefined),
     bildExport: async (spiel) => { download(`advanced-lan-${spiel}.json`, JSON.stringify(exportDatei(spiel, cfg.gamepc.bild.spiele[spiel]), null, 1)); return { ok: true, pfad: `advanced-lan-${spiel}.json` }; },

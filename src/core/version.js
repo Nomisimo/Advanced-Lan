@@ -6,6 +6,16 @@ const REPO = "Nomisimo/Advanced-Lan";
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
+  "0.1.0-beta.7": [
+    "Textfelder bleiben nach Rückfragen bedienbar: eigene Dialoge statt der Windows-Dialoge, die den Tastatur-Fokus verloren haben",
+    "Release-Ablauf wie im Netzwerkplaner: Release-Text aus „Was ist neu?“, Tag muss zur Version passen",
+    "Bilderkennung: Live-Quelle je Spiel oben im Tab: Spielfenster automatisch erkennen, ein beliebiges offenes Fenster oder Programm manuell wählen oder der Bildschirm. Gilt für die Erkennung im Betrieb und für die Editor-Aufnahme",
+    "Bildquelle über einen Teil des Fenstertitels („Fenstertitel eingeben …“), z. B. „OBS“: passt auch, wenn das Programm seinen Titel ändert",
+    "Editor nimmt das gewählte Fenster auch auf, bevor das Spiel Aktionen hat",
+    "Eine Aktion kann mehrere Bereiche als Auslöser haben (bis zu 6), jeder mit eigenen Frames und/oder eigenem Text. Wählbar: ein Bereich reicht oder alle müssen gleichzeitig passen",
+    "Bestehende Aktionen und Exportdateien mit einem Bereich werden übernommen",
+    "Editor-Aufnahme bis zu 2 Stunden statt 10 Minuten (30 Bilder/s, höchstens 1080p, 4 Mbit/s, etwa 1,8 GB pro Stunde). Der Knopf zeigt Dauer und Größe",
+  ],
   "0.1.0-beta.6": [
     "Texterkennung stürzt im gepackten Build nicht mehr ab (fehlender Tesseract-Kern „relaxedsimd“, Mac und Windows)",
     "Bilderkennung erkennt geöffnete Spiele selbst und nimmt ihr Fenster als Bildquelle, statt den ganzen Bildschirm",

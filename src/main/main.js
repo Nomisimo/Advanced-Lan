@@ -14,7 +14,7 @@ const { RegieSim } = require('../core/regie-sim');
 const { CsQuelle } = require('../core/cs-quelle');
 const { RlQuelle } = require('../core/rl-quelle');
 const { DotaQuelle, DOTA_APPID, dotaCfg, dotaStartoptionen, DOTA_CFG_DATEI, DOTA_STARTOPTION } = require('../core/dota');
-const { BildQuelle, BILD_SPIELE, BILD_BY_ID, exportDatei, importDatei } = require('../core/bild-spiele');
+const { BildQuelle, BILD_SPIELE, BILD_BY_ID, exportDatei, importDatei, aktionBereit } = require('../core/bild-spiele');
 const { QUELLEN, SPIEL_BY_ID } = require('../core/spiele');
 const { rlIni, leseRlIni, RL_INI_DATEI } = require('../core/rl-ini');
 const { migrateKonfig, MODI } = require('../core/defaults');
@@ -310,7 +310,7 @@ async function dotaCheck() {
 function bildCheck() {
   const c = cfg.gamepc.bild, st = bild.status();
   return BILD_SPIELE.map((d) => {
-    const n = c.spiele[d.id].aktionen.filter((a) => a.an && (a.vorlagen.length || a.text)).length;
+    const n = c.spiele[d.id].aktionen.filter(aktionBereit).length;
     const l = st.spiele[d.id];
     const q = c.spiele[d.id].quelle;
     const wo = q === 'bildschirm' ? 'Bildschirm' : q.startsWith('fenster:') ? `Fenster „${q.slice(8)}“` : 'Spielfenster';
@@ -678,10 +678,12 @@ ipcMain.handle('test-event', (_, type, spiel = 'cs2', team = '', kills = 1) => {
 ipcMain.handle('gamepc-sim-start', (_, modus) => gamePcSimStart(modus));
 // Bilderkennung: Bildschirme, Texterkennung für den Editor, Aufnahme im Hintergrund, Export und Import der Spiel-Konfiguration
 ipcMain.handle('bild-bildschirme', () => bild.bildschirme());
+// Alle offenen Fenster für die Auswahl der Bildquelle (auch wenn die Erkennung aus ist)
+ipcMain.handle('bild-fenster', async () => { try { return (await bild.fensterSuchen()).map((f) => f.name.trim()); } catch { return []; } });
 ipcMain.handle('bild-lesen', async (_, png) => { try { return { text: await bild.lesen(png) }; } catch (e) { return { fehler: e?.message || String(e) }; } });
 // Editor-Aufnahme: nimmt die Quelle des Spiels auf, das gerade bearbeitet wird (sein Fenster oder den Bildschirm)
 ipcMain.handle('bild-aufnahme', async (_, an, spiel) => {
-  if (an === 'vorbereiten') { bild.editorSpiel = BILD_BY_ID[spiel] ? spiel : null; await bild.anwenden(); return bild.plan()[spiel] || { art: 'bildschirm', name: 'Bildschirm' }; }
+  if (an === 'vorbereiten') { bild.editorSpiel = BILD_BY_ID[spiel] ? spiel : null; return bild.editorQuelle(spiel); }
   if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.setBackgroundThrottling(!an);
 });
 ipcMain.handle('bild-export', async (_, spiel) => {

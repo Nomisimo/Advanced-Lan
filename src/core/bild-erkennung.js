@@ -121,46 +121,60 @@ function textPasst(gelesen, erwartet) {
 }
 
 // Erkennt Aktionen über mehrere Bilder hinweg.
-// aktionen: [{ id, gruppe?, pause?, schwelle?, text? }]  gruppe: Aktionen am selben Ort, nur die ähnlichste zählt
+// aktionen: [{ id, gruppe?, pause?, schwelle?, modus?, teile?: [{ key, text? }], text? }]
+//   teile: Auslöser der Aktion (Bereiche), je mit eigenen Frames (vorlagen[key]) und/oder Text (texte[key]).
+//   Ohne teile ist die Aktion selbst ihr einziger Auslöser (key = id). modus "eines": ein Auslöser reicht, "alle": alle gleichzeitig.
+//   gruppe: Aktionen am selben Ort, nur die ähnlichste zählt
 // Eine Aktion meldet sich, wenn sie `treffer` Bilder in Folge passt. Danach erst wieder, wenn sie verschwunden war
 // (unter Schwelle − 0,1) oder ein anderer ihrer Frames passt (z. B. Kill-Banner mit einem Kill mehr).
 class BildErkennung {
   constructor({ aktionen = [], schwelle = 0.8, treffer = 2 } = {}) {
-    this.aktionen = aktionen;
+    this.aktionen = aktionen.map((a) => ({ ...a, teile: a.teile?.length ? a.teile : [{ key: a.id, text: a.text }] }));
     this.schwelle = schwelle;
     this.treffer = treffer;
-    this.vorlagen = {}; // id → [Float32Array]
+    this.vorlagen = {}; // key → [Float32Array]
     this.z = {};
-    for (const a of aktionen) this.z[a.id] = { n: 0, idx: -1, scharf: true, letzt: -Infinity, gemeldet: -1 };
+    for (const a of this.aktionen) this.z[a.id] = { n: 0, idx: null, scharf: true, letzt: -Infinity, gemeldet: null };
   }
 
-  // vorlagen: { id: [Uint8Array | Base64-Text] }
+  // vorlagen: { key: [Uint8Array | Base64-Text] }
   setVorlagen(vorlagen) {
     this.vorlagen = {};
-    for (const a of this.aktionen) {
-      const liste = (vorlagen?.[a.id] || []).map((v) => normiert(typeof v === "string" ? dekodieren(v) : v)).filter(Boolean);
-      if (liste.length) this.vorlagen[a.id] = liste;
+    for (const a of this.aktionen) for (const t of a.teile) {
+      const liste = (vorlagen?.[t.key] || []).map((v) => normiert(typeof v === "string" ? dekodieren(v) : v)).filter(Boolean);
+      if (liste.length) this.vorlagen[t.key] = liste;
     }
   }
 
-  // Aktionen, die etwas zum Vergleichen haben
-  aktiv(a) { return !!(this.vorlagen[a.id] || a.text); }
+  // Auslöser und Aktionen, die etwas zum Vergleichen haben
+  teilAktiv(t) { return !!(this.vorlagen[t.key] || t.text); }
+  aktiv(a) { return a.teile.some((t) => this.teilAktiv(t)); }
 
-  // sigs: { id: Uint8Array } aus einem Bild, texte: { id: zuletzt gelesener Text }
-  // → { erkannt: [{ id, wert, vorlage }], werte: { id: Ähnlichkeit 0…1 } }
+  // Ähnlichkeit eines Auslösers: bester Frame, Text muss zusätzlich passen → [wert, frame]
+  teilWert(t, sigs, texte) {
+    const v = this.vorlagen[t.key];
+    let w = 1, idx = 0;
+    if (v) {
+      const s = normiert(sigs?.[t.key]);
+      w = -1; idx = -1;
+      if (s) v.forEach((x, i) => { const y = aehnlichkeit(s, x); if (y > w) { w = y; idx = i; } });
+    }
+    // ohne passenden Text zählt der Auslöser als nicht sichtbar
+    if (t.text && !textPasst(texte[t.key], t.text)) w = Math.min(w, 0);
+    return [w, idx];
+  }
+
+  // sigs: { key: Uint8Array } aus einem Bild, texte: { key: zuletzt gelesener Text }
+  // → { erkannt: [{ id, wert, vorlage }], werte: { id: Ähnlichkeit 0…1 }, teilWerte: { key: 0…1 } }
   frame(sigs, now = Date.now(), texte = {}) {
-    const werte = {}, beste = {};
+    const werte = {}, beste = {}, teilWerte = {};
     for (const a of this.aktionen) {
-      if (!this.aktiv(a)) continue;
-      const v = this.vorlagen[a.id];
-      let w = 1, idx = 0;
-      if (v) {
-        const s = normiert(sigs?.[a.id]);
-        w = -1; idx = -1;
-        if (s) v.forEach((t, i) => { const x = aehnlichkeit(s, t); if (x > w) { w = x; idx = i; } });
-      }
-      // Text muss zusätzlich passen; ohne Treffer zählt die Aktion als nicht sichtbar
-      if (a.text && !textPasst(texte[a.id], a.text)) w = Math.min(w, 0);
+      const teile = a.teile.filter((t) => this.teilAktiv(t));
+      if (!teile.length) continue;
+      const r = teile.map((t) => { const x = this.teilWert(t, sigs, texte); teilWerte[t.key] = Math.max(0, Math.round(x[0] * 1000) / 1000); return x; });
+      let w, idx;
+      if (a.modus === "alle") { w = Math.min(...r.map((x) => x[0])); idx = r.map((x) => x[1]).join(","); }
+      else { const i = r.reduce((m, x, j) => (x[0] > r[m][0] ? j : m), 0); w = r[i][0]; idx = `${i}:${r[i][1]}`; }
       werte[a.id] = Math.max(0, Math.round(w * 1000) / 1000);
       beste[a.id] = idx;
     }
@@ -173,8 +187,8 @@ class BildErkennung {
       if (!z) continue;
       const treffer = w != null && w >= sw && (!a.gruppe || gewinner[a.gruppe] === a.id);
       if (!treffer) {
-        z.n = 0; z.idx = -1;
-        if (w == null || w < sw - 0.1) { z.scharf = true; z.gemeldet = -1; }
+        z.n = 0; z.idx = null;
+        if (w == null || w < sw - 0.1) { z.scharf = true; z.gemeldet = null; }
         continue;
       }
       z.n = beste[a.id] === z.idx ? z.n + 1 : 1;
@@ -182,10 +196,11 @@ class BildErkennung {
       const neu = z.scharf || z.idx !== z.gemeldet;
       if (z.n >= this.treffer && neu && now - z.letzt >= (a.pause ?? 2000)) {
         z.scharf = false; z.gemeldet = z.idx; z.letzt = now;
-        erkannt.push({ id: a.id, wert: w, vorlage: z.idx });
+        const v = String(z.idx).split(/[:,]/).map(Number);
+        erkannt.push({ id: a.id, wert: w, vorlage: a.modus === "alle" ? v[0] : v[1] });
       }
     }
-    return { erkannt, werte };
+    return { erkannt, werte, teilWerte };
   }
 }
 

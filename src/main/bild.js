@@ -1,29 +1,30 @@
-// Bilderkennung auf dem Game-PC (Valorant, The Finals): ein unsichtbares Fenster nimmt den Bildschirm auf und schickt
-// je Bild kleine Signaturen der Bereiche, die der Editor festgelegt hat. Hier werden sie mit den Frames verglichen
-// (core/bild-erkennung.js), Texte gelesen (Tesseract.js, Englisch und Deutsch, läuft lokal ohne Internet) und Treffer gemeldet.
+// Bilderkennung auf dem Game-PC (Valorant, The Finals): je Spiel ein unsichtbares Fenster, das die Bildquelle des Spiels
+// aufnimmt (sein Fenster oder den Bildschirm) und je Bild kleine Signaturen der Bereiche schickt, die der Editor festgelegt hat.
+// Hier werden sie mit den Frames verglichen (core/bild-erkennung.js), Texte gelesen (Tesseract.js, Englisch und Deutsch,
+// läuft lokal ohne Internet) und Treffer gemeldet. Sind mehrere Spiele offen, läuft für jedes eine eigene Erkennung.
+// Welche Spiele laufen, entscheidet core/bild-spiele.js (erkennungsPlan) anhand der offenen Fenster.
 // Bildschirmaufnahme über session.setDisplayMediaRequestHandler und desktopCapturer (electron.d.ts von ow-electron).
-const { BrowserWindow, desktopCapturer, screen, session } = require('electron');
+const { BrowserWindow, desktopCapturer, screen, session, webContents } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { BildErkennung } = require('../core/bild-erkennung');
-const { BILD_BY_ID } = require('../core/bild-spiele');
+const { BILD_BY_ID, erkennungsPlan } = require('../core/bild-spiele');
 
 const TEXT_GILT = 2500; // so lange zählt ein gelesener Text
+const FENSTER_ALLE = 3000; // so oft nach geöffneten und geschlossenen Spielen sehen
 
 class BildDienst {
-  // getCfg(): cfg.gamepc.bild, spiel(): Bild-Spiel, das gerade erkannt werden soll (oder null), onTreffer(spiel, aktion), onChange()
-  constructor({ root, preload, getCfg, spiel, onTreffer, onChange }) {
-    Object.assign(this, { root, preload, getCfg, spielVon: spiel, onTreffer, onChange: onChange || (() => {}) });
-    this.fenster = null;
-    this.spiel = null;
-    this.erkennung = null;
-    this.texte = {}; // Aktion → { text, t }
-    this.werte = {};
-    this.letzte = {}; // Aktion → Zeitpunkt des letzten Treffers
-    this.info = { laeuft: false, fehler: '', leer: false, b: 0, h: 0, bilder: 0, t: 0 };
+  // getCfg(): cfg.gamepc.bild, aktiv(): Bild-Spiel, das die Regie gerade aktiv hat (oder null), onTreffer(spiel, aktion), onChange()
+  constructor({ root, preload, getCfg, aktiv, onTreffer, onChange }) {
+    Object.assign(this, { root, preload, getCfg, aktivVon: aktiv, onTreffer, onChange: onChange || (() => {}) });
+    this.laeufe = new Map(); // spiel → Erkennung eines Spiels
+    this.fenster = []; // offene Fenster [{ id, name }]
+    this.fehler = '';
+    this.editorSpiel = null; // Spiel, dessen Quelle der Editor gerade aufnimmt
     this.ocr = null;
     this.ocrLaeuft = 0;
-    this.signatur = '';
+    this.timer = null;
+    this.suche = null;
   }
 
   // Bildschirme für das Setup: Pixelgröße wie die Aufnahme sie sieht
@@ -36,90 +37,135 @@ class BildDienst {
     return l.find((d) => d.id === this.getCfg()?.display) || l.find((d) => d.primaer) || l[0] || null;
   }
 
-  // Aufnahme für Erkennung und Editor: immer der eingestellte Bildschirm, ohne Auswahl-Dialog
+  // Offene Fenster ohne die eigenen (Erkennung, App)
+  async fensterSuchen() {
+    const l = await desktopCapturer.getSources({ types: ['window'], thumbnailSize: { width: 0, height: 0 }, fetchWindowIcons: false });
+    return l.filter((q) => q.name && !/^Advanced LAN/i.test(q.name.trim())).map((q) => ({ id: q.id, name: q.name }));
+  }
+
+  // Quelle für ein Spiel aus dem Plan: Fenster oder eingestellter Bildschirm
+  async quelleFuer(spiel) {
+    const p = spiel && this.plan()[spiel];
+    if (p?.art === 'fenster') {
+      const f = (await desktopCapturer.getSources({ types: ['window'], thumbnailSize: { width: 0, height: 0 }, fetchWindowIcons: false })).find((q) => q.id === p.id);
+      if (f) return f;
+    }
+    const schirme = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 0, height: 0 } });
+    return schirme.find((q) => q.display_id === this.bildschirm()?.id) || schirme[0];
+  }
+
+  // Aufnahme ohne Auswahl-Dialog: Erkennungsfenster nehmen die Quelle ihres Spiels, der Editor die des Spiels, das er bearbeitet
   einrichten() {
-    session.defaultSession.setDisplayMediaRequestHandler(async (_req, antwort) => {
+    session.defaultSession.setDisplayMediaRequestHandler(async (req, antwort) => {
       try {
-        const quellen = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 0, height: 0 } });
-        const ziel = this.bildschirm();
-        antwort({ video: quellen.find((q) => q.display_id === ziel?.id) || quellen[0] });
+        const wc = req.frame ? webContents.fromFrame(req.frame) : null;
+        const lauf = wc && [...this.laeufe.values()].find((l) => l.fenster && !l.fenster.isDestroyed() && l.fenster.webContents.id === wc.id);
+        antwort({ video: await this.quelleFuer(lauf ? lauf.spiel : this.editorSpiel) });
       } catch { antwort({}); }
     });
+    this.timer = setInterval(() => this.anwenden(), FENSTER_ALLE);
   }
 
-  // Nach jeder Änderung der Einstellungen oder des aktiven Spiels
+  plan() {
+    if (!this.getCfg()) return {};
+    const aktiv = this.aktivVon();
+    return erkennungsPlan(this.getCfg(), this.fenster, BILD_BY_ID[aktiv] ? aktiv : null);
+  }
+
+  // Nach jeder Änderung der Einstellungen, des aktiven Spiels und regelmäßig (Spiele öffnen und schließen)
   anwenden() {
+    if (this.suche) return this.suche;
+    if (!this.getCfg()?.an) { this.fenster = []; return Promise.resolve(this.abgleichen()); } // Regie-PC oder aus: keine Fenster suchen
+    this.suche = this.fensterSuchen()
+      .then((f) => { this.fenster = f; this.fehler = ''; }, (e) => { this.fehler = `Fenster nicht lesbar: ${e?.message || e}`; })
+      .then(() => this.abgleichen())
+      .finally(() => { this.suche = null; });
+    return this.suche;
+  }
+
+  abgleichen() {
     const c = this.getCfg();
-    if (!c) return;
-    const spiel = this.spielVon();
-    const aktionen = spiel ? (c.spiele[spiel]?.aktionen || []).filter((a) => a.an && (a.vorlagen.length || a.text)) : [];
-    if (!c.an || !spiel || !aktionen.length) return this.stop(spiel && !aktionen.length ? `${BILD_BY_ID[spiel].name}: noch keine Aktionen im Editor` : '');
-    const sig = JSON.stringify([spiel, c.display, c.fps, aktionen.map((a) => [a.id, a.region, a.text, a.schwelle, a.pause, a.vorlagen.length])]);
-    if (sig === this.signatur && this.fenster) return;
-    this.signatur = sig;
-    this.spiel = spiel;
-    this.aktionen = aktionen;
+    const plan = c ? this.plan() : {};
+    let geaendert = false;
+    for (const spiel of [...this.laeufe.keys()]) if (!plan[spiel]) { this.stop(spiel); geaendert = true; }
+    for (const [spiel, quelle] of Object.entries(plan)) {
+      const aktionen = c.spiele[spiel].aktionen.filter((a) => a.an && (a.vorlagen.length || a.text));
+      const sig = JSON.stringify([quelle.art, quelle.id, c.display, c.fps, aktionen.map((a) => [a.id, a.region, a.text, a.schwelle, a.pause, a.vorlagen.length])]);
+      const alt = this.laeufe.get(spiel);
+      if (alt && alt.signatur === sig && alt.fenster) continue;
+      geaendert = true;
+      // Neue Quelle (anderes Fenster, anderer Bildschirm): neu aufnehmen
+      if (alt && (alt.quelle.art !== quelle.art || alt.quelle.id !== quelle.id || alt.display !== c.display)) this.stop(spiel);
+      this.starten(spiel, quelle, aktionen, sig, c);
+    }
+    if (geaendert) this.onChange();
+  }
+
+  starten(spiel, quelle, aktionen, signatur, c) {
     // Aktionen mit demselben Bereich bilden eine Gruppe: nur die ähnlichste zählt (z. B. Runde gewonnen/verloren)
     const gruppe = (a) => aktionen.filter((b) => JSON.stringify(b.region) === JSON.stringify(a.region)).length > 1 ? JSON.stringify(a.region) : undefined;
-    this.erkennung = new BildErkennung({ aktionen: aktionen.map((a) => ({ id: a.id, gruppe: gruppe(a), pause: a.pause, schwelle: a.schwelle, text: a.text })) });
-    this.erkennung.setVorlagen(Object.fromEntries(aktionen.map((a) => [a.id, a.vorlagen.map((v) => v.sig)])));
-    this.texte = {}; this.werte = {};
+    const erkennung = new BildErkennung({ aktionen: aktionen.map((a) => ({ id: a.id, gruppe: gruppe(a), pause: a.pause, schwelle: a.schwelle, text: a.text })) });
+    erkennung.setVorlagen(Object.fromEntries(aktionen.map((a) => [a.id, a.vorlagen.map((v) => v.sig)])));
+    const alt = this.laeufe.get(spiel);
+    const lauf = alt || { spiel, fenster: null, letzte: {}, info: { fehler: '', leer: false, b: 0, h: 0, bilder: 0, t: 0 } };
+    Object.assign(lauf, { quelle, aktionen, signatur, erkennung, display: c.display, texte: {}, werte: {} });
+    this.laeufe.set(spiel, lauf);
     const start = { fps: c.fps, aktionen: aktionen.map((a) => ({ id: a.id, region: a.region, text: !!a.text })) };
-    if (!this.fenster) this.oeffnen(start);
-    else this.fenster.webContents.send('erkennung-start', start);
-    this.onChange();
-  }
-
-  oeffnen(start) {
-    this.fenster = new BrowserWindow({
-      name: 'erkennung', show: false, width: 320, height: 200, skipTaskbar: true,
+    if (lauf.fenster) return lauf.fenster.webContents.send('erkennung-start', start);
+    const w = new BrowserWindow({
+      name: `erkennung-${spiel}`, show: false, width: 320, height: 200, skipTaskbar: true,
       webPreferences: { contextIsolation: true, nodeIntegration: false, backgroundThrottling: false, preload: this.preload },
     });
-    this.fenster.loadFile(path.join(this.root, 'dist-app', 'erkennung.html'));
-    this.fenster.webContents.once('did-finish-load', () => this.fenster?.webContents.send('erkennung-start', start));
-    this.fenster.on('closed', () => { this.fenster = null; this.info.laeuft = false; this.onChange(); });
+    lauf.fenster = w;
+    w.loadFile(path.join(this.root, 'dist-app', 'erkennung.html'));
+    w.webContents.once('did-finish-load', () => !w.isDestroyed() && w.webContents.send('erkennung-start', start));
+    w.on('closed', () => { if (lauf.fenster === w) { lauf.fenster = null; this.onChange(); } });
   }
 
-  stop(grund = '') {
-    this.signatur = '';
-    this.spiel = null;
-    if (this.fenster) { this.fenster.destroy(); this.fenster = null; }
-    this.info = { ...this.info, laeuft: false, fehler: grund, bilder: 0 };
-    this.onChange();
+  stop(spiel) {
+    const lauf = this.laeufe.get(spiel);
+    if (!lauf) return;
+    this.laeufe.delete(spiel);
+    if (lauf.fenster && !lauf.fenster.isDestroyed()) lauf.fenster.destroy();
   }
 
-  // Vom Erkennungsfenster: { t, b, h, sigs: { id: Uint8Array }, leer }
-  frame(d) {
-    if (!this.erkennung || !d) return;
+  lauf(sender) { return [...this.laeufe.values()].find((l) => l.fenster && !l.fenster.isDestroyed() && l.fenster.webContents.id === sender?.id); }
+
+  // Vom Erkennungsfenster eines Spiels: { t, b, h, sigs: { id: Uint8Array }, leer }
+  frame(sender, d) {
+    const l = this.lauf(sender);
+    if (!l || !d) return;
     const now = Date.now();
     const texte = {};
-    for (const [id, x] of Object.entries(this.texte)) if (now - x.t < TEXT_GILT) texte[id] = x.text;
-    const r = this.erkennung.frame(d.sigs || {}, now, texte);
-    this.werte = r.werte;
-    Object.assign(this.info, { laeuft: true, fehler: '', leer: !!d.leer, b: d.b, h: d.h, bilder: this.info.bilder + 1, t: now });
+    for (const [id, x] of Object.entries(l.texte)) if (now - x.t < TEXT_GILT) texte[id] = x.text;
+    const r = l.erkennung.frame(d.sigs || {}, now, texte);
+    l.werte = r.werte;
+    Object.assign(l.info, { fehler: '', leer: !!d.leer, b: d.b, h: d.h, bilder: l.info.bilder + 1, t: now });
     for (const e of r.erkannt) {
-      const a = this.aktionen.find((x) => x.id === e.id);
+      const a = l.aktionen.find((x) => x.id === e.id);
       if (!a) continue;
-      this.letzte[a.id] = now;
-      this.onTreffer(this.spiel, a);
+      l.letzte[a.id] = now;
+      this.onTreffer(l.spiel, a);
     }
   }
 
-  meldung(s) { Object.assign(this.info, s || {}); this.onChange(); }
+  meldung(sender, s) { const l = this.lauf(sender); if (l) { Object.assign(l.info, s || {}); this.onChange(); } }
 
   // Text in einem Bereich lesen (Erkennung und Editor-Test). png: Buffer/Uint8Array eines PNG
   async lesen(png) {
     if (!png) return '';
     if (!this.ocr) this.ocr = this.ocrStarten();
-    const w = await this.ocr;
+    let w;
+    try { w = await this.ocr; } catch (e) { this.ocr = null; throw e; } // beim nächsten Mal neu versuchen
     const r = await w.recognize(Buffer.from(png));
     return String(r.data?.text || '').trim();
   }
-  async text(id, png) {
-    if (this.ocrLaeuft > 2) return; // nicht stauen: lieber ein Bild auslassen
+  async text(sender, id, png) {
+    const l = this.lauf(sender);
+    if (!l || this.ocrLaeuft > 2) return; // nicht stauen: lieber ein Bild auslassen
     this.ocrLaeuft++;
-    try { this.texte[id] = { text: await this.lesen(png), t: Date.now() }; }
-    catch (e) { this.info.fehler = `Texterkennung: ${e?.message || e}`; }
+    try { l.texte[id] = { text: await this.lesen(png), t: Date.now() }; }
+    catch (e) { l.info.fehler = `Texterkennung: ${e?.message || e}`; }
     finally { this.ocrLaeuft--; }
   }
   async ocrStarten() {
@@ -130,13 +176,19 @@ class BildDienst {
     return createWorker(['eng', 'deu'], 1, { langPath: fs.existsSync(unpacked) ? unpacked : lang, gzip: true, cacheMethod: 'none' });
   }
 
+  // { spiele: { id: { laeuft, leer, b, h, fehler, quelle, werte, letzte } }, fenster: offene Fenster, bildschirm }
   status() {
-    const alt = this.info.t ? Date.now() - this.info.t : null;
-    return { ...this.info, laeuft: !!this.fenster && alt != null && alt < 3000, spiel: this.spiel, werte: this.werte, letzte: this.letzte, bildschirm: this.bildschirm() };
+    const spiele = {};
+    for (const l of this.laeufe.values()) {
+      const alt = l.info.t ? Date.now() - l.info.t : null;
+      spiele[l.spiel] = { ...l.info, laeuft: !!l.fenster && alt != null && alt < 3000, quelle: l.quelle, werte: l.werte, letzte: l.letzte };
+    }
+    return { spiele, fehler: this.fehler, fenster: this.fenster.map((f) => f.name.trim()), bildschirm: this.bildschirm() };
   }
 
   async beenden() {
-    this.stop();
+    clearInterval(this.timer);
+    for (const s of [...this.laeufe.keys()]) this.stop(s);
     if (this.ocr) { try { await (await this.ocr).terminate(); } catch {} this.ocr = null; }
   }
 }

@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { SIG_B, SIG_H, SIG_LAENGE, signatur, normiert, aehnlichkeit, bildLeer, kodieren, dekodieren, region, umrechnen, textPasst, BildErkennung } = require("../src/core/bild-erkennung");
-const { standardBild, migrateBild, exportDatei, importDatei } = require("../src/core/bild-spiele");
+const { standardBild, migrateBild, exportDatei, importDatei, erkennungsPlan } = require("../src/core/bild-spiele");
 
 // Testbild: b × h Pixel RGBA, farbe(x, y) → Grauwert
 const bild = (b, h, farbe) => {
@@ -100,4 +100,30 @@ test("Spiel-Konfiguration: Migration, Export ohne Team, Import mit Korrektur", (
   assert.ok(importDatei({ format: "anders" }).fehler);
   assert.ok(importDatei({ format: "advanced-lan-spiel", spiel: "ow2", aktionen: [] }).fehler);
   assert.ok(importDatei({ format: "advanced-lan-spiel", spiel: "finals", aktionen: [] }).fehler);
+});
+
+test("Bildquellen: Spielfenster automatisch, mehrere Spiele gleichzeitig, Fenster oder Bildschirm von Hand", () => {
+  const sig = kodieren(streifen(64, 24, 8));
+  const aktion = { id: "a", event: "kill", region: { x: 0.1, y: 0.1, b: 0.1, h: 0.1 }, vorlagen: [{ sig }] };
+  const cfg = migrateBild({ spiele: { valorant: { aktionen: [aktion] }, finals: { aktionen: [aktion] } } });
+  const fenster = [{ id: "window:1:0", name: "VALORANT  " }, { id: "window:2:0", name: "THE FINALS  " }, { id: "window:3:0", name: "OBS 31" }];
+  assert.deepEqual(erkennungsPlan(cfg, []), {}, "kein Spiel offen: keine Erkennung");
+  const plan = erkennungsPlan(cfg, fenster);
+  assert.deepEqual(Object.keys(plan), ["valorant", "finals"]);
+  assert.deepEqual(plan.valorant, { art: "fenster", id: "window:1:0", name: "VALORANT" });
+  assert.equal(plan.finals.id, "window:2:0");
+  // Valorant-Launcher oder ein Browser-Tab „Valorant Guide“ zählen nicht als Spielfenster
+  assert.deepEqual(erkennungsPlan(cfg, [{ id: "w", name: "Valorant Guide – Chrome" }]), {});
+  cfg.spiele.valorant.quelle = "fenster:OBS 31";
+  assert.equal(erkennungsPlan(cfg, fenster).valorant.id, "window:3:0");
+  cfg.spiele.valorant.quelle = "bildschirm";
+  assert.deepEqual(erkennungsPlan(cfg, [], "valorant").valorant, { art: "bildschirm", name: "Bildschirm" }, "Bildschirm: läuft, wenn die Regie das Spiel aktiv hat");
+  assert.equal(migrateBild({ spiele: { valorant: { quelle: "irgendwas" } } }).spiele.valorant.quelle, "auto");
+  cfg.an = false;
+  assert.deepEqual(erkennungsPlan(cfg, fenster), {});
+});
+
+test("Texterkennung: alle Tesseract-Kerne sind im Build (Node lädt je nach CPU einen anderen)", () => {
+  const pkg = require("../package.json");
+  assert.ok(!pkg.build.files.some((f) => f.startsWith("!") && f.includes("tesseract.js-core")), "kein Kern ausgeschlossen");
 });

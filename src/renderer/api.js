@@ -45,7 +45,7 @@ function browserApi() {
       discoveryFehler: "", gsi: { laeuft: true, port: cfg.gamepc.gsiPort, fehler: "" }, letzte: gp.letzte || 0, status: null, stand: gp.stand || null, fremd: 0,
       sim: { ...gpSim.status(), spiel: "cs2" },
       rl: { verbunden: false, port: cfg.gamepc.rlPort, letzte: 0, stand: null },
-      daten: {}, bild: { laeuft: false, fehler: "", leer: false, b: 0, h: 0, spiel: null, werte: {}, letzte: {}, bildschirm: VORSCHAU_BILDSCHIRM },
+      daten: {}, bild: { spiele: {}, fehler: "", fenster: [], bildschirm: VORSCHAU_BILDSCHIRM },
     };
     return s;
   };
@@ -212,7 +212,7 @@ function browserApi() {
     // Bilderkennung: in der Vorschau nimmt der Browser selbst auf (getDisplayMedia fragt nach), Texterkennung gibt es nur in der App
     bildBildschirme: async () => [VORSCHAU_BILDSCHIRM],
     bildLesen: async () => ({ fehler: "Texterkennung nur in der App" }),
-    bildAufnahme: async () => {},
+    bildAufnahme: async (an) => (an === "vorbereiten" ? { art: "bildschirm", name: "Bildschirm" } : undefined),
     bildExport: async (spiel) => { download(`advanced-lan-${spiel}.json`, JSON.stringify(exportDatei(spiel, cfg.gamepc.bild.spiele[spiel]), null, 1)); return { ok: true, pfad: `advanced-lan-${spiel}.json` }; },
     bildImport: () => new Promise((ok) => {
       const i = document.createElement("input"); i.type = "file"; i.accept = ".json,application/json";

@@ -19,7 +19,7 @@ const EIGENE = Array.from({ length: 6 }, (_, i) => ({ id: `eigene_${i + 1}`, lab
 const BILD_SPIELE = [
   {
     id: "valorant", name: "Valorant", kurz: "VAL", farbe: "#ff4655", teams: ["TEAM A", "TEAM B"],
-    exe: "valorant-win64-shipping.exe",
+    exe: "valorant-win64-shipping.exe", fenster: "VALORANT",
     events: [
       M("match_start", "Match startet"), M("match_won", "Match gewonnen", { team: true, art: "matchende" }),
       R("round_start", "Kaufphase (Runde startet)", { art: "start" }), R("round_end", "Runde gewonnen", { team: true, art: "ende" }),
@@ -44,7 +44,7 @@ const BILD_SPIELE = [
   },
   {
     id: "finals", name: "The Finals", kurz: "FIN", farbe: "#ffd23f", teams: ["TEAM A", "TEAM B", "TEAM C", "TEAM D"],
-    exe: "discovery.exe",
+    exe: "discovery.exe", fenster: "THE FINALS",
     events: [
       M("match_start", "Match startet"), M("match_won", "Match gewonnen", { team: true, art: "matchende" }), M("eliminated", "Team ausgeschieden", { team: true }),
       R("round_start", "Runde startet", { art: "start" }), R("round_end", "Runde gewonnen", { team: true, art: "ende" }),
@@ -94,11 +94,13 @@ function migrateAktion(a, spiel) {
 }
 
 function standardBildSpiel(id) {
-  return { team: BILD_BY_ID[id].teams[0], aufloesung: null, aktionen: [] }; // aufloesung: { b, h } des Bildes, in dem die Bereiche gezogen wurden
+  // quelle: "auto" (Spielfenster, sobald es offen ist), "bildschirm" (eingestellter Bildschirm) oder "fenster:<Titel>"
+  return { team: BILD_BY_ID[id].teams[0], quelle: "auto", aufloesung: null, aktionen: [] }; // aufloesung: { b, h } des Bildes, in dem die Bereiche gezogen wurden
 }
 function standardBild() {
   return { an: true, display: "", fps: 4, spiele: Object.fromEntries(BILD_SPIELE.map((s) => [s.id, standardBildSpiel(s.id)])) };
 }
+const quelleOk = (q) => (q === "bildschirm" || (typeof q === "string" && /^fenster:.+/.test(q)) ? q.slice(0, 200) : "auto");
 const aufloesung = (a) => (a && Number(a.b) > 0 && Number(a.h) > 0 ? { b: Math.round(Number(a.b)), h: Math.round(Number(a.h)) } : null);
 function migrateBild(v) {
   const d = standardBild();
@@ -108,11 +110,41 @@ function migrateBild(v) {
     const alt = v.spiele?.[s.id] || {};
     spiele[s.id] = {
       team: s.teams.includes(alt.team) ? alt.team : s.teams[0],
+      quelle: quelleOk(alt.quelle),
       aufloesung: aufloesung(alt.aufloesung),
       aktionen: (Array.isArray(alt.aktionen) ? alt.aktionen : []).map((a) => migrateAktion(a, s.id)).filter(Boolean).slice(0, 40),
     };
   }
   return { an: v.an !== false, display: typeof v.display === "string" ? v.display : "", fps: FPS.includes(Number(v.fps)) ? Number(v.fps) : d.fps, spiele };
+}
+
+/* ── Bildquellen ──────────────────────────────────────────────────────── */
+// Fenstertitel vergleichen: Groß/klein und Leerzeichen am Rand egal (Valorant heißt „VALORANT  “)
+const titel = (t) => String(t || "").trim().replace(/\s+/g, " ").toUpperCase();
+// Ist das Spielfenster offen? fenster: [{ id, name }] aus desktopCapturer (Typ window)
+function spielFenster(def, fenster) {
+  const muster = titel(def.fenster);
+  return (muster && fenster.find((f) => titel(f.name) === muster)) || null; // genau der Titel: ein Browser-Tab „Valorant Guide“ zählt nicht
+}
+// Welche Bild-Spiele werden gerade erkannt, und woher kommt ihr Bild?
+// bild: cfg.gamepc.bild, fenster: offene Fenster, aktiv: Bild-Spiel, das die Regie aktiv hat (oder null)
+// → { spiel: { art: "fenster" | "bildschirm", id?, name } }. Mehrere Spiele gleichzeitig, jedes mit eigener Quelle.
+function erkennungsPlan(bild, fenster = [], aktiv = null) {
+  const plan = {};
+  if (!bild?.an) return plan;
+  for (const def of BILD_SPIELE) {
+    const sc = bild.spiele?.[def.id];
+    if (!sc || !sc.aktionen.some((a) => a.an && (a.vorlagen.length || a.text))) continue;
+    const offen = spielFenster(def, fenster);
+    const q = sc.quelle || "auto";
+    if (q.startsWith("fenster:")) {
+      const f = fenster.find((x) => titel(x.name) === titel(q.slice(8)));
+      if (f) plan[def.id] = { art: "fenster", id: f.id, name: f.name.trim() };
+    } else if (q === "bildschirm") {
+      if (offen || aktiv === def.id) plan[def.id] = { art: "bildschirm", name: "Bildschirm" };
+    } else if (offen) plan[def.id] = { art: "fenster", id: offen.id, name: offen.name.trim() };
+  }
+  return plan;
 }
 
 /* ── Export und Import ────────────────────────────────────────────────── */
@@ -204,4 +236,4 @@ class BildQuelle {
   }
 }
 
-module.exports = { BILD_SPIELE, BILD_BY_ID, FPS, standardBild, migrateBild, migrateAktion, exportDatei, importDatei, EXPORT_FORMAT, BildQuelle, uid };
+module.exports = { erkennungsPlan, spielFenster, BILD_SPIELE, BILD_BY_ID, FPS, standardBild, migrateBild, migrateAktion, exportDatei, importDatei, EXPORT_FORMAT, BildQuelle, uid };

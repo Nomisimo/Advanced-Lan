@@ -6,6 +6,12 @@ const REPO = "Nomisimo/Advanced-Lan";
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
+  "0.1.0-beta.6": [
+    "Texterkennung stürzt im gepackten Build nicht mehr ab (fehlender Tesseract-Kern „relaxedsimd“, Mac und Windows)",
+    "Bilderkennung erkennt geöffnete Spiele selbst und nimmt ihr Fenster als Bildquelle, statt den ganzen Bildschirm",
+    "Mehrere Spiele gleichzeitig: Sind Valorant und The Finals offen, läuft für jedes eine eigene Erkennung",
+    "Bildquelle je Spiel wählbar: automatisch (Spielfenster), ein bestimmtes Fenster oder der Bildschirm. Der Editor nimmt dieselbe Quelle auf",
+  ],
   "0.1.0-beta.5": [
     "Valorant und The Finals über Bilderkennung: Der Game-PC schaut auf seinen Bildschirm und meldet Aktionen wie Runde gewonnen, Spike gelegt, Kill oder Cashout an die Regie",
     "Neuer Tab „Bilderkennung“ mit Editor: Gameplay in der App aufzeichnen, Bereich aufziehen, Frames wählen, Event zuordnen, Schwelle und Pause einstellen, „Erkennung testen“ auf der Aufnahme",

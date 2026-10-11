@@ -46,13 +46,11 @@ export default function BildTab({ cfg, mutate, g, notify }) {
     if (l.leer) return [ERR, "Bild ist schwarz: Spiel im randlosen Fenstermodus starten"];
     return l.laeuft ? [OK, `läuft · ${l.quelle?.name || "Bildschirm"} · ${l.b}×${l.h}`] : [WARN, `startet · ${l.quelle?.name || "Bildschirm"}`];
   };
-  // Bildquelle: jedes offene Fenster oder Programm, Liste beim Öffnen der Auswahl neu holen
+  // Offene Fenster für die Auswahl der Live-Quelle, beim Öffnen einer Auswahl neu holen
   const [offen, setOffen] = useState([]);
-  const [eigen, setEigen] = useState(false);
   const fensterHolen = () => api.bildFenster().then((l) => setOffen(Array.isArray(l) ? l : [])).catch(() => {});
   useEffect(() => { fensterHolen(); }, []);
-  const gewaehlt = sc.quelle.startsWith("fenster:") ? sc.quelle.slice(8) : null;
-  const fensterListe = [...new Set([...offen, ...(st.fenster || [])])].filter((f) => f && f !== gewaehlt).sort((x, y) => x.localeCompare(y));
+  const fensterAlle = [...new Set([...offen, ...(st.fenster || [])])].filter(Boolean).sort((x, y) => x.localeCompare(y));
 
   return (
     <>
@@ -72,8 +70,13 @@ export default function BildTab({ cfg, mutate, g, notify }) {
           </Field>
         </div>
         <div style={{ marginTop: 12, display: "grid", gap: 4 }}>
+          <div style={{ fontSize: 11, color: MUTED, textTransform: "uppercase", letterSpacing: 0.5 }}>Live-Quelle je Spiel (Erkennung und Editor-Aufnahme)</div>
           {BILD_SPIELE.map((d) => { const [farbe, text] = spielStatus(d); return (
-            <div key={d.id} style={{ fontSize: 13, display: "flex", gap: 8 }}><b style={{ minWidth: 90, color: d.farbe }}>{d.name}</b><span style={{ color: farbe }}>● {text}</span></div>
+            <div key={d.id} style={{ fontSize: 13, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+              <b style={{ minWidth: 90, color: d.farbe }}>{d.name}</b>
+              <QuelleWahl def={d} quelle={b.spiele[d.id].quelle} fenster={fensterAlle} holen={fensterHolen} setzen={(q) => mutate((x) => { x.bild.spiele[d.id].quelle = q; })} />
+              <span style={{ color: farbe }}>● {text}</span>
+            </div>
           ); })}
           {st.fehler && <div style={{ fontSize: 12, color: ERR }}>{st.fehler}</div>}
         </div>
@@ -85,23 +88,6 @@ export default function BildTab({ cfg, mutate, g, notify }) {
           <button key={s.id} onClick={() => setSpiel(s.id)} style={{ ...S.smallBtn, padding: "6px 12px", fontSize: 13, fontWeight: 700, background: spielId === s.id ? s.farbe : "transparent", color: spielId === s.id ? "#14121a" : SUB }}>{s.name}</button>
         ))}
       </span>} right={<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        <Field label="Bildquelle">
-          <div style={{ display: "flex", gap: 6 }}>
-            <select style={{ ...S.selectSm, width: 230 }} value={eigen ? "eigen" : sc.quelle} onFocus={fensterHolen} onMouseDown={fensterHolen}
-              onChange={(e) => { const v = e.target.value; setEigen(v === "eigen"); if (v !== "eigen") setzeSpiel((s) => { s.quelle = v; }); }}>
-              <option value="auto">Automatisch: Fenster „{def.fenster}“</option>
-              <option value="bildschirm">Bildschirm</option>
-              {gewaehlt && <option value={sc.quelle}>Fenster: {gewaehlt}{offen.some((f) => f.toUpperCase().includes(gewaehlt.toUpperCase())) ? "" : " (nicht offen)"}</option>}
-              {fensterListe.length > 0 && <optgroup label="Offene Fenster und Programme">
-                {fensterListe.map((f) => <option key={f} value={`fenster:${f}`}>{f}</option>)}
-              </optgroup>}
-              <option value="eigen">Fenstertitel eingeben …</option>
-            </select>
-            {eigen && <input style={{ ...S.inputSm, width: 160 }} autoFocus placeholder="Titel enthält …" defaultValue={gewaehlt || ""}
-              onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
-              onBlur={(e) => { const t = e.target.value.trim(); setEigen(false); if (t) setzeSpiel((s) => { s.quelle = `fenster:${t}`; }); }} />}
-          </div>
-        </Field>
         <Field label="Team dieses PCs">
           <select style={{ ...S.selectSm, width: 130, color: teamFarbe(sc.team) }} value={sc.team} onChange={(e) => setzeSpiel((s) => { s.team = e.target.value; })}>
             {def.teams.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -117,6 +103,30 @@ export default function BildTab({ cfg, mutate, g, notify }) {
         <Editor key={spielId} def={def} sc={sc} setzeSpiel={setzeSpiel} notify={notify} werteLive={st.spiele?.[spielId]?.werte || null} teilWerteLive={st.spiele?.[spielId]?.teilWerte || null} letzteLive={st.spiele?.[spielId]?.letzte} />
       </Section>
     </>
+  );
+}
+
+// Live-Quelle eines Spiels: Spielfenster automatisch erkennen, ein beliebiges offenes Fenster/Programm, ein eigener Titel oder der Bildschirm
+function QuelleWahl({ def, quelle, fenster, holen, setzen }) {
+  const [eigen, setEigen] = useState(false);
+  const gewaehlt = quelle.startsWith("fenster:") ? quelle.slice(8) : null;
+  const liste = fenster.filter((f) => f !== gewaehlt);
+  return (
+    <span style={{ display: "inline-flex", gap: 6 }}>
+      <select style={{ ...S.selectSm, width: 240 }} value={eigen ? "eigen" : quelle} onFocus={holen} onMouseDown={holen}
+        onChange={(e) => { const v = e.target.value; setEigen(v === "eigen"); if (v !== "eigen") setzen(v); }}>
+        <option value="auto">Automatisch: Spielfenster „{def.fenster}“</option>
+        <option value="bildschirm">Bildschirm</option>
+        {gewaehlt && <option value={quelle}>Fenster: {gewaehlt}{fenster.some((f) => f.toUpperCase().includes(gewaehlt.toUpperCase())) ? "" : " (nicht offen)"}</option>}
+        {liste.length > 0 && <optgroup label="Fenster manuell wählen">
+          {liste.map((f) => <option key={f} value={`fenster:${f}`}>{f}</option>)}
+        </optgroup>}
+        <option value="eigen">Fenstertitel eingeben …</option>
+      </select>
+      {eigen && <input style={{ ...S.inputSm, width: 160 }} autoFocus placeholder="Titel enthält …" defaultValue={gewaehlt || ""}
+        onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+        onBlur={(e) => { const t = e.target.value.trim(); setEigen(false); if (t) setzen(`fenster:${t}`); }} />}
+    </span>
   );
 }
 

@@ -7,7 +7,7 @@ const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
   "0.1.0-beta.7": [
-    "Bilderkennung: Als Bildquelle lässt sich jedes offene Fenster oder Programm wählen, die Liste wird beim Öffnen der Auswahl neu geholt",
+    "Bilderkennung: Live-Quelle je Spiel oben im Tab: Spielfenster automatisch erkennen, ein beliebiges offenes Fenster oder Programm manuell wählen oder der Bildschirm. Gilt für die Erkennung im Betrieb und für die Editor-Aufnahme",
     "Bildquelle über einen Teil des Fenstertitels („Fenstertitel eingeben …“), z. B. „OBS“: passt auch, wenn das Programm seinen Titel ändert",
     "Editor nimmt das gewählte Fenster auch auf, bevor das Spiel Aktionen hat",
     "Eine Aktion kann mehrere Bereiche als Auslöser haben (bis zu 6), jeder mit eigenen Frames und/oder eigenem Text. Wählbar: ein Bereich reicht oder alle müssen gleichzeitig passen",

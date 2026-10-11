@@ -1,5 +1,13 @@
-# Beta-Release: baut die App für Windows und macOS Intel und hängt beides an ein GitHub-Release (als Vorabversion markiert).
-# Start: Tag v* pushen (z. B. v0.1.0-beta.1) oder von Hand unter Actions → Release.
+# Baut die Installer für Windows (x64) und macOS Intel mit ow-electron-builder
+# und veröffentlicht sie als GitHub-Release. Ablauf wie im Netzwerkplaner.
+#
+# Auslöser:
+#  - ein Tag „v…“ pushen, z. B.  git tag v0.1.0-beta.7 && git push origin v0.1.0-beta.7
+#  - oder auf GitHub unter Actions → Release → „Run workflow“ starten: baut den gewählten
+#    Branch (meist main) und legt den Tag v<version aus package.json> selbst an.
+# Tags mit Bindestrich (…-beta.1, …-rc.1) werden als Vorabversion (Beta) veröffentlicht.
+# Die Versionsnummer im Tag muss zur „version“ in package.json passen, und src/core/version.js
+# braucht dafür einen Eintrag „Was ist neu?“: daraus entsteht der Release-Text.
 # Windows ist noch nicht signiert (Code-Signing-Zertifikat kommt später, Anleitung in docs/zertifikat.md).
 name: Release
 
@@ -12,99 +20,123 @@ permissions:
   contents: write
 
 jobs:
-  windows:
-    runs-on: windows-latest
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows x64
+            os: windows-latest
+            args: --win --x64
+          # Intel-DMG auf einem Intel-Runner bauen: dort entsteht ein HFS+-Image.
+          # APFS-Images lehnen ältere macOS-Versionen als „beschädigt“ ab.
+          - name: macOS Intel
+            os: macos-15-intel
+            args: --mac --x64
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
-      - run: npm test
+
+      - name: Abhängigkeiten installieren
+        run: npm ci
+
+      - name: Version prüfen
+        shell: bash
+        run: |
+          PKG="v$(node -p "require('./package.json').version")"
+          if [ "${{ github.ref_type }}" = "tag" ]; then TAG="${{ github.ref_name }}"; else TAG="$PKG"; fi
+          echo "Tag $TAG, package.json $PKG"
+          if [ "$TAG" != "$PKG" ]; then echo "::error::Tag $TAG passt nicht zu package.json ($PKG)"; exit 1; fi
+
+      - name: Tests
+        run: npm test
         timeout-minutes: 5
-      - run: npm run build
+
+      - name: App bauen
+        run: npm run build
+
       # Ohne Zertifikat und ohne Overwolf-Schlüssel: der Build läuft durch, ow-electron-builder warnt nur.
-      - run: npx ow-electron-builder --win --x64 --publish never
+      # Mac wie im Netzwerkplaner ad-hoc signiert (identity "-"), kein Apple-Zertifikat.
+      - name: Installer bauen
+        run: npx ow-electron-builder ${{ matrix.args }} --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
       - name: Installer prüfen
+        if: runner.os == 'Windows'
         shell: bash
         run: |
           ls -l dist
           n=$(ls dist/*.exe | wc -l | tr -d ' ')
           if [ "$n" != "1" ]; then echo "::error::$n Installer gebaut, erwartet 1"; exit 1; fi
           test -f dist/latest.yml || { echo "::error::latest.yml fehlt (Update-Suche unter Windows)"; exit 1; }
-      - uses: actions/upload-artifact@v4
-        with:
-          name: windows
-          path: |
-            dist/*.exe
-            dist/*.exe.blockmap
-            dist/latest.yml
 
-  mac-intel:
-    runs-on: macos-15-intel
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm test
-        timeout-minutes: 5
-      - run: npm run build
-      # Wie im Netzwerkplaner: ad-hoc signiert (identity "-"), kein Apple-Zertifikat, keine Overwolf-Signatur.
-      # Auf dem Intel-Runner entsteht ein HFS+-Image; APFS-Images lehnen ältere macOS-Versionen als „beschädigt“ ab.
-      - run: npx ow-electron-builder --mac --x64 --publish never
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      # Jeder Mac-Job darf genau ein DMG liefern, sonst überschreiben sich gleichnamige
+      # Dateien beim Zusammenführen der Artefakte und das DMG ist kaputt (Fehler 3840).
       - name: DMG prüfen
+        if: runner.os == 'macOS'
+        shell: bash
         run: |
           ls -l dist/*.dmg
           n=$(ls dist/*.dmg | wc -l | tr -d ' ')
           if [ "$n" != "1" ]; then echo "::error::$n DMGs gebaut, erwartet 1"; exit 1; fi
           hdiutil verify dist/*.dmg
           if ! hdiutil imageinfo dist/*.dmg | grep -q "Apple_HFS"; then echo "::error::Intel-DMG ist kein HFS+-Image"; exit 1; fi
+
       - uses: actions/upload-artifact@v4
         with:
-          name: mac-intel
-          path: dist/*.dmg
-
-  # Ein Release für beide Builds, erst wenn beide fertig sind
-  release:
-    needs: [windows, mac-intel]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          path: dist
-          merge-multiple: true
-      - id: version
-        run: echo "tag=v$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
-      - uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: Advanced LAN ${{ steps.version.outputs.tag }}
-          prerelease: true
-          fail_on_unmatched_files: true
-          files: |
+          name: installer-${{ strategy.job-index }}
+          # latest.yml und die Blockmap braucht das automatische Update unter Windows
+          path: |
             dist/*.exe
             dist/*.exe.blockmap
             dist/latest.yml
             dist/*.dmg
-          body: |
-            Beta von Advanced LAN für Windows und macOS mit Intel-Prozessor.
+          if-no-files-found: error
 
-            **Windows:** `Advanced-LAN-…-win-x64.exe` ausführen. Die App ist noch nicht signiert, deshalb warnt Windows SmartScreen:
-            **Weitere Informationen** → **Trotzdem ausführen**.
+  # Ein Release für alle Builds, erst wenn alle fertig sind
+  release:
+    name: GitHub-Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-            **macOS:** `.dmg` öffnen und Advanced LAN in den Programme-Ordner ziehen. Beim ersten Start im Finder mit Rechtsklick → **Öffnen** starten
-            (oder Systemeinstellungen → Datenschutz & Sicherheit → „Trotzdem öffnen“).
+      - uses: actions/download-artifact@v4
+        with:
+          path: artefakte
+          merge-multiple: true
 
-            **Enthalten:** Regie, Game-PC und Standalone in einer App, Sessions per mDNS, OSC-Befehle an Licht, Audio und Video (Ziel-Datenbank, Signale-Matrix),
-            CS2 und Dota 2 (Game State Integration), Rocket League (Stats API), Valorant und The Finals (Bilderkennung), Simulator, Mini-Overlay, Game-Stats-Screen (Fenster, NDI).
+      # Release-Text aus „Was ist neu?“ (src/core/version.js) plus Download- und Installationshinweise
+      - name: Release-Text
+        id: notes
+        shell: bash
+        run: |
+          PKG="v$(node -p "require('./package.json').version")"
+          if [ "${{ github.ref_type }}" = "tag" ]; then TAG="${{ github.ref_name }}"; else TAG="$PKG"; fi
+          node -e '
+            const v = process.argv[1];
+            const eintraege = require("./src/core/version.js").CHANGELOG[v];
+            if (!eintraege || !eintraege.length) { console.error(`::error::Kein Eintrag für ${v} in src/core/version.js`); process.exit(1); }
+            console.log(["### Was ist neu", "", ...eintraege.map((e) => `- ${e}`)].join("\n"));
+          ' "${TAG#v}" > notes.md
+          cat .github/release-hinweise.md >> notes.md
+          cat notes.md
+          echo "prerelease=$([[ "$TAG" == *-* ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
-            Nutzungsbedingungen: https://github.com/Nomisimo/Advanced-Lan/blob/main/docs/TERMS.md · Datenschutz: https://github.com/Nomisimo/Advanced-Lan/blob/main/docs/PRIVACY.md
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.notes.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: Advanced LAN ${{ steps.notes.outputs.tag }}
+          body_path: notes.md
+          prerelease: ${{ steps.notes.outputs.prerelease }}
+          fail_on_unmatched_files: true
+          files: artefakte/*

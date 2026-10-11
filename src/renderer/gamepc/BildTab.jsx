@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { S, ACCENT, ACCENT_HI, LINE, SUB, MUTED, OK, WARN, ERR, FELD, teamFarbe } from "../theme.js";
+import { uiConfirm } from "../dialog.jsx";
 import { api } from "../api.js";
 import { Section, Field, Toggle, SpielChip, Kbd } from "../ui.jsx";
 import { BILD_SPIELE, BILD_BY_ID, FPS, migrateAktion, migrateBereich, erkennungsAuftrag, aktionBereit, bereichBereit, MAX_BEREICHE, MAX_FRAMES, uid } from "../../core/bild-spiele.js";
@@ -223,9 +224,9 @@ function Editor({ def, sc, setzeSpiel, notify, werteLive, teilWerteLive, letzteL
     setzeSpiel((s) => { s.aktionen.push(a); });
     setWahl(a.id); setBWahl(null); setBox(null);
   };
-  const bereichUebernehmen = () => {
+  const bereichUebernehmen = async () => {
     if (!bereich || !box) return;
-    if (bereich.vorlagen.length && !confirm(`Neuer Rahmen für ${bName(aktion, bereich)} von „${aktion.name}“: Die ${bereich.vorlagen.length} gespeicherten Frames passen dann nicht mehr und werden gelöscht. Weiter?`)) return;
+    if (bereich.vorlagen.length && !await uiConfirm(`Neuer Rahmen für ${bName(aktion, bereich)} von „${aktion.name}“: Die ${bereich.vorlagen.length} gespeicherten Frames passen dann nicht mehr und werden gelöscht. Weiter?`)) return;
     aendernB((b) => { b.region = box; b.anker = ankerVon(box); b.vorlagen = []; });
     setBox(null);
   };
@@ -420,7 +421,7 @@ function AktionBearbeiten({ def, a, aendern, entfernen, bereich: b, waehleBereic
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
         <input style={{ ...S.inputSm, fontWeight: 700 }} value={a.name} maxLength={60} onChange={(e) => aendern((x) => { x.name = e.target.value; })} />
         <Toggle checked={a.an} title="Aktion an/aus" onChange={(v) => aendern((x) => { x.an = v; })} />
-        <button style={S.dangerBtn} title="Aktion löschen" onClick={() => confirm(`Aktion „${a.name}“ löschen?`) && entfernen()}><Trash2 size={13} /></button>
+        <button style={S.dangerBtn} title="Aktion löschen" onClick={async () => { if (await uiConfirm(`Aktion „${a.name}“ löschen?`)) entfernen(); }}><Trash2 size={13} /></button>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: mitSeite ? "1fr 120px" : "1fr", gap: 8, marginBottom: 10 }}>
         <Field label="Event an die Regie">
@@ -460,7 +461,7 @@ function AktionBearbeiten({ def, a, aendern, entfernen, bereich: b, waehleBereic
         })}
         <span style={{ fontSize: 11, color: MUTED }}>{a.bereiche.length < MAX_BEREICHE ? "Weiterer Bereich: Rahmen ziehen, dann „Als weiteren Bereich“." : ""}</span>
         <span style={{ flex: 1 }} />
-        {a.bereiche.length > 1 && <button style={S.dangerBtn} title="Diesen Bereich löschen" onClick={() => confirm(`Bereich ${a.bereiche.indexOf(b) + 1} von „${a.name}“ löschen?`) && bereichEntfernen(b.id)}><Trash2 size={13} /> Bereich</button>}
+        {a.bereiche.length > 1 && <button style={S.dangerBtn} title="Diesen Bereich löschen" onClick={async () => { if (await uiConfirm(`Bereich ${a.bereiche.indexOf(b) + 1} von „${a.name}“ löschen?`)) bereichEntfernen(b.id); }}><Trash2 size={13} /> Bereich</button>}
       </div>
       <Field label="Text muss dastehen (optional)" hint="Mehrere Wörter mit | trennen, z. B. ROUND WIN|RUNDE GEWONNEN">
         <div style={{ display: "flex", gap: 6 }}>

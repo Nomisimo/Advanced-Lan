@@ -7,6 +7,8 @@ const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
   "0.1.0-beta.7": [
+    "Textfelder bleiben nach Rückfragen bedienbar: eigene Dialoge statt der Windows-Dialoge, die den Tastatur-Fokus verloren haben",
+    "Release-Ablauf wie im Netzwerkplaner: Release-Text aus „Was ist neu?“, Tag muss zur Version passen",
     "Bilderkennung: Live-Quelle je Spiel oben im Tab: Spielfenster automatisch erkennen, ein beliebiges offenes Fenster oder Programm manuell wählen oder der Bildschirm. Gilt für die Erkennung im Betrieb und für die Editor-Aufnahme",
     "Bildquelle über einen Teil des Fenstertitels („Fenstertitel eingeben …“), z. B. „OBS“: passt auch, wenn das Programm seinen Titel ändert",
     "Editor nimmt das gewählte Fenster auch auf, bevor das Spiel Aktionen hat",

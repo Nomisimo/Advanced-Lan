@@ -28,6 +28,7 @@ const { RlSimMatch } = require('../core/rl-sim');
 const { DotaSimMatch } = require('../core/dota-sim');
 const { ValSimMatch } = require('../core/val-sim');
 const { einrichtenUpdates } = require('./updates');
+const { restoreFocus, mitFokus } = require('./fokus');
 const { StatsAusgabe } = require('./stats-ausgabe');
 const { hotkeyText, feedbackUrl } = require('../core/app-info');
 const os = require('os');
@@ -92,6 +93,7 @@ const regieSim = new RegieSim({ regie, onChange: statusMelden });
 const stats = new StatsAusgabe({
   root, preload: path.join(root, 'src', 'preload', 'preload.js'), icon: path.join(root, 'assets', 'app-icon', 'icon.png'),
   getStats: () => cfg.regie.stats, aktiv: () => istRegie(), onChange: statusMelden,
+  onFensterZu: () => restoreFocus(mainWin),
 });
 
 // Auf dem Regie-PC darf kein Spiel laufen (Windows: Prozessliste prüfen)
@@ -401,6 +403,9 @@ function gesamtStatus() {
   return s;
 }
 
+// Native Dialoge (Speichern unter, Öffnen) am Hauptfenster, danach Fokus zurück an die Seite
+const dialogMitFokus = (art, optionen) => mitFokus(mainWin, () => dialog[art](mainWin, optionen));
+
 /* ── Fenster ──────────────────────────────────────────────────────────── */
 function createWindow() {
   // Startanimation wie im Netzwerkplaner: Controller, dessen Tasten nacheinander gedrückt werden
@@ -427,7 +432,7 @@ function createWindow() {
     splash.webContents.executeJavaScript('document.body.style.opacity="0"').catch(() => {});
     setTimeout(() => {
       hauptGezeigt = true;
-      mainWin.show(); mainWin.focus();
+      mainWin.show(); mainWin.focus(); mainWin.webContents.focus();
       if (!splash.isDestroyed()) splash.close();
     }, 250);
   };
@@ -435,6 +440,10 @@ function createWindow() {
   setTimeout(() => { animationFertig = true; zeigen(); }, 1900);
   for (const ev of ['minimize', 'restore', 'hide', 'show']) mainWin.on(ev, () => setImmediate(overlayAktualisieren));
   mainWin.on('closed', () => { if (overlayWin) overlayWin.destroy(); stats.beenden(); });
+  // Fokus im Fenster immer auch an die Seite geben, sonst nehmen Textfelder unter Windows teils keine Eingabe an
+  mainWin.on('focus', () => mainWin.webContents.focus());
+  // Per window.open erzeugte Kindfenster (derzeit verweigert, siehe unten): beim Schließen Fokus zurück
+  mainWin.webContents.on('did-create-window', (kind) => kind.on('closed', () => restoreFocus(mainWin)));
   mainWin.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//i.test(url)) shell.openExternal(url);
     return { action: 'deny' };
@@ -627,7 +636,7 @@ ipcMain.handle('rl-ini-installieren', async () => {
   return { ok: true, pfad: path.join(ordner, RL_INI_DATEI) };
 });
 ipcMain.handle('rl-ini-speichern', async () => {
-  const r = await dialog.showSaveDialog(mainWin, { defaultPath: RL_INI_DATEI, filters: [{ name: 'Rocket League Stats API', extensions: ['ini'] }] });
+  const r = await dialogMitFokus('showSaveDialog', { defaultPath: RL_INI_DATEI, filters: [{ name: 'Rocket League Stats API', extensions: ['ini'] }] });
   if (r.canceled || !r.filePath) return { abgebrochen: true };
   fs.writeFileSync(r.filePath, rlIni({ webPort: Number(cfg.gamepc.rlPort) }));
   return { ok: true, pfad: r.filePath };
@@ -640,7 +649,7 @@ ipcMain.handle('cfg-installieren', async () => {
   return { ok: true, pfad: path.join(ordner, CFG_DATEI) };
 });
 ipcMain.handle('cfg-speichern', async () => {
-  const r = await dialog.showSaveDialog(mainWin, { defaultPath: CFG_DATEI, filters: [{ name: 'CS2-Konfiguration', extensions: ['cfg'] }] });
+  const r = await dialogMitFokus('showSaveDialog', { defaultPath: CFG_DATEI, filters: [{ name: 'CS2-Konfiguration', extensions: ['cfg'] }] });
   if (r.canceled || !r.filePath) return { abgebrochen: true };
   fs.writeFileSync(r.filePath, gsiCfg({ port: cfg.gamepc.gsiPort, token: cfg.gamepc.gsiToken }));
   return { ok: true, pfad: r.filePath };
@@ -653,7 +662,7 @@ ipcMain.handle('dota-cfg-installieren', async () => {
   return { ok: true, pfad: path.join(ordner, DOTA_CFG_DATEI) };
 });
 ipcMain.handle('dota-cfg-speichern', async () => {
-  const r = await dialog.showSaveDialog(mainWin, { defaultPath: DOTA_CFG_DATEI, filters: [{ name: 'Dota-2-Konfiguration', extensions: ['cfg'] }] });
+  const r = await dialogMitFokus('showSaveDialog', { defaultPath: DOTA_CFG_DATEI, filters: [{ name: 'Dota-2-Konfiguration', extensions: ['cfg'] }] });
   if (r.canceled || !r.filePath) return { abgebrochen: true };
   fs.writeFileSync(r.filePath, dotaCfg({ port: cfg.gamepc.gsiPort, token: cfg.gamepc.gsiToken }));
   return { ok: true, pfad: r.filePath };
@@ -679,13 +688,13 @@ ipcMain.handle('bild-aufnahme', async (_, an, spiel) => {
 });
 ipcMain.handle('bild-export', async (_, spiel) => {
   if (!BILD_BY_ID[spiel]) return { fehler: 'Unbekanntes Spiel' };
-  const r = await dialog.showSaveDialog(mainWin, { defaultPath: `advanced-lan-${spiel}.json`, filters: [{ name: 'Advanced LAN Spiel-Konfiguration', extensions: ['json'] }] });
+  const r = await dialogMitFokus('showSaveDialog', { defaultPath: `advanced-lan-${spiel}.json`, filters: [{ name: 'Advanced LAN Spiel-Konfiguration', extensions: ['json'] }] });
   if (r.canceled || !r.filePath) return { abgebrochen: true };
   try { fs.writeFileSync(r.filePath, JSON.stringify(exportDatei(spiel, cfg.gamepc.bild.spiele[spiel]), null, 1)); } catch (e) { return { fehler: e.message }; }
   return { ok: true, pfad: r.filePath };
 });
 ipcMain.handle('bild-import', async () => {
-  const r = await dialog.showOpenDialog(mainWin, { properties: ['openFile'], filters: [{ name: 'Advanced LAN Spiel-Konfiguration', extensions: ['json'] }] });
+  const r = await dialogMitFokus('showOpenDialog', { properties: ['openFile'], filters: [{ name: 'Advanced LAN Spiel-Konfiguration', extensions: ['json'] }] });
   if (r.canceled || !r.filePaths?.[0]) return { abgebrochen: true };
   let inhalt;
   try { inhalt = fs.readFileSync(r.filePaths[0], 'utf8'); } catch (e) { return { fehler: e.message }; }

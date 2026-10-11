@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { S, ACCENT, ACCENT_HI, LINE, SUB, MUTED, ERR, OK, WARN, CT, TT, BLAU, ORANGE, GLOW, teamFarbe } from "../theme.js";
+import { uiConfirm } from "../dialog.jsx";
 import { Section, TeamChip, Dot, EventIcon, eventLabel, zeit, Leer, SpielChip, th, td } from "../ui.jsx";
 import { api } from "../api.js";
 import { SPIELE, SPIEL_BY_ID } from "../../core/spiele.js";
@@ -42,7 +43,7 @@ const Kennzahl = ({ label, wert, farbe }) => (
 
 function Ausgabe({ cfg, status, zuruecksetzen, notify }) {
   const z = status.zaehler || {};
-  const zurueck = async () => { if (!confirm("Zähler auf null setzen und das Event-Log leeren?")) return; await zuruecksetzen(); notify("Zähler zurückgesetzt."); };
+  const zurueck = async () => { if (!await uiConfirm("Zähler auf null setzen und das Event-Log leeren?")) return; await zuruecksetzen(); notify("Zähler zurückgesetzt."); };
   return (
     <Section title={cfg.armed ? "Ausgabe an" : "Ausgabe aus"} style={{ borderColor: cfg.armed ? OK : ERR, boxShadow: cfg.armed ? "0 0 16px rgba(46,204,113,.25)" : "0 0 16px rgba(255,93,93,.18)" }}
       right={<button style={S.smallBtn} title="Zähler auf null setzen und Event-Log leeren" onClick={zurueck}><RotateCcw size={12} /> Zurücksetzen</button>}>
@@ -306,7 +307,7 @@ function Verbindungscheck({ cfg, status, jetzt }) {
                   <td style={td({ fontSize: 12 })}>{s.spieler ? <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>{s.spieler} <TeamChip team={s.team} /></span> : <span style={{ color: MUTED }}>–</span>}</td>
                   <td style={td({ whiteSpace: "nowrap" })} title={(p.spiele || []).map((x) => SPIEL_BY_ID[x]?.name || x).join(", ")}><Erkennt spiele={p.spiele || []} aktiv={cfg.aktivesSpiel} /></td>
                   <td style={td({ color: SUB, fontSize: 12, whiteSpace: "nowrap" })}>{p.t ? `${Math.max(0, Math.round((jetzt - p.t) / 1000))} s` : "–"}</td>
-                  <td style={td({ textAlign: "right" })}>{p.verbunden && !p.sim && <button style={S.dangerBtn} title="Trennen" onClick={() => confirm(`${p.pcId} trennen?`) && api.pcTrennen(p.pcId)}><Unplug size={12} /></button>}</td>
+                  <td style={td({ textAlign: "right" })}>{p.verbunden && !p.sim && <button style={S.dangerBtn} title="Trennen" onClick={async () => { if (await uiConfirm(`${p.pcId} trennen?`)) api.pcTrennen(p.pcId); }}><Unplug size={12} /></button>}</td>
                 </tr>
               );
             })}

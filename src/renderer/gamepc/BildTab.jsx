@@ -7,7 +7,11 @@ import { BildErkennung, kodieren, ankerVon, region as regionBegrenzen, ANKER_H, 
 import { sigAus, bildAus, pngAus, istLeer } from "../bild.js";
 import { Circle, Square, Upload, Download, Play, Pause, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Plus, Trash2, Film, FlaskConical, Type, Crop, ImagePlus, FolderOpen } from "lucide-react";
 
-const MAX_AUFNAHME = 10 * 60 * 1000; // 10 Minuten, liegt nur im Arbeitsspeicher
+// Aufnahme bis zu 2 Stunden (Sicherheitsgrenze). 30 Bilder/s, höchstens 1080p und 4 Mbit/s: etwa 1,8 GB pro Stunde.
+// Chromium lagert so große Videos selbst aus dem Arbeitsspeicher aus; gelöscht wird sie mit „Aufnahme löschen“ oder beim Schließen.
+const MAX_AUFNAHME = 2 * 60 * 60 * 1000;
+const BITRATE = 4_000_000;
+const groesse = (n) => (n > 1e9 ? `${(n / 1e9).toFixed(1)} GB` : `${Math.round(n / 1e6)} MB`);
 const FRAME = 1 / 30;
 const pct = (x) => `${(x * 100).toFixed(2)}%`;
 const uhr = (s) => (Number.isFinite(s) ? `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, "0")}` : "–");
@@ -160,12 +164,13 @@ function Editor({ def, sc, setzeSpiel, notify, werteLive, teilWerteLive, letzteL
   const aufnehmen = async () => {
     let stream;
     const q = await api.bildAufnahme("vorbereiten", def.id); // nimmt die Bildquelle dieses Spiels auf
-    try { stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30 }, audio: false }); }
+    try { stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30, height: { max: 1080 } }, audio: false }); }
     catch (e) { return notify(`Aufnahme nicht möglich: ${e?.message || e}`, "err"); }
     const mime = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"].find((m) => MediaRecorder.isTypeSupported(m));
-    const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8_000_000 });
+    const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: BITRATE });
     const teile = [];
-    rec.ondataavailable = (e) => e.data.size && teile.push(e.data);
+    let bytes = 0;
+    rec.ondataavailable = (e) => { if (e.data.size) { teile.push(e.data); bytes += e.data.size; } };
     rec.onstop = () => {
       stream.getTracks().forEach((t) => t.stop());
       api.bildAufnahme(false);
@@ -178,7 +183,7 @@ function Editor({ def, sc, setzeSpiel, notify, werteLive, teilWerteLive, letzteL
     api.bildAufnahme(true); // App darf im Hintergrund weiter aufnehmen
     const timer = setTimeout(() => rec.state === "recording" && rec.stop(), MAX_AUFNAHME);
     rec.addEventListener("stop", () => clearTimeout(timer));
-    setAufnahme({ rec, start: Date.now() });
+    setAufnahme({ rec, start: Date.now(), bytes: () => bytes });
     notify(`Aufnahme läuft (${q?.art === "fenster" ? `Fenster „${q.name}“` : "Bildschirm"}). Jetzt ins Spiel wechseln und die Momente spielen, die erkannt werden sollen.`);
   };
   const laden = (url, name) => {
@@ -286,7 +291,7 @@ function Editor({ def, sc, setzeSpiel, notify, werteLive, teilWerteLive, letzteL
         {/* Aufnahme und Laden */}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
           {aufnahme ? (
-            <button style={{ ...S.primaryBtn, background: ERR, boxShadow: `0 0 12px ${ERR}88` }} onClick={() => aufnahme.rec.stop()}><Square size={14} /> Aufnahme stoppen ({uhr((jetzt - aufnahme.start) / 1000)})</button>
+            <button style={{ ...S.primaryBtn, background: ERR, boxShadow: `0 0 12px ${ERR}88` }} onClick={() => aufnahme.rec.stop()}><Square size={14} /> Aufnahme stoppen ({uhr((jetzt - aufnahme.start) / 1000)} · {groesse(aufnahme.bytes())})</button>
           ) : (
             <button style={S.primaryBtn} onClick={aufnehmen}><Circle size={14} fill="#fff" /> Gameplay aufnehmen</button>
           )}

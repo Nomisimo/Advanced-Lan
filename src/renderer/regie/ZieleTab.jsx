@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { S, SUB, MUTED, LINE, FELD, ACCENT, GLOW, WARN } from "../theme.js";
+import { uiConfirm } from "../dialog.jsx";
 import { Section, th, td, ZielBadge, KAT_FARBE, KartenWahl, useKarten } from "../ui.jsx";
 import { karteFuer, zielHinweis } from "../../core/netzwerk.js";
 import { api } from "../api.js";
@@ -113,9 +114,9 @@ export default function ZieleTab({ cfg, mutate, notify, goTab }) {
   const [info, setInfo] = useState(null);
   const karten = useKarten();
   const setZiel = (id, fn) => mutate((d) => { const t = d.targets.find((x) => x.id === id); if (t) fn(t); });
-  const loeschen = (t) => {
+  const loeschen = async (t) => {
     const n = nutzung(cfg, t.id);
-    if (n && !window.confirm(`„${t.name}“ wird in ${n} Signal-Befehl(en) benutzt. Trotzdem löschen? Die Befehle werden mit entfernt.`)) return;
+    if (n && !await uiConfirm(`„${t.name}“ wird in ${n} Signal-Befehl(en) benutzt. Trotzdem löschen? Die Befehle werden mit entfernt.`)) return;
     mutate((d) => {
       d.targets = d.targets.filter((x) => x.id !== t.id);
       for (const evs of Object.values(d.signale || {})) for (const k of Object.keys(evs || {})) if (Array.isArray(evs[k])) evs[k] = evs[k].filter((z) => z.ziel !== t.id);

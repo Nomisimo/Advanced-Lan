@@ -1,5 +1,6 @@
 import React from "react";
 import { S, LINE, SUB } from "./theme.js";
+import { uiConfirm } from "./dialog.jsx";
 import APP_ICON_SVG from "../../assets/app-icon/icon.svg";
 import { Repeat } from "lucide-react";
 import { useUpdate, VersionKnopf, UpdateKnopf, ChangelogKnopf, Changelog } from "./Updates.jsx";
@@ -19,7 +20,7 @@ export default function Kopf({ modus, version, meta, children, modusWechseln }) 
       <div style={S.headerMeta}>{meta}</div>
       {children}
       <ChangelogKnopf u={u} />
-      <button style={{ ...S.ghostBtn, padding: "7px 9px" }} title="Modus wechseln (Regie / Game-PC)" onClick={() => confirm("Modus wechseln? Verbindungen und Session werden dabei beendet.") && modusWechseln()}><Repeat size={14} /></button>
+      <button style={{ ...S.ghostBtn, padding: "7px 9px" }} title="Modus wechseln (Regie / Game-PC)" onClick={async () => { if (await uiConfirm("Modus wechseln? Verbindungen und Session werden dabei beendet.")) modusWechseln(); }}><Repeat size={14} /></button>
       {u.changelog && <Changelog version={version} u={u} />}
     </header>
   );

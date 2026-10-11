@@ -7,14 +7,14 @@ const { OscSender } = require('./osc-out');
 const { SessionServer } = require('./session-server');
 const { Discovery, SessionClient } = require('./session-client');
 const { findeCs2CfgOrdner, findeRlConfigOrdner, findeDotaCfgOrdner, steamLocalConfigs } = require('./cs2-pfad');
-const { GepAnbindung } = require('./gep');
+const { BildDienst } = require('./bild');
 const { RlClient } = require('./rl-client');
 const { Regie } = require('../core/regie');
 const { RegieSim } = require('../core/regie-sim');
 const { CsQuelle } = require('../core/cs-quelle');
 const { RlQuelle } = require('../core/rl-quelle');
 const { DotaQuelle, DOTA_APPID, dotaCfg, dotaStartoptionen, DOTA_CFG_DATEI, DOTA_STARTOPTION } = require('../core/dota');
-const { GepQuelle, GEP_SPIELE, GEP_BY_ID } = require('../core/gep-spiele');
+const { BildQuelle, BILD_SPIELE, BILD_BY_ID, exportDatei, importDatei } = require('../core/bild-spiele');
 const { QUELLEN, SPIEL_BY_ID } = require('../core/spiele');
 const { rlIni, leseRlIni, RL_INI_DATEI } = require('../core/rl-ini');
 const { migrateKonfig, MODI } = require('../core/defaults');
@@ -26,7 +26,7 @@ const { SimRunner } = require('../core/sim-runner');
 const { SimMatch } = require('../core/gsi-sim');
 const { RlSimMatch } = require('../core/rl-sim');
 const { DotaSimMatch } = require('../core/dota-sim');
-const { GepSimMatch } = require('../core/gep-sim');
+const { ValSimMatch } = require('../core/val-sim');
 const { einrichtenUpdates } = require('./updates');
 const { StatsAusgabe } = require('./stats-ausgabe');
 const { hotkeyText, feedbackUrl } = require('../core/app-info');
@@ -95,8 +95,8 @@ const stats = new StatsAusgabe({
 });
 
 // Auf dem Regie-PC darf kein Spiel laufen (Windows: Prozessliste prüfen)
-const SPIEL_PROZESSE = { 'cs2.exe': 'CS2', 'valorant-win64-shipping.exe': 'Valorant', 'rocketleague.exe': 'Rocket League', 'dota2.exe': 'Dota 2', 'r5apex_dx12.exe': 'Apex Legends', 'rainbowsix_vulkan.exe': 'Rainbow Six Siege', 'rainbowsix_be.exe': 'Rainbow Six Siege',
-  ...Object.fromEntries(GEP_SPIELE.map((s) => [s.exe, s.name])) };
+const SPIEL_PROZESSE = { 'cs2.exe': 'CS2', 'rocketleague.exe': 'Rocket League', 'dota2.exe': 'Dota 2',
+  ...Object.fromEntries(BILD_SPIELE.map((s) => [s.exe, s.name])) };
 let spielAufRegie = '', spielCheck = null;
 function pruefeSpielProzesse() {
   if (process.platform !== 'win32') return;
@@ -114,16 +114,24 @@ let quelle = new CsQuelle();
 const gp = { letzte: 0, status: null, stand: null, fremd: 0, log: [], nr: 0, statusGesendet: 0 };
 let rlQuelle = new RlQuelle();
 const rl = { letzte: 0, stand: null, statusGesendet: 0 };
-// Dota 2 (Valve GSI) und Overwolf-Spiele (GEP): je Spiel eine Quelle und der letzte Stand
+// Dota 2 (Valve GSI) und Bild-Spiele (Valorant, The Finals): je Spiel eine Quelle und der letzte Stand
 let quellen = {};
-const neueQuellen = () => { quellen = { dota2: new DotaQuelle(), ...Object.fromEntries(GEP_SPIELE.map((d) => [d.id, new GepQuelle(d.id)])) }; };
+const bildQuelle = (id) => new BildQuelle(id, { team: cfg?.gamepc.bild.spiele[id]?.team, name: cfg?.gamepc.pcId || '' });
+const neueQuellen = () => { quellen = { dota2: new DotaQuelle(), ...Object.fromEntries(BILD_SPIELE.map((d) => [d.id, bildQuelle(d.id)])) }; };
 neueQuellen();
 const daten = {}; // spiel → { letzte, stand, status, statusGesendet }
-const gep = new GepAnbindung({ app, onNachricht: (spiel, m) => gepNachricht(spiel, m), onChange: statusMelden });
-gep.start(); // vor app.whenReady: das Paket meldet sich, sobald ow-electron es geladen hat
+// Bilderkennung: läuft für das Bild-Spiel, das gerade aktiv ist (Session der Regie, im Standalone die eigene Regie)
+const aktivesSpielHier = () => (cfg.modus === 'standalone' ? cfg.regie.aktivesSpiel : client.zustand === 'verbunden' ? client.aktivesSpiel : null);
+const bild = new BildDienst({
+  root, preload: path.join(root, 'src', 'preload', 'erkennung-preload.js'),
+  getCfg: () => cfg?.gamepc.bild,
+  spiel: () => (hatSpiele() && BILD_BY_ID[aktivesSpielHier()] ? aktivesSpielHier() : null),
+  onTreffer: (spiel, a) => bildNachricht(spiel, { bild: true, event: a.event, seite: a.seite, aktion: a.name }),
+  onChange: statusMelden,
+});
 const rlClient = new RlClient({ onNachricht: (m) => rlNachricht(m), onChange: statusMelden });
 const client = new SessionClient({
-  onChange: () => { if (client.zustand !== 'verbunden') gpSim.stop(); statusMelden(); },
+  onChange: () => { if (client.zustand !== 'verbunden') gpSim.stop(); bild.anwenden(); statusMelden(); },
   onAntwort: statusMelden,
   geraet: () => ({ app: app.getVersion() }),
   karte: () => cfg.gamepc.netz,
@@ -165,7 +173,7 @@ function gamePcPayload(body, sim = false) {
   statusMelden();
 }
 
-// Ergebnis einer Quelle (Dota 2, Overwolf-Spiele) → Log, Regie, Status
+// Ergebnis einer Quelle (Dota 2, Bild-Spiele) → Log, Regie, Status
 function quelleMelden(spiel, r, sim = false) {
   const d = daten[spiel] = daten[spiel] || { letzte: 0, statusGesendet: 0 };
   Object.assign(d, { letzte: Date.now(), stand: r.stand, status: r.status });
@@ -174,10 +182,10 @@ function quelleMelden(spiel, r, sim = false) {
   statusMelden();
 }
 
-// Overwolf-Spiele: GEP-Nachrichten des Spiels auf diesem PC
-function gepNachricht(spiel, m, sim = false) {
+// Bild-Spiele: erkannte Aktionen auf diesem PC. Team und Name kommen aus dem Setup dieses PCs, auch im Simulator.
+function bildNachricht(spiel, m, sim = false) {
   if (!hatSpiele() || !quellen[spiel]) return;
-  quelleMelden(spiel, quellen[spiel].ingest(m), sim);
+  quelleMelden(spiel, quellen[spiel].ingest({ ...m, team: cfg.gamepc.bild.spiele[spiel]?.team, name: cfg.gamepc.pcId || '' }), sim);
 }
 
 function gamePcLog(x) {
@@ -194,10 +202,10 @@ const gpSim = new SimRunner({
   onChange: () => statusMelden(),
   neuesMatch: () => {
     if (gpSimSpiel === 'rl') return new RlSimMatch();
-    // Dota 2 und Overwolf-Spiele: dieser PC ist Spieler 1, nur dessen Daten kommen hier an
+    // Dota 2 und Valorant: dieser PC ist Spieler 1, nur dessen Daten kommen hier an
     const clients = (n, ich) => Array.from({ length: n }, (_, i) => ({ token: i === 0 ? ich : `sim${i}` }));
     if (gpSimSpiel === 'dota2') { const m = new DotaSimMatch({ clients: clients(10, cfg.gamepc.gsiToken) }); m.spieler[0].name = cfg.gamepc.pcId || m.spieler[0].name; return m; }
-    if (GEP_BY_ID[gpSimSpiel]) { const m = new GepSimMatch({ spiel: gpSimSpiel, clients: clients(GEP_BY_ID[gpSimSpiel].spieler, 'ich') }); m.spieler[0].name = cfg.gamepc.pcId || m.spieler[0].name; return m; }
+    if (gpSimSpiel === 'valorant') return new ValSimMatch({ clients: clients(10, 'ich') });
     // 5 gegen 5, dieser PC ist Spieler 1 (CT): nur dessen Daten kommen hier an, wie bei echtem CS2
     const m = new SimMatch({ clients: Array.from({ length: 10 }, (_, i) => ({ token: i === 0 ? cfg.gamepc.gsiToken : `sim${i}` })) });
     m.spieler[0].name = cfg.gamepc.pcId || m.spieler[0].name;
@@ -205,7 +213,7 @@ const gpSim = new SimRunner({
   },
   deliver: (p) => {
     if (gpSimSpiel === 'rl') rlNachricht(p, true);
-    else if (p.gep) { if (p.an == null || p.an === 'ich') gepNachricht(gpSimSpiel, p, true); }
+    else if (p.bild) { if (p.an == null || p.an === 'ich') bildNachricht(gpSimSpiel, { bild: true, event: p.event, seite: p.seite }, true); }
     else if (p.auth?.token === cfg.gamepc.gsiToken) gamePcPayload(p, true);
   },
 });
@@ -216,7 +224,7 @@ function gamePcSimStart(modus) {
   if (spiel !== gpSimSpiel) { gpSim.neu(); gpSimSpiel = spiel; }
   if (spiel === 'cs2' && !gpSim.match) quelle = new CsQuelle();
   if (spiel === 'rl' && !gpSim.match) rlQuelle = new RlQuelle();
-  if (quellen[spiel] && !gpSim.match) quellen[spiel] = spiel === 'dota2' ? new DotaQuelle() : new GepQuelle(spiel);
+  if (quellen[spiel] && !gpSim.match) quellen[spiel] = spiel === 'dota2' ? new DotaQuelle() : bildQuelle(spiel);
   gpSim.start(modus);
   return { ok: true };
 }
@@ -295,19 +303,17 @@ async function dotaCheck() {
   ];
 }
 
-// Overwolf-Spiele: GEP geladen? Welches Spiel läuft, kommen Daten?
-function gepCheck() {
-  const st = gep.status();
-  const punkte = [
-    { id: 'gep-geladen', label: 'Overwolf-Spieldaten (GEP) geladen', ok: st.geladen, detail: st.geladen ? `GEP ${st.version || ''}`.trim() : st.fehler || (st.laedt ? 'wird geladen …' : 'nicht geladen: braucht Overwolf-Freigabe und signierte App') },
-    ...(st.admin ? [{ id: 'gep-admin', label: 'Spiel läuft als Administrator', ok: false, detail: 'Advanced LAN auch als Administrator starten' }] : []),
-    ...(st.geladen && st.fehler ? [{ id: 'gep-fehler', label: 'GEP meldet einen Fehler', ok: false, warn: true, detail: st.fehler }] : []),
-  ];
-  const spiele = GEP_SPIELE.map((d) => {
-    const alter = alterVon(daten[d.id]?.letzte), laeuft = st.spiel?.id === d.id;
-    return { id: `gep-${d.id}`, spiel: d.id, label: d.name, ok: alter != null && alter < 15, warn: true, detail: alter != null && alter < 15 ? `Daten vor ${alter} s` : laeuft ? 'läuft, wartet auf Daten' : 'nicht gestartet' };
-  });
-  return { punkte, spiele };
+// Bild-Spiele: Aktionen eingerichtet, Bild kommt an, nicht schwarz
+function bildCheck() {
+  const c = cfg.gamepc.bild, st = bild.status();
+  return BILD_SPIELE.map((d) => {
+    const n = c.spiele[d.id].aktionen.filter((a) => a.an && (a.vorlagen.length || a.text)).length;
+    const aktiv = st.spiel === d.id;
+    return [
+      { id: `${d.id}-aktionen`, spiel: d.id, label: `${d.name}: Aktionen eingerichtet`, ok: n > 0, warn: true, detail: n ? `${n} Aktionen, Team ${c.spiele[d.id].team}` : 'noch keine: im Tab „Bilderkennung“ anlegen oder importieren' },
+      ...(aktiv ? [{ id: `${d.id}-bild`, spiel: d.id, label: `${d.name}: Bild kommt an`, ok: st.laeuft && !st.leer, detail: st.fehler || (st.leer ? 'Bild ist schwarz: Spiel im randlosen Fenstermodus starten' : st.laeuft ? `${st.b}×${st.h}, ${c.fps} Bilder/s` : 'startet …') }] : []),
+    ];
+  }).flat();
 }
 
 // „Ist korrekt aufgesetzt“-Check des Game-PCs
@@ -321,9 +327,8 @@ async function setupCheck() {
     { id: 'pcid', label: 'PC-ID eingetragen', ok: !!g.pcId.trim(), detail: g.pcId.trim() || 'fehlt' },
     { id: 'session', label: 'Mit einer Session verbunden', ok: c.zustand === 'verbunden', detail: c.zustand === 'verbunden' ? c.session : c.grund || 'nicht verbunden' },
   ];
-  // GEP gibt es nur unter Windows (Overwolf); Dota 2 läuft auch auf dem Mac
-  const gepMac = { punkte: [{ id: 'gep-plattform', label: 'Overwolf-Spieldaten nur unter Windows', ok: false, warn: true, nichtVerfuegbar: true, detail: 'Overwatch 2, R6, Marvel Rivals, Fortnite, Apex und PUBG nur auf Windows-PCs' }], spiele: [] };
-  if (process.platform === 'darwin') return { allgemein, cs2: OHNE_MAC('Counter-Strike 2'), rl: OHNE_MAC('Rocket League'), dota2: await dotaCheck(), gep: gepMac, plattform: 'darwin' };
+  // Dota 2 läuft auch auf dem Mac; Valorant und The Finals gibt es nur für Windows, der Editor geht trotzdem
+  if (process.platform === 'darwin') return { allgemein, cs2: OHNE_MAC('Counter-Strike 2'), rl: OHNE_MAC('Rocket League'), dota2: await dotaCheck(), bild: bildCheck(), plattform: 'darwin' };
   const ordner = await findeCs2CfgOrdner();
   const datei = ordner ? path.join(ordner, CFG_DATEI) : '';
   let inhalt = null;
@@ -344,7 +349,7 @@ async function setupCheck() {
     ],
     rl: await rlCheck(),
     dota2: await dotaCheck(),
-    gep: process.platform === 'win32' ? gepCheck() : gepMac,
+    bild: bildCheck(),
   };
 }
 
@@ -375,6 +380,7 @@ async function modusStarten() {
     neueQuellen();
     rlClient.start(Number(cfg.gamepc.rlPort));
   }
+  bild.anwenden();
   if (cfg.modus === 'gamepc') {
     discovery.start();
     autoWartet = !!(cfg.gamepc.autoVerbinden && cfg.gamepc.regie.id && cfg.gamepc.passwort && cfg.gamepc.pcId);
@@ -387,7 +393,7 @@ async function modusStarten() {
 function gesamtStatus() {
   const s = { modus: cfg.modus, jetzt: Date.now(), app: { hotkeyFehler, plattform: process.platform } };
   if (istRegie()) s.regie = { ...regie.snapshot(), session: session.status(), sim: regieSim.status(), armed: cfg.regie.armed, spielAufRegie, stats: stats.status(), lokal: lokalPc };
-  if (hatSpiele()) s.gamepc = { client: client.info(), sessions: discovery.liste(), discoveryFehler: discovery.fehler, gsi: gsi.status(), letzte: gp.letzte, status: gp.status, stand: gp.stand, fremd: gp.fremd, sim: { ...gpSim.status(), spiel: gpSimSpiel }, rl: { ...rlClient.status(), letzte: rl.letzte, stand: rl.stand }, daten, gep: gep.status() };
+  if (hatSpiele()) s.gamepc = { client: client.info(), sessions: discovery.liste(), discoveryFehler: discovery.fehler, gsi: gsi.status(), letzte: gp.letzte, status: gp.status, stand: gp.stand, fremd: gp.fremd, sim: { ...gpSim.status(), spiel: gpSimSpiel }, rl: { ...rlClient.status(), letzte: rl.letzte, stand: rl.stand }, daten, bild: bild.status() };
   return s;
 }
 
@@ -558,6 +564,10 @@ ipcMain.handle('config-set', async (_, neu) => {
   if (hatSpiele() && cfg.gamepc.gsiPort !== alt.gamepc.gsiPort) await gsi.start(Number(cfg.gamepc.gsiPort));
   if (hatSpiele() && cfg.gamepc.rlPort !== alt.gamepc.rlPort) rlClient.start(Number(cfg.gamepc.rlPort));
   if (cfg.modus === 'standalone' && lokalPc !== lokalId()) lokalAnmelden();
+  if (hatSpiele()) {
+    for (const d of BILD_SPIELE) if (quellen[d.id]) { quellen[d.id].team = cfg.gamepc.bild.spiele[d.id].team; quellen[d.id].name = cfg.gamepc.pcId || ''; }
+    bild.anwenden();
+  }
   if (istRegie() && JSON.stringify(cfg.regie.stats) !== JSON.stringify(alt.regie.stats)) await stats.anwenden();
   if (cfg.modus === 'gamepc' && cfg.gamepc.netz !== alt.gamepc.netz) {
     // Andere Karte: Sessions dort neu suchen und eine bestehende Verbindung darüber neu aufbauen
@@ -653,6 +663,33 @@ ipcMain.handle('test-event', (_, type, spiel = 'cs2', team = '', kills = 1) => {
   return { ok };
 });
 ipcMain.handle('gamepc-sim-start', (_, modus) => gamePcSimStart(modus));
+// Bilderkennung: Bildschirme, Texterkennung für den Editor, Aufnahme im Hintergrund, Export und Import der Spiel-Konfiguration
+ipcMain.handle('bild-bildschirme', () => bild.bildschirme());
+ipcMain.handle('bild-lesen', async (_, png) => { try { return { text: await bild.lesen(png) }; } catch (e) { return { fehler: e?.message || String(e) }; } });
+ipcMain.handle('bild-aufnahme', (_, an) => { if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.setBackgroundThrottling(!an); });
+ipcMain.handle('bild-export', async (_, spiel) => {
+  if (!BILD_BY_ID[spiel]) return { fehler: 'Unbekanntes Spiel' };
+  const r = await dialog.showSaveDialog(mainWin, { defaultPath: `advanced-lan-${spiel}.json`, filters: [{ name: 'Advanced LAN Spiel-Konfiguration', extensions: ['json'] }] });
+  if (r.canceled || !r.filePath) return { abgebrochen: true };
+  try { fs.writeFileSync(r.filePath, JSON.stringify(exportDatei(spiel, cfg.gamepc.bild.spiele[spiel]), null, 1)); } catch (e) { return { fehler: e.message }; }
+  return { ok: true, pfad: r.filePath };
+});
+ipcMain.handle('bild-import', async () => {
+  const r = await dialog.showOpenDialog(mainWin, { properties: ['openFile'], filters: [{ name: 'Advanced LAN Spiel-Konfiguration', extensions: ['json'] }] });
+  if (r.canceled || !r.filePaths?.[0]) return { abgebrochen: true };
+  let inhalt;
+  try { inhalt = fs.readFileSync(r.filePaths[0], 'utf8'); } catch (e) { return { fehler: e.message }; }
+  const d = importDatei(inhalt, bild.bildschirm());
+  if (d.fehler) return d;
+  Object.assign(cfg.gamepc.bild.spiele[d.spiel], { aufloesung: d.aufloesung, aktionen: d.aktionen });
+  speichereKonfig();
+  bild.anwenden();
+  statusMelden();
+  return { ok: true, spiel: d.spiel, anzahl: d.aktionen.length, korrigiert: d.korrigiert, cfg };
+});
+ipcMain.on('erkennung-frame', (_, d) => bild.frame(d));
+ipcMain.on('erkennung-text', (_, id, png) => bild.text(id, png));
+ipcMain.on('erkennung-status', (_, s) => bild.meldung(s));
 ipcMain.handle('gamepc-sim-stop', () => { gpSim.stop(); });
 ipcMain.handle('gamepc-sim-neu', () => { gpSim.neu(); });
 ipcMain.handle('open-external', (_, url) => { if (/^https?:\/\//i.test(url)) shell.openExternal(url); });
@@ -665,6 +702,7 @@ else {
   app.whenReady().then(async () => {
     ladeKonfig();
     createWindow();
+    bild.einrichten();
     hotkeyAnwenden();
     updates.autoUpdaterStarten();
     await modusStarten();
@@ -676,7 +714,7 @@ else {
     client.trennen();
     rlClient.stop();
     discovery.stop();
-    await Promise.allSettled([session.schliessen(), gsi.stop(), stats.beenden()]);
+    await Promise.allSettled([session.schliessen(), gsi.stop(), stats.beenden(), bild.beenden()]);
     osc.close();
     app.quit();
   });

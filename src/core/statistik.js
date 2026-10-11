@@ -5,8 +5,8 @@ const neueRunde = (nr) => ({ nr: nr ?? null, phase: "", kills: 0, headshots: 0, 
 const neuesMatch = () => ({ runden: 0, kills: 0, headshots: 0, tode: 0, multikills: 0, aces: 0, bomben: 0, siege: { CT: 0, T: 0 }, vorbei: false, sieger: "",
   // Rocket League
   tore: { BLUE: 0, ORANGE: 0 }, schuesse: 0, paraden: 0, demos: 0, anstoesse: 0, overtime: false, letztesTor: null,
-  // Dota 2 und Overwolf-Spiele
-  assists: 0, knocks: 0, tuerme: 0, roshan: 0, siegerSpieler: "" });
+  // Dota 2 und Valorant
+  assists: 0, tuerme: 0, roshan: 0 });
 
 class Statistik {
   constructor() { this.reset(""); }
@@ -83,7 +83,7 @@ class Statistik {
     }
   }
 
-  // Dota 2 und Overwolf-Spiele: jedes Event zählt einmal (Kill-Events dort sind einzelne Kills)
+  // Dota 2 und Valorant: jedes Event zählt einmal (Kill-Events dort sind einzelne Kills)
   addAllgemein(ev, m) {
     const r = this.runde;
     switch (ev.type) {
@@ -94,19 +94,19 @@ class Statistik {
         m.runden++;
         if (ev.team) m.siege[ev.team] = (m.siege[ev.team] || 0) + 1;
         break;
-      case "bomb_planted": case "bomb_defused": r.bombe = ev.type === "bomb_planted" ? "planted" : "defused"; if (ev.type === "bomb_planted") m.bomben++; break;
+      case "spike_planted": r.bombe = "planted"; m.bomben++; break;
+      case "spike_defused": r.bombe = "defused"; break;
       case "kill": r.kills++; m.kills++; this.sp(ev).kills++; break;
       case "headshot": r.headshots++; m.headshots++; this.sp(ev).headshots++; break;
       case "death": r.tode++; m.tode++; this.sp(ev).tode++; break;
       case "assist": m.assists++; this.sp(ev).assists++; break;
-      case "knockdown": case "knockout": m.knocks++; break;
       case "double_kill": case "triple_kill": case "ultra_kill": m.multikills++; break;
       case "rampage": m.multikills++; m.aces++; break;
+      case "ace": m.aces++; break;
       case "tower_destroyed": case "barracks_destroyed": m.tuerme++; break;
       case "roshan_killed": m.roshan++; break;
       case "match_end": m.vorbei = true; if (ev.team) m.sieger = ev.team; break;
       case "match_won": m.vorbei = true; m.sieger = ev.team || m.sieger; break;
-      case "victory": m.vorbei = true; m.siegerSpieler = ev.player || ""; break;
     }
   }
 

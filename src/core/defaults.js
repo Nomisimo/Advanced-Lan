@@ -1,6 +1,7 @@
 "use strict";
 // Einstellungen der App. Eine Datei für beide Modi: Regie und Game-PC.
 const { STANDARD_HOTKEY, gueltigerHotkey } = require("./app-info");
+const { standardBild, migrateBild } = require("./bild-spiele");
 
 const PORTS = { session: 47801, gsi: 3000, rl: 49124 };
 
@@ -16,7 +17,7 @@ function standardRegie() {
   return {
     armed: false,
     aktivesSpiel: "cs2",
-    spiele: { cs2: true, rl: true, dota2: false, ow2: false, r6: false, mr: false, fn: false, apex: false, pubg: false, valorant: false }, // Tab „Setup“: nur genutzte Spiele erscheinen in Control und Signale
+    spiele: { cs2: true, rl: true, dota2: false, valorant: false, finals: false }, // Tab „Setup“: nur genutzte Spiele erscheinen in Control und Signale
     session: { name: "LAN-Party", passwort: "", port: PORTS.session, offen: false },
     netz: { empfang: "", senden: "" }, // Netzwerkkarten (Name, leer = automatisch): Empfang der Game-PCs, Senden der OSC-Befehle
     // Tab „Ziele“: angelegt aus der Ziel-Datenbank (ziel-typen.js)
@@ -38,6 +39,7 @@ function standardGamePc() {
     gsiPort: PORTS.gsi,
     overlay: { an: true, x: null, y: null }, // Mini-Overlay, solange die App minimiert ist (Tab „Setup“)
     rlPort: PORTS.rl, // WebSocket der Rocket-League-Stats-API
+    bild: standardBild(), // Bilderkennung (Valorant, The Finals): Bildschirm, Bilder pro Sekunde, je Spiel Team und Aktionen aus dem Editor
     gsiToken: neuerToken(),
   };
 }
@@ -113,7 +115,7 @@ function migrateKonfig(k) {
       spiele: genutzteSpiele(r.spiele, d.regie.spiele),
       stats: migrateStats(r.stats, d.regie.stats),
     },
-    gamepc: { ...d.gamepc, ...g, regie: { ...d.gamepc.regie, ...(g.regie || {}) }, overlay: { ...d.gamepc.overlay, ...(g.overlay && typeof g.overlay === "object" ? g.overlay : {}) }, gsiToken: g.gsiToken || d.gamepc.gsiToken },
+    gamepc: { ...d.gamepc, ...g, regie: { ...d.gamepc.regie, ...(g.regie || {}) }, overlay: { ...d.gamepc.overlay, ...(g.overlay && typeof g.overlay === "object" ? g.overlay : {}) }, bild: migrateBild(g.bild), gsiToken: g.gsiToken || d.gamepc.gsiToken },
   };
   delete m.gamepc.spiel;
   // Das aktive Spiel muss ein genutztes Spiel sein

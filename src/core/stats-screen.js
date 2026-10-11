@@ -11,15 +11,15 @@ const uhr = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(
 const n = (x) => (Number.isFinite(Number(x)) ? Number(x) : 0);
 
 // spiel: Eintrag aus SPIELE, statistik: regie.statistik.json(), stand: regie.stand
-// → { leer, teams: [{ name, score, sieger }] | null, br, mitte: { gross, klein }, chips, zahlen: [[label, wert]], spalten: [[key, label]], top, vorbei }
+// → { leer, teams: [{ name, score, sieger }] | null, mitte: { gross, klein }, chips, zahlen: [[label, wert]], spalten: [[key, label]], top, vorbei }
 function statsDaten(spiel, statistik, stand) {
-  if (!spiel) return { leer: true, teams: null, br: null, mitte: null, chips: [], zahlen: [], spalten: [], top: [], vorbei: false };
+  if (!spiel) return { leer: true, teams: null, mitte: null, chips: [], zahlen: [], spalten: [], top: [], vorbei: false };
   const st = statistik?.spiel === spiel.id ? statistik : null;
   const sd = stand?.spiel === spiel.id ? stand : null;
   const m = st?.match || { siege: {}, tore: {} }, r = st?.runde || {};
   const top = st?.top || [];
   const team = (name, score) => ({ name, score: n(score), sieger: !!m.sieger && m.sieger === name });
-  const out = { leer: !st && !sd, teams: null, br: null, mitte: null, chips: [], zahlen: [], spalten: [], top, vorbei: !!m.vorbei };
+  const out = { leer: !st && !sd, teams: null, mitte: null, chips: [], zahlen: [], spalten: [], top, vorbei: !!m.vorbei };
 
   if (spiel.id === "cs2") {
     out.teams = [team("CT", sd?.ct ?? m.siege?.CT), team("T", sd?.tt ?? m.siege?.T)];
@@ -44,25 +44,22 @@ function statsDaten(spiel, statistik, stand) {
     return out;
   }
 
-  const dota = spiel.id === "dota2", br = spiel.art === "br";
+  const dota = spiel.id === "dota2";
   const hat = (id) => (spiel.events || []).some((e) => e.id === id);
   const mitAssists = hat("assist");
   out.zahlen = [
     ["Kills", n(m.kills)], ["Tode", n(m.tode)],
     ...(mitAssists ? [["Assists", n(m.assists)]] : []),
     ...(hat("headshot") ? [["Headshots", n(m.headshots)]] : []),
-    ...(br && (spiel.events || []).some((e) => /knock/.test(e.id)) ? [["Niedergeschlagen", n(m.knocks)]] : []),
     ...(dota ? [["Multikills", n(m.multikills)], ["Türme", n(m.tuerme)], ["Roshan", n(m.roshan)]] : []),
-    ...(!dota && !br ? [["Runden", n(m.runden)]] : []),
+    ...(hat("ace") ? [["Aces", n(m.aces)], ["Spikes", n(m.bomben)]] : []),
+    ...(!dota ? [["Runden", n(m.runden)]] : []),
   ];
   out.spalten = [["kills", "K"], ["tode", "D"], ...(mitAssists ? [["assists", "A"]] : [])];
   if (sd?.map && !dota) out.chips.push(sd.map);
-  if (br) {
-    out.br = { uebrig: sd?.uebrig ?? null, sieger: m.siegerSpieler || "" };
-    return out;
-  }
   const [t1, t2] = spiel.teams || [];
   if (t1 && t2) out.teams = [team(t1, dota ? sd?.score?.[t1] : m.siege?.[t1]), team(t2, dota ? sd?.score?.[t2] : m.siege?.[t2])];
+  if (BOMBE[r.bombe]) out.chips.push(BOMBE[r.bombe].replace("Bombe", "Spike"));
   if (dota) {
     out.mitte = { gross: uhr(Math.max(0, n(sd?.zeit))), klein: DOTA_PHASE[sd?.phase] || "Spielzeit" };
     if (sd?.phase === "GAME_IN_PROGRESS") out.chips.push(sd.tag ? "Tag" : "Nacht");

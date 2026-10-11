@@ -2,7 +2,7 @@
 // Spielt simulierte Runden in Echtzeit ab. deliver(payload) schickt eine Nachricht an den Empfang.
 
 class SimRunner {
-  // neuesMatch(): ein Match mit naechsteRunde(), vorbei() und anzeige() (CS2: SimMatch, Rocket League: RlSimMatch, Dota 2: DotaSimMatch, GEP-Spiele: GepSimMatch)
+  // neuesMatch(): ein Match mit naechsteRunde(), vorbei() und anzeige() (CS2: SimMatch, Rocket League: RlSimMatch, Dota 2: DotaSimMatch, Valorant: ValSimMatch)
   constructor({ deliver, neuesMatch, onChange = () => {} }) {
     this.deliver = deliver;
     this.neuesMatch = neuesMatch;

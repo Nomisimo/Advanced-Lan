@@ -35,18 +35,24 @@ test("Stats-Screen Rocket League: Tore, Spielzeit, Verlängerung", () => {
   assert.equal(d.mitte.klein, "Verlängerung");
 });
 
-test("Stats-Screen Dota 2 und Battle Royale", () => {
+test("Stats-Screen Dota 2 und Valorant", () => {
   const dota = statsDaten(SPIEL_BY_ID.dota2, null, { spiel: "dota2", score: { RADIANT: 12, DIRE: 9 }, zeit: 754, phase: "GAME_IN_PROGRESS", tag: false });
   assert.deepEqual(dota.teams.map((t) => t.score), [12, 9]);
   assert.equal(dota.mitte.gross, "12:34");
   assert.ok(dota.chips.includes("Nacht"));
   assert.ok(dota.spalten.some(([k]) => k === "assists"));
   const s = new Statistik();
-  s.add({ spiel: "fn", type: "victory", player: "Kira" });
-  const fn = statsDaten(SPIEL_BY_ID.fn, s.json(), { spiel: "fn", uebrig: 1 });
-  assert.equal(fn.teams, null);
-  assert.deepEqual(fn.br, { uebrig: 1, sieger: "Kira" });
-  assert.equal(fn.vorbei, true);
+  s.add({ spiel: "valorant", type: "round_start", round: 1 });
+  s.add({ spiel: "valorant", type: "kill", player: "Kira", steamid: "k", team: "TEAM A" });
+  s.add({ spiel: "valorant", type: "ace", player: "Kira", steamid: "k", team: "TEAM A" });
+  s.add({ spiel: "valorant", type: "spike_planted" });
+  const val = statsDaten(SPIEL_BY_ID.valorant, s.json(), { spiel: "valorant", runde: 1, score: {}, laeuft: true });
+  assert.deepEqual(val.teams.map((t) => t.name), ["TEAM A", "TEAM B"]);
+  assert.equal(val.mitte.gross, "Runde 1");
+  assert.ok(val.chips.includes("Spike gelegt"));
+  assert.deepEqual(val.zahlen.filter(([k]) => k === "Aces" || k === "Spikes"), [["Aces", 1], ["Spikes", 1]]);
+  s.add({ spiel: "valorant", type: "round_end", team: "TEAM A" });
+  assert.deepEqual(statsDaten(SPIEL_BY_ID.valorant, s.json(), null).teams.map((t) => t.score), [1, 0]);
 });
 
 test("Stats-Screen: Statistik eines anderen Spiels zählt nicht", () => {

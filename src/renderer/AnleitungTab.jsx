@@ -5,7 +5,6 @@ import { Section, Kbd, th, td } from "./ui.jsx";
 import { CFG_DATEI, CFG_ORDNER } from "../core/cfg.js";
 import { RL_INI_DATEI, RL_INI_ORDNER, RL_RATE } from "../core/rl-ini.js";
 import { DOTA_CFG_DATEI, DOTA_CFG_ORDNER, DOTA_STARTOPTION } from "../core/dota.js";
-import { GEP_SPIELE } from "../core/gep-spiele.js";
 import { STANDARD_HOTKEY, hotkeyText } from "../core/app-info.js";
 
 // Alle Erklärungen der App stehen hier, für beide Modi. Der eigene Modus steht oben.
@@ -74,7 +73,7 @@ const Regie = ({ goTab }) => (
         <li><b>Aktives Spiel</b>: nur dessen Events werden gesendet. Die Game-PCs erfahren den Wechsel sofort.</li>
         <li><b>Ausgabe</b>: Events, verworfene Events, gesendete OSC-Nachrichten, Events mit Fehler. Die Zahlen sind dieselben wie an den Filtern im Event-Log; die Liste zeigt davon die letzten 300. <b>Zurücksetzen</b> setzt alle Zähler auf null und leert das Log.</li>
         <li><b>Verbindungscheck</b> je PC: Verbindung steht, Daten kommen (in den letzten 15 s), Spiel passt zum aktiven Spiel, Ping. Ein PC ist ok, wenn alle drei grün sind.
-          Die Spalte <b>Match</b> zeigt, ob der PC im selben Match ist wie die meisten: Rocket League, Dota 2 und die Overwolf-Spiele liefern eine Match-ID, CS2 nicht, dort werden Map und Spielstand verglichen (eine Runde Unterschied ist erlaubt).</li>
+          Die Spalte <b>Match</b> zeigt, ob der PC im selben Match ist wie die meisten: Rocket League und Dota 2 liefern eine Match-ID, Valorant und The Finals nicht (dort kein Vergleich), CS2 nicht, dort werden Map und Spielstand verglichen (eine Runde Unterschied ist erlaubt).</li>
         <li><b>Statistik</b>: Spielstand, aktuelle Runde (Kills, Headshots, Bombe, Sieger, MVP) und Match (Runden, Kills, Headshot-Quote, Multikills, Aces, Top-Spieler). Beginnt bei jedem Matchstart neu.</li>
         <li><b>Events</b>: neueste oben, darunter jeder Befehl mit Ziel und OSC-Nachricht. „nicht gesendet“ heißt Ausgabe aus, „kein Befehl“ heißt im Tab Signale nicht belegt.
           Filter: <b>Alle</b> (ohne verworfene), <b>Eingerichtet</b> (Events mit Befehl, gesendet oder nicht), <b>Fehler</b> (Befehl fehlgeschlagen oder Ziel fehlt), <b>Verworfen</b>.</li>
@@ -96,7 +95,7 @@ const GamePc = ({ goTab }) => (
     </Schritt>
     <Schritt n={3} titel="Spiele einrichten" onGo={goTab && (() => goTab("setup"))} goLabel="Setup">
       Im Tab <b>Setup</b> einmal je Spiel: bei CS2 und Dota 2 <b>cfg installieren</b> (Dota 2 zusätzlich mit der Startoption <Kbd>{DOTA_STARTOPTION}</Kbd>), bei Rocket League <b>Stats API einschalten</b>, danach das Spiel neu starten.
-      Die Overwolf-Spiele brauchen nichts: Die App erkennt das laufende Spiel selbst.
+      Valorant und The Finals richtest du im Tab <b>Bilderkennung</b> ein, einmal auf einem PC, dann per Datei auf die anderen.
       Der Check „Ist korrekt aufgesetzt?“ zeigt für jedes Spiel, ob alles stimmt. Findet die App ein Spiel nicht, mit „Speichern unter …“ speichern und die Datei
       von Hand ablegen: <Kbd>{CFG_DATEI}</Kbd> nach <Kbd>{CFG_ORDNER}</Kbd>, <Kbd>{DOTA_CFG_DATEI}</Kbd> nach <Kbd>{DOTA_CFG_ORDNER}</Kbd>, <Kbd>{RL_INI_DATEI}</Kbd> nach <Kbd>{RL_INI_ORDNER}</Kbd>.
     </Schritt>
@@ -114,7 +113,7 @@ const GamePc = ({ goTab }) => (
       Ein- und ausschalten im Tab <b>Setup</b>. Über Spielen im exklusiven Vollbild erscheint es nicht; in CS2 dafür „Vollbild (Fenster)“ wählen.
     </P>
     <P><span style={{ color: SUB }}>
-      CS2, Rocket League und die Overwolf-Spiele gibt es als Game-PC nur unter Windows, Dota 2 auch auf dem Mac. Auf dem Mac läuft vor allem die Regie; der Game-PC-Modus zeigt dort, welche Spiele fehlen.
+      CS2, Rocket League, Valorant und The Finals gibt es als Game-PC nur unter Windows, Dota 2 auch auf dem Mac. Auf dem Mac läuft vor allem die Regie; der Game-PC-Modus zeigt dort, welche Spiele fehlen.
     </span></P>
   </Section>
 );
@@ -123,7 +122,7 @@ const Cs2 = () => (
   <Section title="CS2">
     <P>
       CS2 liefert seine Daten über Valves offizielle <b>Game State Integration</b>: Die cfg-Datei im CS2-Ordner lässt das Spiel seinen Zustand per HTTP an die App
-      auf demselben PC schicken (<Kbd>127.0.0.1:3000</Kbd>, mit eigenem Token je PC). Das braucht keine Freigabe und keine Overwolf-Spielereignisse.
+      auf demselben PC schicken (<Kbd>127.0.0.1:3000</Kbd>, mit eigenem Token je PC). Das braucht keine Freigabe.
     </P>
     <P>
       Erkannt werden: Match startet und vorbei, Freezetime, Runde läuft, Runde gewonnen, Bombe gelegt, entschärft und explodiert, Kill, Headshot, 3 und 4 Kills, Ace,
@@ -152,7 +151,7 @@ const Dota = () => (
     <P>
       Dota 2 liefert seine Daten wie CS2 über Valves <b>Game State Integration</b>: Die cfg-Datei <Kbd>{DOTA_CFG_DATEI}</Kbd> im Ordner <Kbd>{DOTA_CFG_ORDNER}</Kbd> lässt
       das Spiel seinen Zustand an denselben Empfang wie CS2 schicken (<Kbd>127.0.0.1:3000</Kbd>). Zusätzlich braucht Dota die Startoption <Kbd>{DOTA_STARTOPTION}</Kbd>
-      (Steam → Dota 2 → Eigenschaften → Startoptionen); der Setup-Check liest sie aus Steam. Kein Overwolf nötig, läuft auch auf dem Mac.
+      (Steam → Dota 2 → Eigenschaften → Startoptionen); der Setup-Check liest sie aus Steam. Läuft auch auf dem Mac.
     </P>
     <P>
       Erkannt werden: Heldenwahl, Vorbereitung, Horn (Spiel startet), Ancient zerstört (mit Siegerteam), Tag und Nacht, Roshan getötet, Aegis, Turm und Kaserne zerstört (Team = wer zerstört hat),
@@ -162,23 +161,26 @@ const Dota = () => (
   </Section>
 );
 
-const Gep = () => (
-  <Section title="Overwolf-Spiele (GEP)">
+const Bild = () => (
+  <Section title="Valorant und The Finals (Bilderkennung)">
     <P>
-      {GEP_SPIELE.map((s) => s.name).join(", ")} liefern ihre Events über <b>Overwolf Game Events (GEP)</b>, das Paket steckt in ow-electron. Die App erkennt das laufende Spiel selbst,
-      einzurichten ist nichts. Jeder PC meldet, was sein Spieler erlebt: eigene Kills, Tode und Assists, dazu Match, Runden und Sieg.
-    </P>
-    <P>
-      <b>Wichtig:</b> Overwolf liefert diese Daten nur an freigegebene Apps, und in verteilten Builds nur mit signierter Windows-App. Bis dahin bleiben die echten Events aus,
-      der Simulator geht aber schon. Spiele, die Overwolf noch nicht in PROD hat, laufen zum Testen mit dem Startparameter <Kbd>--owepm-packages-url=https://electronapi-qa.overwolf.com/v2/packages</Kbd>.
+      Beide Spiele haben keine offizielle Live-Schnittstelle. Die App schaut deshalb auf den Bildschirm des Game-PCs und vergleicht Bereiche, die du festlegst,
+      mit Frames aus deinem eigenen Gameplay. Optional muss dort zusätzlich ein Wort stehen (Texterkennung auf Englisch und Deutsch, läuft lokal ohne Internet).
+      Die Erkennung läuft auf dem Game-PC, die Events gehen wie bei allen Spielen an die Regie. Sie läuft nur, wenn die Regie das Spiel aktiv hat.
+      Die App liest keinen Speicher und greift nicht ins Spiel ein.
     </P>
     <L>
-      <li><b>Overwatch 2</b> und <b>Marvel Rivals</b>: Match startet/vorbei, Match gewonnen (mit Team), Runde startet/vorbei, Kill, Assist, Tod, bei Overwatch auch Respawn und Wiederbelebt. Teams <Kbd>TEAM 1</Kbd>/<Kbd>TEAM 2</Kbd>.</li>
-      <li><b>Rainbow Six Siege</b>: Match, Runde startet, Runde gewonnen, Defuser gelegt/entschärft, Kill, Headshot, niedergeschlagen, Tod. Team ist die Seite der Runde: <Kbd>ATK</Kbd> (Angriff) oder <Kbd>DEF</Kbd> (Verteidigung).
-        Nach den Overwolf-Regeln für R6 nutzt die App nur den Namen, den das Spiel gerade zeigt.</li>
-      <li><b>Fortnite</b>, <b>Apex Legends</b>, <b>PUBG</b>: Match startet, Sieg (Victory Royale, Champion, Chicken Dinner), Kill, Gegner niedergeschlagen, selbst niedergeschlagen, Tod, Apex auch Squad ausgeschieden. Ohne Teams; der Sieg kommt einmal, egal wie viele PCs im Squad ihn melden.</li>
+      <li><b>Aufnehmen:</b> Im Tab <b>Bilderkennung</b> auf „Gameplay aufnehmen“, ins Spiel wechseln, die Momente spielen (Kill, Runde gewonnen und verloren, Spike gelegt …), zurück und stoppen. Oder ein vorhandenes Video laden.</li>
+      <li><b>Aktionen anlegen:</b> Zum passenden Frame spulen (Frame für Frame), einen Rahmen um die Stelle ziehen, eine Aktion aus den Vorschlägen anlegen und „Aktuellen Frame hinzufügen“. Mehrere Frames je Aktion erkennen Varianten.</li>
+      <li><b>Threshold und Text:</b> Der Threshold legt fest, wie ähnlich das Bild sein muss. Mit „Erkennung testen“ läuft die Erkennung auf der Aufnahme und zeigt jeden Treffer. Wörter mit <Kbd>|</Kbd> trennen, z. B. <Kbd>ROUND WIN|RUNDE GEWONNEN</Kbd>.</li>
+      <li><b>Teilen:</b> Exportieren und auf den anderen Game-PCs importieren. Hat ein PC ein anderes Seitenverhältnis, verschiebt der Import die Bereiche nach ihrem Anker (links/Mitte/rechts, oben/Mitte/unten). Das Team stellt jeder PC selbst ein.</li>
+      <li><b>Aufnahme löschen:</b> Die Aufnahme liegt nur im Arbeitsspeicher und ist beim Schließen weg. Gespeichert werden nur die kleinen Frames der Aktionen.</li>
     </L>
-    <P><span style={{ color: SUB }}>Valorant und die anderen Riot-Spiele bleiben draußen: Riot gibt keine Live-Daten frei.</span></P>
+    <P>
+      <b>Randloser Fenstermodus:</b> Im exklusiven Vollbild schreibt das Spiel direkt auf den Monitor, an der Windows-Bildschirmaufnahme vorbei; das Bild bleibt dann oft schwarz.
+      Die App meldet ein schwarzes Bild im Setup-Check. Teams: Valorant <Kbd>TEAM A</Kbd>/<Kbd>TEAM B</Kbd>, The Finals <Kbd>TEAM A</Kbd> bis <Kbd>TEAM D</Kbd>.
+      Riot-Regel: kein Spike-Timer, „Spike gelegt“ ist ein einzelner Cue.
+    </P>
   </Section>
 );
 
@@ -191,7 +193,7 @@ const Osc = () => (
     <P>In jedem Wert dürfen Platzhalter stehen, die beim Senden aus dem Event gefüllt werden:</P>
     <table style={{ ...S.table, marginTop: 0, marginBottom: 12 }}>
       <tbody>
-        {[["{spieler}", "Spielername"], ["{team}", "CT, T, BLUE, ORANGE, RADIANT, DIRE, ATK, DEF, TEAM 1, TEAM 2"], ["{pc}", "PC-ID des meldenden PCs"], ["{runde}", "Rundennummer (CS2, R6, Overwatch, Marvel Rivals)"], ["{spiel}", "cs2, rl, dota2, ow2, r6, mr, fn, apex, pubg"], ["{event}", "Event-ID, z. B. goal"]].map(([k, v]) => (
+        {[["{spieler}", "Spielername"], ["{team}", "CT, T, BLUE, ORANGE, RADIANT, DIRE, TEAM A bis TEAM D"], ["{pc}", "PC-ID des meldenden PCs"], ["{runde}", "Rundennummer (CS2, Valorant, The Finals)"], ["{spiel}", "cs2, rl, dota2, valorant, finals"], ["{event}", "Event-ID, z. B. goal"]].map(([k, v]) => (
           <tr key={k}><td style={td({ ...S.mono, width: 120 })}>{k}</td><td style={td()}>{v}</td></tr>
         ))}
       </tbody>
@@ -280,7 +282,7 @@ const Standalone = ({ goTab }) => (
       Alles andere ist wie in der Regie: aktives Spiel, Ziele, Signale, Simulator und Game-Stats-Screen.
     </P>
     <Schritt n={1} titel="Spiele einrichten" onGo={goTab && (() => goTab("spiele"))} goLabel="Spiele">
-      Im Tab <b>Spiele</b> wie auf einem Game-PC die cfg-Dateien installieren (CS2, Dota 2) und die Stats API einschalten (Rocket League). Overwolf-Spiele erkennt die App selbst.
+      Im Tab <b>Spiele</b> wie auf einem Game-PC die cfg-Dateien installieren (CS2, Dota 2) und die Stats API einschalten (Rocket League). Valorant und The Finals im Tab <b>Bilderkennung</b>.
       Oben steht der Name, unter dem dieser PC in der Regie erscheint.
     </Schritt>
     <Schritt n={2} titel="Spiele, Ziele und Signale" onGo={goTab && (() => goTab("setup"))} goLabel="Setup">
@@ -311,7 +313,7 @@ const AppHilfe = ({ goTab }) => (
   <Section title="Tastenkürzel, Datenschutz und Feedback">
     <L>
       <li><b>Ein-/Ausblenden:</b> <Kbd>{hotkeyText(STANDARD_HOTKEY, "win32")}</Kbd> (Mac: <Kbd>{hotkeyText(STANDARD_HOTKEY, "darwin")}</Kbd>) holt Advanced LAN nach vorn oder minimiert es, auch mitten im Spiel. Unter <b>Setup → App</b> lässt es sich ändern oder ausschalten. Nutzt schon eine andere App dieselbe Kombination, steht dort „belegt“.</li>
-      <li><b>Datenschutz:</b> Advanced LAN zeigt keine Werbung und sammelt keine persönlichen Daten. Spielereignisse gehen nur an die Regie und an die Ziele, die du einträgst. Die Overwolf-Laufzeit sendet anonyme Nutzungsdaten an Overwolf; was genau, steht in den <b>Datenschutz-Einstellungen</b> unter Setup → App.</li>
+      <li><b>Datenschutz:</b> Advanced LAN zeigt keine Werbung und sammelt keine persönlichen Daten. Spielereignisse gehen nur an die Regie und an die Ziele, die du einträgst. Das Bild der Bilderkennung wird nur auf dem Game-PC ausgewertet und verlässt ihn nie. Die Overwolf-Laufzeit sendet anonyme Nutzungsdaten an Overwolf; was genau, steht in den <b>Datenschutz-Einstellungen</b> unter Setup → App.</li>
       <li><b>Einführung:</b> Die Tour vom ersten Start gibt es unter Setup → App noch einmal.</li>
       <li><b>Feedback:</b> „Melden“ unter Setup → App öffnet ein neues GitHub-Issue, Version und System sind schon eingetragen.</li>
     </L>
@@ -329,7 +331,7 @@ export default function AnleitungTab({ modus, goTab }) {
       <Cs2 />
       <Rl />
       <Dota />
-      <Gep />
+      <Bild />
       <Osc />
       <ZieleEinrichten />
       <Netz />

@@ -4,7 +4,7 @@ const { Regie } = require("../src/core/regie");
 const { SIM_SPIELE, fuer } = require("../src/core/regie-sim");
 const { standardRegie } = require("../src/core/defaults");
 const { SPIELE, QUELLEN } = require("../src/core/spiele");
-const { GepQuelle } = require("../src/core/gep-spiele");
+const { BildQuelle } = require("../src/core/bild-spiele");
 const { DotaQuelle, dotaStartoptionen, dotaCfg } = require("../src/core/dota");
 const { matchCheck } = require("../src/core/match-check");
 const { overlayStatus } = require("../src/core/overlay-status");
@@ -34,21 +34,21 @@ function spiele(spiel, seed = 7) {
 }
 
 test("Spiele: alle mit Datenquelle haben Events, Teams und einen Simulator", () => {
-  assert.deepEqual(QUELLEN, ["cs2", "rl", "dota2", "ow2", "r6", "mr", "fn", "apex", "pubg"]);
+  assert.deepEqual(QUELLEN, ["cs2", "rl", "dota2", "valorant", "finals"]);
   for (const s of SPIELE.filter((x) => x.quelle)) {
     assert.ok(s.events.length >= 5, s.id);
-    assert.ok(SIM_SPIELE[s.id], `Simulator für ${s.id}`);
+    if (s.id !== "finals") assert.ok(SIM_SPIELE[s.id], `Simulator für ${s.id}`);
     for (const e of s.events.filter((e) => e.fest)) assert.ok(s.teams.includes(e.fest), `${s.id}/${e.id}`);
   }
-  assert.ok(!SPIELE.some((s) => /valorant|league|tft|2xko/i.test(s.id) && s.quelle), "keine Riot-Spiele mit Datenquelle");
+  assert.ok(SPIELE.filter((s) => s.bild).every((s) => s.quelle === "Bilderkennung"));
 });
 
-for (const spiel of ["dota2", "ow2", "r6", "mr", "fn", "apex", "pubg"]) {
+for (const spiel of ["dota2", "valorant"]) {
   test(`Simulator ${spiel}: Match läuft bis zum Ende, jedes Spielende genau einmal`, () => {
     const { ev, regie, m } = spiele(spiel);
     assert.ok(m.vorbei());
     assert.ok(ev.kill > 0 && ev.death > 0, JSON.stringify(ev));
-    const ende = ["dota2", "ow2", "mr"].includes(spiel) ? (spiel === "dota2" ? "match_end" : "match_won") : spiel === "r6" ? "match_end" : "victory";
+    const ende = spiel === "dota2" ? "match_end" : "match_won";
     assert.equal(ev[ende], 1, JSON.stringify(ev));
     assert.equal(ev.match_start, 1);
     const st = regie.statistik.json();
@@ -60,33 +60,26 @@ for (const spiel of ["dota2", "ow2", "r6", "mr", "fn", "apex", "pubg"]) {
   });
 }
 
-test("Overwolf-Spiele: Sieger aus Sicht eines PCs, Werte als Text oder JSON", () => {
-  const q = new GepQuelle("ow2");
-  q.ingest({ gep: true, art: "info", key: "roster_03", value: JSON.stringify({ player_name: "Momo", is_local: true, team: 1 }) }, 0);
-  q.ingest({ gep: true, art: "event", key: "match_start", value: null }, 1);
-  const k = q.ingest({ gep: true, art: "event", feature: "kill", key: "elimination", value: "1" }, 2).events[0];
-  assert.deepEqual([k.type, k.team, k.player], ["kill", "TEAM 2", "Momo"]);
-  const w = q.ingest({ gep: true, art: "info", key: "match_outcome", value: "defeat" }, 3).events[0];
-  assert.deepEqual([w.type, w.team], ["match_won", "TEAM 1"]);
-  // Unbekanntes und Kaputtes stoppt nichts
-  assert.deepEqual(q.ingest({ gep: true, art: "info", key: "roster_04", value: "{kaputt" }, 4).events, []);
+test("Bilderkennung: Runden, Spike und Sieger aus Sicht eines PCs", () => {
+  const q = new BildQuelle("valorant", { team: "TEAM B", name: "Momo" });
+  const typen = (m, t) => q.ingest({ bild: true, ...m }, t).events.map((e) => `${e.type}${e.team ? ":" + e.team : ""}`);
+  assert.deepEqual(typen({ event: "round_start" }, 0), ["match_start", "round_start"]);
+  const k = q.ingest({ bild: true, event: "kill", seite: "eigen" }, 1000).events[0];
+  assert.deepEqual([k.type, k.team, k.player, k.round], ["kill", "TEAM B", "Momo", 1]);
+  assert.deepEqual(typen({ event: "spike_planted" }, 2000), ["spike_planted"]);
+  assert.deepEqual(typen({ event: "round_end", seite: "gegner" }, 3000), ["round_end:TEAM A"]);
+  assert.deepEqual(typen({ event: "round_end", seite: "eigen" }, 3500), [], "Rundenende flackert: zählt einmal");
+  // Ohne erkannte Kaufphase zählt das nächste Rundenende als neue Runde
+  assert.deepEqual(typen({ event: "round_end", seite: "eigen" }, 30000), ["round_end:TEAM B"]);
+  assert.deepEqual(q.stand(), { runde: 2, score: { "TEAM A": 1, "TEAM B": 1 }, laeuft: true });
+  assert.deepEqual(typen({ event: "match_won", seite: "gegner" }, 40000), ["match_won:TEAM A"]);
+  assert.deepEqual(typen({ event: "match_won", seite: "gegner" }, 60000), [], "Sieg nur einmal");
+  // Nächste Runde: neues Match, Zähler von vorn
+  assert.deepEqual(typen({ event: "round_start" }, 90000), ["match_start", "round_start"]);
+  assert.equal(q.status().kills, 0);
+  // Unbekanntes stoppt nichts
+  assert.deepEqual(q.ingest({ bild: true, event: "gibtsnicht" }).events, []);
   assert.deepEqual(q.ingest(null).events, []);
-
-  const r6 = new GepQuelle("r6");
-  r6.ingest({ gep: true, art: "info", key: "roster_00", value: JSON.stringify({ player: "Kira", is_local: true, role: "defender" }) }, 0);
-  assert.equal(r6.ingest({ gep: true, art: "event", key: "roundOutcome", value: "defeat" }, 1).events[0].team, "ATK");
-  assert.equal(r6.ingest({ gep: true, art: "event", key: "defuser_planted" }, 2).events[0].team, "ATK");
-
-  const fn = new GepQuelle("fn");
-  fn.ingest({ gep: true, art: "event", key: "matchStart" }, 0);
-  assert.equal(fn.ingest({ gep: true, art: "event", key: "killer", value: "Rex" }, 10).events[0].type, "death");
-  assert.equal(fn.ingest({ gep: true, art: "event", key: "death" }, 20).events.length, 0, "Tod nur einmal");
-  assert.equal(fn.ingest({ gep: true, art: "info", key: "rank", value: "1" }, 30).events[0].type, "victory");
-  assert.equal(fn.ingest({ gep: true, art: "event", key: "generic", value: "won" }, 40).events.length, 0, "Sieg nur einmal");
-
-  const mr = new GepQuelle("mr");
-  mr.ingest({ gep: true, art: "event", key: "match_start" }, 0);
-  assert.equal(mr.ingest({ gep: true, art: "event", key: "kill", value: { name: "kill", data: 4 } }, 1).events[0].type, "kill");
 });
 
 test("Dota 2: Kill-Serie, Turm, Roshan, Tag und Nacht, Sieger", () => {
@@ -121,8 +114,8 @@ test("Dota 2: cfg-Datei und Startoption aus Steams localconfig.vdf", () => {
   assert.equal(dotaStartoptionen(""), null);
 });
 
-test("Overlay: Dota 2 und Overwolf-Spiele zählen als Spieldaten", () => {
-  const s = overlayStatus({ client: { zustand: "verbunden", session: "LAN", gesendet: 3 }, weitere: { "Dota 2": 99000, Fortnite: 1 }, jetzt: 100000 });
+test("Overlay: Dota 2 und Bilderkennung zählen als Spieldaten", () => {
+  const s = overlayStatus({ client: { zustand: "verbunden", session: "LAN", gesendet: 3 }, weitere: { "Dota 2": 99000, Valorant: 1 }, jetzt: 100000 });
   assert.equal(s.farbe, "ok");
   assert.match(s.text, /^Dota 2 → Session/);
 });

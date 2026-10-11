@@ -9,11 +9,12 @@ import { SimRunner } from "../core/sim-runner.js";
 import { SimMatch } from "../core/gsi-sim.js";
 import { CsQuelle } from "../core/cs-quelle.js";
 import { DOTA_CFG_DATEI, DOTA_STARTOPTION, dotaCfg } from "../core/dota.js";
-import { GEP_SPIELE } from "../core/gep-spiele.js";
+import { exportDatei, importDatei } from "../core/bild-spiele.js";
 import { QUELLEN } from "../core/spiele.js";
 import { feedbackUrl } from "../core/app-info.js";
 
 export const isElectron = typeof window !== "undefined" && !!window.regieAPI;
+const VORSCHAU_BILDSCHIRM = { id: "1", name: "Bildschirm 1 (Haupt)", b: 1920, h: 1080, primaer: true };
 
 function browserApi() {
   const KEY = "advancedlan_konfig";
@@ -44,7 +45,7 @@ function browserApi() {
       discoveryFehler: "", gsi: { laeuft: true, port: cfg.gamepc.gsiPort, fehler: "" }, letzte: gp.letzte || 0, status: null, stand: gp.stand || null, fremd: 0,
       sim: { ...gpSim.status(), spiel: "cs2" },
       rl: { verbunden: false, port: cfg.gamepc.rlPort, letzte: 0, stand: null },
-      daten: {}, gep: { geladen: false, laedt: false, version: "", fehler: "", spiel: null, admin: false },
+      daten: {}, bild: { laeuft: false, fehler: "", leer: false, b: 0, h: 0, spiel: null, werte: {}, letzte: {}, bildschirm: VORSCHAU_BILDSCHIRM },
     };
     return s;
   };
@@ -187,10 +188,10 @@ function browserApi() {
         { id: "dota-empfang", label: "Empfang bereit", ok: true, detail: `127.0.0.1:${cfg.gamepc.gsiPort} (wie CS2)` },
         { id: "dota-daten", label: "Dota 2 sendet Daten", ok: false, detail: "In der Vorschau kein Dota 2" },
       ],
-      gep: {
-        punkte: [{ id: "gep-geladen", label: "Overwolf-Spieldaten (GEP) geladen", ok: false, detail: "nicht geladen: braucht Overwolf-Freigabe und signierte App" }],
-        spiele: GEP_SPIELE.map((d) => ({ id: `gep-${d.id}`, spiel: d.id, label: d.name, ok: false, warn: true, detail: "nicht gestartet" })),
-      },
+      bild: ["valorant", "finals"].map((id) => {
+        const n = cfg.gamepc.bild.spiele[id].aktionen.length;
+        return { id: `${id}-aktionen`, spiel: id, label: `${id === "valorant" ? "Valorant" : "The Finals"}: Aktionen eingerichtet`, ok: n > 0, warn: true, detail: n ? `${n} Aktionen` : "noch keine: im Tab „Bilderkennung“ anlegen oder importieren" };
+      }),
     }),
     trennen: async () => { gp.zustand = "getrennt"; gpSim.stop(); statusMelden(); },
     gamePcSimStart: async (m) => { if (gp.zustand !== "verbunden") return { fehler: "Nur mit verbundener Session" }; if (!gpSim.match) gpQuelle = new CsQuelle(); gpSim.start(m); return { ok: true }; },
@@ -208,6 +209,22 @@ function browserApi() {
       gp.log.unshift(e); melde("gamePcEvent", e); statusMelden(); return { ok: e.gesendet };
     },
     onGamePcEvent: abo("gamePcEvent"),
+    // Bilderkennung: in der Vorschau nimmt der Browser selbst auf (getDisplayMedia fragt nach), Texterkennung gibt es nur in der App
+    bildBildschirme: async () => [VORSCHAU_BILDSCHIRM],
+    bildLesen: async () => ({ fehler: "Texterkennung nur in der App" }),
+    bildAufnahme: async () => {},
+    bildExport: async (spiel) => { download(`advanced-lan-${spiel}.json`, JSON.stringify(exportDatei(spiel, cfg.gamepc.bild.spiele[spiel]), null, 1)); return { ok: true, pfad: `advanced-lan-${spiel}.json` }; },
+    bildImport: () => new Promise((ok) => {
+      const i = document.createElement("input"); i.type = "file"; i.accept = ".json,application/json";
+      i.onchange = async () => {
+        const f = i.files?.[0]; if (!f) return ok({ abgebrochen: true });
+        const d = importDatei(await f.text(), VORSCHAU_BILDSCHIRM);
+        if (d.fehler) return ok(d);
+        Object.assign(cfg.gamepc.bild.spiele[d.spiel], { aufloesung: d.aufloesung, aktionen: d.aktionen }); speichern(); statusMelden();
+        ok({ ok: true, spiel: d.spiel, anzahl: d.aktionen.length, korrigiert: d.korrigiert, cfg });
+      };
+      i.click();
+    }),
   };
 }
 

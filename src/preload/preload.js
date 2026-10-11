@@ -57,4 +57,10 @@ contextBridge.exposeInMainWorld('regieAPI', {
   gamePcSimStop:   call('gamepc-sim-stop'),
   gamePcSimNeu:    call('gamepc-sim-neu'),
   onGamePcEvent:   abo('gamepc-event'),
+  // Bilderkennung (Valorant, The Finals)
+  bildBildschirme: call('bild-bildschirme'),
+  bildLesen:       call('bild-lesen'),
+  bildAufnahme:    call('bild-aufnahme'),
+  bildExport:      call('bild-export'),
+  bildImport:      call('bild-import'),
 });

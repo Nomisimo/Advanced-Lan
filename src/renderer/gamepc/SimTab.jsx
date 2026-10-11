@@ -22,7 +22,7 @@ export default function SimTab({ cfg, g, log, goTab, notify }) {
   const ergebnis = (r) => r?.fehler && notify(r.fehler, "err");
   const ausloesen = (e) => api.testEvent(e.id, spielId, e.fest || (e.team ? team : ""), KILLS[e.id] || 1);
   // Wer dieser PC in der Simulation ist
-  const rolle = spielId === "cs2" ? " (Spieler 1, CT)" : spielId === "dota2" ? " (Spieler 1, Radiant)" : spiel?.teams?.length && spielId !== "rl" ? " (Spieler 1, Team 1)" : spiel?.art === "br" ? " (Spieler 1, Squad 1)" : "";
+  const rolle = spielId === "cs2" ? " (Spieler 1, CT)" : spielId === "dota2" ? " (Spieler 1, Radiant)" : spiel?.bild ? ` (${cfg.bild?.spiele?.[spielId]?.team || "TEAM A"})` : "";
   const simLog = log.filter((e) => e.sim).slice(0, 12);
 
   if (!verbunden) return (

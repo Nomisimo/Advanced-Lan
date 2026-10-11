@@ -669,10 +669,12 @@ ipcMain.handle('test-event', (_, type, spiel = 'cs2', team = '', kills = 1) => {
 ipcMain.handle('gamepc-sim-start', (_, modus) => gamePcSimStart(modus));
 // Bilderkennung: Bildschirme, Texterkennung für den Editor, Aufnahme im Hintergrund, Export und Import der Spiel-Konfiguration
 ipcMain.handle('bild-bildschirme', () => bild.bildschirme());
+// Alle offenen Fenster für die Auswahl der Bildquelle (auch wenn die Erkennung aus ist)
+ipcMain.handle('bild-fenster', async () => { try { return (await bild.fensterSuchen()).map((f) => f.name.trim()); } catch { return []; } });
 ipcMain.handle('bild-lesen', async (_, png) => { try { return { text: await bild.lesen(png) }; } catch (e) { return { fehler: e?.message || String(e) }; } });
 // Editor-Aufnahme: nimmt die Quelle des Spiels auf, das gerade bearbeitet wird (sein Fenster oder den Bildschirm)
 ipcMain.handle('bild-aufnahme', async (_, an, spiel) => {
-  if (an === 'vorbereiten') { bild.editorSpiel = BILD_BY_ID[spiel] ? spiel : null; await bild.anwenden(); return bild.plan()[spiel] || { art: 'bildschirm', name: 'Bildschirm' }; }
+  if (an === 'vorbereiten') { bild.editorSpiel = BILD_BY_ID[spiel] ? spiel : null; return bild.editorQuelle(spiel); }
   if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.setBackgroundThrottling(!an);
 });
 ipcMain.handle('bild-export', async (_, spiel) => {

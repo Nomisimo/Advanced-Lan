@@ -59,6 +59,7 @@ contextBridge.exposeInMainWorld('regieAPI', {
   onGamePcEvent:   abo('gamepc-event'),
   // Bilderkennung (Valorant, The Finals)
   bildBildschirme: call('bild-bildschirme'),
+  bildFenster:     call('bild-fenster'),
   bildLesen:       call('bild-lesen'),
   bildAufnahme:    call('bild-aufnahme'),
   bildExport:      call('bild-export'),

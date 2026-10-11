@@ -8,7 +8,7 @@ const { BrowserWindow, desktopCapturer, screen, session, webContents } = require
 const path = require('path');
 const fs = require('fs');
 const { BildErkennung } = require('../core/bild-erkennung');
-const { BILD_BY_ID, erkennungsPlan } = require('../core/bild-spiele');
+const { BILD_BY_ID, erkennungsPlan, fensterFuer } = require('../core/bild-spiele');
 
 const TEXT_GILT = 2500; // so lange zählt ein gelesener Text
 const FENSTER_ALLE = 3000; // so oft nach geöffneten und geschlossenen Spielen sehen
@@ -43,11 +43,26 @@ class BildDienst {
     return l.filter((q) => q.name && !/^Advanced LAN/i.test(q.name.trim())).map((q) => ({ id: q.id, name: q.name }));
   }
 
-  // Quelle für ein Spiel aus dem Plan: Fenster oder eingestellter Bildschirm
-  async quelleFuer(spiel) {
-    const p = spiel && this.plan()[spiel];
-    if (p?.art === 'fenster') {
-      const f = (await desktopCapturer.getSources({ types: ['window'], thumbnailSize: { width: 0, height: 0 }, fetchWindowIcons: false })).find((q) => q.id === p.id);
+  // Fenster, das ein Spiel gerade als Quelle hat (auch ohne Aktionen, für die Editor-Aufnahme), sonst null = Bildschirm
+  async fensterFuer(spiel) {
+    const def = BILD_BY_ID[spiel], c = this.getCfg();
+    if (!def || !c) return null;
+    const alle = await desktopCapturer.getSources({ types: ['window'], thumbnailSize: { width: 0, height: 0 }, fetchWindowIcons: false });
+    return fensterFuer(def, c.spiele[spiel], alle.filter((q) => !/^Advanced LAN/i.test(q.name.trim())));
+  }
+  // Was der Editor aufnehmen würde: { art, name }
+  async editorQuelle(spiel) {
+    const f = await this.fensterFuer(spiel);
+    return f ? { art: 'fenster', name: f.name.trim() } : { art: 'bildschirm', name: 'Bildschirm' };
+  }
+
+  // Quelle für die Aufnahme: Fenster des Spiels oder eingestellter Bildschirm
+  async quelleFuer(spiel, lauf) {
+    if (lauf?.quelle.art === 'fenster') {
+      const f = (await desktopCapturer.getSources({ types: ['window'], thumbnailSize: { width: 0, height: 0 }, fetchWindowIcons: false })).find((q) => q.id === lauf.quelle.id);
+      if (f) return f;
+    } else if (!lauf) {
+      const f = await this.fensterFuer(spiel);
       if (f) return f;
     }
     const schirme = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 0, height: 0 } });
@@ -60,7 +75,7 @@ class BildDienst {
       try {
         const wc = req.frame ? webContents.fromFrame(req.frame) : null;
         const lauf = wc && [...this.laeufe.values()].find((l) => l.fenster && !l.fenster.isDestroyed() && l.fenster.webContents.id === wc.id);
-        antwort({ video: await this.quelleFuer(lauf ? lauf.spiel : this.editorSpiel) });
+        antwort({ video: await this.quelleFuer(lauf ? lauf.spiel : this.editorSpiel, lauf) });
       } catch { antwort({}); }
     });
     this.timer = setInterval(() => this.anwenden(), FENSTER_ALLE);

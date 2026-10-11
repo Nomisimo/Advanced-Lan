@@ -46,7 +46,13 @@ export default function BildTab({ cfg, mutate, g, notify }) {
     if (l.leer) return [ERR, "Bild ist schwarz: Spiel im randlosen Fenstermodus starten"];
     return l.laeuft ? [OK, `läuft · ${l.quelle?.name || "Bildschirm"} · ${l.b}×${l.h}`] : [WARN, `startet · ${l.quelle?.name || "Bildschirm"}`];
   };
-  const fensterListe = [...new Set([...(st.fenster || []), ...(sc.quelle.startsWith("fenster:") ? [sc.quelle.slice(8)] : [])])];
+  // Bildquelle: jedes offene Fenster oder Programm, Liste beim Öffnen der Auswahl neu holen
+  const [offen, setOffen] = useState([]);
+  const [eigen, setEigen] = useState(false);
+  const fensterHolen = () => api.bildFenster().then((l) => setOffen(Array.isArray(l) ? l : [])).catch(() => {});
+  useEffect(() => { fensterHolen(); }, []);
+  const gewaehlt = sc.quelle.startsWith("fenster:") ? sc.quelle.slice(8) : null;
+  const fensterListe = [...new Set([...offen, ...(st.fenster || [])])].filter((f) => f && f !== gewaehlt).sort((x, y) => x.localeCompare(y));
 
   return (
     <>
@@ -80,11 +86,21 @@ export default function BildTab({ cfg, mutate, g, notify }) {
         ))}
       </span>} right={<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
         <Field label="Bildquelle">
-          <select style={{ ...S.selectSm, width: 200 }} value={sc.quelle} onChange={(e) => setzeSpiel((s) => { s.quelle = e.target.value; })}>
-            <option value="auto">Automatisch: Fenster „{def.fenster}“</option>
-            <option value="bildschirm">Bildschirm</option>
-            {fensterListe.map((f) => <option key={f} value={`fenster:${f}`}>Fenster: {f}</option>)}
-          </select>
+          <div style={{ display: "flex", gap: 6 }}>
+            <select style={{ ...S.selectSm, width: 230 }} value={eigen ? "eigen" : sc.quelle} onFocus={fensterHolen} onMouseDown={fensterHolen}
+              onChange={(e) => { const v = e.target.value; setEigen(v === "eigen"); if (v !== "eigen") setzeSpiel((s) => { s.quelle = v; }); }}>
+              <option value="auto">Automatisch: Fenster „{def.fenster}“</option>
+              <option value="bildschirm">Bildschirm</option>
+              {gewaehlt && <option value={sc.quelle}>Fenster: {gewaehlt}{offen.some((f) => f.toUpperCase().includes(gewaehlt.toUpperCase())) ? "" : " (nicht offen)"}</option>}
+              {fensterListe.length > 0 && <optgroup label="Offene Fenster und Programme">
+                {fensterListe.map((f) => <option key={f} value={`fenster:${f}`}>{f}</option>)}
+              </optgroup>}
+              <option value="eigen">Fenstertitel eingeben …</option>
+            </select>
+            {eigen && <input style={{ ...S.inputSm, width: 160 }} autoFocus placeholder="Titel enthält …" defaultValue={gewaehlt || ""}
+              onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+              onBlur={(e) => { const t = e.target.value.trim(); setEigen(false); if (t) setzeSpiel((s) => { s.quelle = `fenster:${t}`; }); }} />}
+          </div>
         </Field>
         <Field label="Team dieses PCs">
           <select style={{ ...S.selectSm, width: 130, color: teamFarbe(sc.team) }} value={sc.team} onChange={(e) => setzeSpiel((s) => { s.team = e.target.value; })}>

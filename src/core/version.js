@@ -6,6 +6,11 @@ const REPO = "Nomisimo/Advanced-Lan";
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
+  "0.1.0-beta.7": [
+    "Bilderkennung: Als Bildquelle lässt sich jedes offene Fenster oder Programm wählen, die Liste wird beim Öffnen der Auswahl neu geholt",
+    "Bildquelle über einen Teil des Fenstertitels („Fenstertitel eingeben …“), z. B. „OBS“: passt auch, wenn das Programm seinen Titel ändert",
+    "Editor nimmt das gewählte Fenster auch auf, bevor das Spiel Aktionen hat",
+  ],
   "0.1.0-beta.6": [
     "Texterkennung stürzt im gepackten Build nicht mehr ab (fehlender Tesseract-Kern „relaxedsimd“, Mac und Windows)",
     "Bilderkennung erkennt geöffnete Spiele selbst und nimmt ihr Fenster als Bildquelle, statt den ganzen Bildschirm",

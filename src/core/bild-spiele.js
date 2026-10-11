@@ -126,6 +126,15 @@ function spielFenster(def, fenster) {
   const muster = titel(def.fenster);
   return (muster && fenster.find((f) => titel(f.name) === muster)) || null; // genau der Titel: ein Browser-Tab „Valorant Guide“ zählt nicht
 }
+// Welches offene Fenster gehört zur eingestellten Quelle eines Spiels? null = Bildschirm oder (noch) nicht offen.
+// "fenster:<Titel>": genau dieser Titel, sonst ein Fenster, dessen Titel ihn enthält (Programme mit wechselndem Titel, z. B. „OBS“)
+function fensterFuer(def, sc, fenster = []) {
+  const q = sc?.quelle || "auto";
+  if (q === "bildschirm") return null;
+  if (!q.startsWith("fenster:")) return spielFenster(def, fenster);
+  const t = titel(q.slice(8));
+  return (t && (fenster.find((x) => titel(x.name) === t) || fenster.find((x) => titel(x.name).includes(t)))) || null;
+}
 // Welche Bild-Spiele werden gerade erkannt, und woher kommt ihr Bild?
 // bild: cfg.gamepc.bild, fenster: offene Fenster, aktiv: Bild-Spiel, das die Regie aktiv hat (oder null)
 // → { spiel: { art: "fenster" | "bildschirm", id?, name } }. Mehrere Spiele gleichzeitig, jedes mit eigener Quelle.
@@ -135,14 +144,9 @@ function erkennungsPlan(bild, fenster = [], aktiv = null) {
   for (const def of BILD_SPIELE) {
     const sc = bild.spiele?.[def.id];
     if (!sc || !sc.aktionen.some((a) => a.an && (a.vorlagen.length || a.text))) continue;
-    const offen = spielFenster(def, fenster);
-    const q = sc.quelle || "auto";
-    if (q.startsWith("fenster:")) {
-      const f = fenster.find((x) => titel(x.name) === titel(q.slice(8)));
-      if (f) plan[def.id] = { art: "fenster", id: f.id, name: f.name.trim() };
-    } else if (q === "bildschirm") {
-      if (offen || aktiv === def.id) plan[def.id] = { art: "bildschirm", name: "Bildschirm" };
-    } else if (offen) plan[def.id] = { art: "fenster", id: offen.id, name: offen.name.trim() };
+    const f = fensterFuer(def, sc, fenster);
+    if (f) plan[def.id] = { art: "fenster", id: f.id, name: f.name.trim() };
+    else if (sc.quelle === "bildschirm" && (spielFenster(def, fenster) || aktiv === def.id)) plan[def.id] = { art: "bildschirm", name: "Bildschirm" };
   }
   return plan;
 }
@@ -236,4 +240,4 @@ class BildQuelle {
   }
 }
 
-module.exports = { erkennungsPlan, spielFenster, BILD_SPIELE, BILD_BY_ID, FPS, standardBild, migrateBild, migrateAktion, exportDatei, importDatei, EXPORT_FORMAT, BildQuelle, uid };
+module.exports = { erkennungsPlan, spielFenster, fensterFuer, BILD_SPIELE, BILD_BY_ID, FPS, standardBild, migrateBild, migrateAktion, exportDatei, importDatei, EXPORT_FORMAT, BildQuelle, uid };

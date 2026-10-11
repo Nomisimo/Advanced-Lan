@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { SIG_B, SIG_H, SIG_LAENGE, signatur, normiert, aehnlichkeit, bildLeer, kodieren, dekodieren, region, umrechnen, textPasst, BildErkennung } = require("../src/core/bild-erkennung");
-const { standardBild, migrateBild, exportDatei, importDatei, erkennungsPlan } = require("../src/core/bild-spiele");
+const { standardBild, migrateBild, exportDatei, importDatei, erkennungsPlan, fensterFuer, BILD_BY_ID } = require("../src/core/bild-spiele");
 
 // Testbild: b × h Pixel RGBA, farbe(x, y) → Grauwert
 const bild = (b, h, farbe) => {
@@ -116,6 +116,12 @@ test("Bildquellen: Spielfenster automatisch, mehrere Spiele gleichzeitig, Fenste
   assert.deepEqual(erkennungsPlan(cfg, [{ id: "w", name: "Valorant Guide – Chrome" }]), {});
   cfg.spiele.valorant.quelle = "fenster:OBS 31";
   assert.equal(erkennungsPlan(cfg, fenster).valorant.id, "window:3:0");
+  // Beliebiges Programm, auch wenn sich sein Titel ändert: Teil des Titels reicht
+  cfg.spiele.valorant.quelle = "fenster:obs";
+  assert.equal(erkennungsPlan(cfg, fenster).valorant.id, "window:3:0");
+  cfg.spiele.valorant.quelle = "fenster:Discord";
+  assert.equal(erkennungsPlan(cfg, fenster).valorant, undefined, "gewähltes Fenster nicht offen: keine Erkennung");
+  assert.equal(fensterFuer(BILD_BY_ID.finals, { quelle: "fenster:VALORANT" }, fenster).id, "window:1:0", "jedes Fenster für jedes Spiel");
   cfg.spiele.valorant.quelle = "bildschirm";
   assert.deepEqual(erkennungsPlan(cfg, [], "valorant").valorant, { art: "bildschirm", name: "Bildschirm" }, "Bildschirm: läuft, wenn die Regie das Spiel aktiv hat");
   assert.equal(migrateBild({ spiele: { valorant: { quelle: "irgendwas" } } }).spiele.valorant.quelle, "auto");

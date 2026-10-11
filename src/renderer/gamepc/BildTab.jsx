@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { S, ACCENT, ACCENT_HI, LINE, SUB, MUTED, OK, WARN, ERR, FELD, teamFarbe } from "../theme.js";
+import { uiConfirm } from "../dialog.jsx";
 import { api } from "../api.js";
 import { Section, Field, Toggle, SpielChip, Kbd } from "../ui.jsx";
 import { BILD_SPIELE, BILD_BY_ID, FPS, migrateAktion, uid } from "../../core/bild-spiele.js";
@@ -187,9 +188,9 @@ function Editor({ def, sc, setzeSpiel, notify, werteLive, letzteLive }) {
     setzeSpiel((s) => { s.aktionen.push(a); });
     setWahl(a.id); setBox(null);
   };
-  const bereichUebernehmen = () => {
+  const bereichUebernehmen = async () => {
     if (!aktion || !box) return;
-    if (aktion.vorlagen.length && !confirm(`Neuer Bereich für „${aktion.name}“: Die ${aktion.vorlagen.length} gespeicherten Frames passen dann nicht mehr und werden gelöscht. Weiter?`)) return;
+    if (aktion.vorlagen.length && !await uiConfirm(`Neuer Bereich für „${aktion.name}“: Die ${aktion.vorlagen.length} gespeicherten Frames passen dann nicht mehr und werden gelöscht. Weiter?`)) return;
     aendern(aktion.id, (a) => { a.region = box; a.anker = ankerVon(box); a.vorlagen = []; });
     setBox(null);
   };
@@ -372,7 +373,7 @@ function AktionBearbeiten({ def, a, aendern, entfernen, frameDazu, kannFrame, te
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
         <input style={{ ...S.inputSm, fontWeight: 700 }} value={a.name} maxLength={60} onChange={(e) => aendern((x) => { x.name = e.target.value; })} />
         <Toggle checked={a.an} title="Aktion an/aus" onChange={(v) => aendern((x) => { x.an = v; })} />
-        <button style={S.dangerBtn} title="Aktion löschen" onClick={() => confirm(`Aktion „${a.name}“ löschen?`) && entfernen()}><Trash2 size={13} /></button>
+        <button style={S.dangerBtn} title="Aktion löschen" onClick={async () => { if (await uiConfirm(`Aktion „${a.name}“ löschen?`)) entfernen(); }}><Trash2 size={13} /></button>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: mitSeite ? "1fr 120px" : "1fr", gap: 8, marginBottom: 10 }}>
         <Field label="Event an die Regie">

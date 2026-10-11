@@ -18,8 +18,8 @@ function ladeNdi() {
 
 class StatsAusgabe {
   // root: App-Ordner, preload: Pfad zum Preload, getStats(): cfg.regie.stats, aktiv(): läuft Regie oder Standalone, onChange()
-  constructor({ root, preload, icon, getStats, aktiv, onChange }) {
-    Object.assign(this, { root, preload, icon, getStats, aktiv, onChange: onChange || (() => {}) });
+  constructor({ root, preload, icon, getStats, aktiv, onChange, onFensterZu }) {
+    Object.assign(this, { root, preload, icon, getStats, aktiv, onChange: onChange || (() => {}), onFensterZu: onFensterZu || (() => {}) });
     this.fenster = null;
     this.ndiWin = null;
     this.sender = null;
@@ -56,7 +56,7 @@ class StatsAusgabe {
     });
     this.fenster.setMenuBarVisibility(false);
     this.seite(this.fenster);
-    this.fenster.on('closed', () => { this.fenster = null; this.onChange(); });
+    this.fenster.on('closed', () => { this.fenster = null; this.onChange(); this.onFensterZu(); });
     this.onChange();
     return true;
   }

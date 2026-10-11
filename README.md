@@ -116,7 +116,7 @@ npm run dist:win   # Windows-Installer mit ow-electron-builder
 npm run dist:mac   # macOS Intel (dmg), nur auf einem Mac
 ```
 
-**Beta-Releases:** Ein Tag `v*` (z. B. `v0.1.0-beta.1`) oder Actions → Release startet `.github/workflows/release.yml`: Builds für Windows (x64) und macOS Intel auf GitHub-Runnern, Ergebnis als Vorabversion unter Releases. Beide sind noch unsigniert: Windows warnt mit SmartScreen (Weitere Informationen → Trotzdem ausführen), auf dem Mac beim ersten Start Rechtsklick → Öffnen. Apple Silicon folgt.
+**Beta-Releases:** Ein Tag `v*` (z. B. `v0.1.0-beta.1`) oder Actions → Release startet `.github/workflows/release.yml`: Builds für Windows (x64) und macOS Intel auf GitHub-Runnern, Ergebnis als Release, Tags mit Bindestrich (`-beta.n`) als Vorabversion. Wie im Netzwerkplaner prüft der Workflow, dass Tag und `version` in `package.json` passen, und baut den Release-Text aus dem „Was ist neu?“-Eintrag in `src/core/version.js` plus `.github/release-hinweise.md` (Download und Installation). Ablauf: Version in `package.json` erhöhen, Änderungen in `src/core/version.js` eintragen, committen, dann `git tag v0.1.0-beta.7 && git push origin v0.1.0-beta.7`. Beide sind noch unsigniert: Windows warnt mit SmartScreen (Weitere Informationen → Trotzdem ausführen), auf dem Mac beim ersten Start Rechtsklick → Öffnen. Apple Silicon folgt.
 
 `dist-app/index.html` lässt sich auch direkt im Browser öffnen: Dann läuft eine Vorschau ohne Netzwerk, mit derselben Regie-Logik und dem Simulator.
 

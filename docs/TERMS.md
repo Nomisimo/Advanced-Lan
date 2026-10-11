@@ -20,7 +20,7 @@ You may use, copy, modify and distribute the app under the terms of the MIT Lice
 
 ## 4. Third-party services and games
 
-The app relies on Overwolf (runtime and game events) and on official interfaces provided by game publishers. These services may change or stop at any time, which can limit what the app can do. Game names and trademarks belong to their owners; the app is not endorsed by them.
+The app relies on the Overwolf runtime and on official interfaces provided by game publishers. These services may change or stop at any time, which can limit what the app can do. Game names and trademarks belong to their owners; the app is not endorsed by them.
 
 ## 5. No warranty
 

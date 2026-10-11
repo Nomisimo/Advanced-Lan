@@ -1,7 +1,7 @@
 "use strict";
 // Prüft, ob die Game-PCs im selben Match sind. Verglichen wird der Spielstand, den jeder PC meldet:
 // Rocket League hat eine eindeutige MatchGuid, CS2 liefert keine Match-ID, dort zählen Map und Spielstand.
-// Dota 2 und die Overwolf-Spiele melden eine Match-ID (sonst zählt die Map).
+// Dota 2 meldet eine Match-ID (sonst zählt die Map). Valorant über Bilderkennung kennt weder Match noch Map: kein Vergleich.
 
 // CS2: gleiche Map und höchstens eine Runde Unterschied (Meldungen kommen gedrosselt, am Rundenende kurz versetzt)
 const csGleich = (a, b) => a.map === b.map && Math.abs(a.ct - b.ct) + Math.abs(a.tt - b.tt) <= 1;

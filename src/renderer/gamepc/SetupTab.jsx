@@ -8,7 +8,7 @@ import { SPIELE } from "../../core/spiele.js";
 import { CFG_ORDNER, CFG_DATEI } from "../../core/cfg.js";
 import { RL_INI_DATEI, RL_INI_ORDNER } from "../../core/rl-ini.js";
 import { DOTA_CFG_DATEI, DOTA_CFG_ORDNER, DOTA_STARTOPTION } from "../../core/dota.js";
-import { FileDown, Download, RefreshCw, LocateFixed, BookOpen } from "lucide-react";
+import { FileDown, Download, RefreshCw, LocateFixed, BookOpen, ScanEye } from "lucide-react";
 
 // Offizielle Dokumentation der Datenquellen, öffnet im Browser
 const DOKU = {
@@ -20,10 +20,6 @@ const DOKU = {
   ],
   dota2: [
     ["Valve: Dota 2 Game State Integration", "https://developer.valvesoftware.com/wiki/Dota_2_Workshop_Tools/Scripting/Game_State_Integration"],
-  ],
-  gep: [
-    ["Overwolf: Game Events (GEP)", "https://dev.overwolf.com/ow-electron/live-game-data-gep/live-game-data-gep-intro/"],
-    ["Overwolf: Spiele und Events", "https://dev.overwolf.com/ow-electron/live-game-data-gep/supported-games/"],
   ],
 };
 const DokuLinks = ({ spiel }) => (
@@ -79,12 +75,12 @@ function LokalName({ cfg, mutate }) {
   );
 }
 
-export default function SetupTab({ cfg, mutate, g, jetzt, notify, standalone = false }) {
+export default function SetupTab({ cfg, mutate, g, jetzt, notify, goTab, standalone = false }) {
   const [check, setCheck] = useState(null);
   const laden = () => api.setupCheck().then(setCheck);
   useEffect(() => { laden(); const t = setInterval(laden, 3000); return () => clearInterval(t); }, []);
   const fertig = async (r, text) => { if (r?.ok) notify(text); else if (r?.fehler) notify(r.fehler, "err"); laden(); };
-  const alle = check ? [...check.allgemein, ...check.cs2, ...check.rl, ...(check.dota2 || []), ...(check.gep?.punkte || [])].filter((p) => !p.nichtVerfuegbar) : [];
+  const alle = check ? [...check.allgemein, ...check.cs2, ...check.rl, ...(check.dota2 || [])].filter((p) => !p.nichtVerfuegbar) : [];
   const mac = check?.plattform === "darwin";
   const weitere = Object.fromEntries(Object.entries(g.daten || {}).map(([id, d]) => [SPIELE.find((s) => s.id === id)?.name || id, d.letzte]));
   const ampel = overlayStatus({ client: g.client, gsi: g.gsi, letzteCs2: g.letzte, letzteRl: g.rl?.letzte, weitere, jetzt });
@@ -170,34 +166,10 @@ export default function SetupTab({ cfg, mutate, g, jetzt, notify, standalone = f
           )}
         </Section>
 
-        <Section title="Overwolf-Spiele (GEP)" subtitle="Overwatch 2, Rainbow Six Siege, Marvel Rivals, Fortnite, Apex Legends und PUBG liefern ihre Events über Overwolf. Nichts einzurichten: Die App erkennt das laufende Spiel selbst. Overwolf liefert die Daten erst, wenn die App freigegeben und signiert ist.">
-          {check?.gep && <Liste punkte={check.gep.punkte} />}
-          {check?.gep?.spiele?.length > 0 && (
-            <div style={{ border: `1px solid ${LINE}`, borderRadius: 8, overflow: "hidden", marginTop: 10 }}>
-              {check.gep.spiele.map((p) => (
-                <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderBottom: `1px solid ${LINE}`, fontSize: 13 }}>
-                  <span style={{ minWidth: 46, display: "inline-flex" }}><SpielChip spiel={p.spiel} aktiv={p.ok} /></span>
-                  <span style={{ flex: 1, color: p.ok ? "#fff" : SUB }}>{p.label}</span>
-                  <span style={{ fontSize: 12, color: p.ok ? OK : MUTED }}>{p.detail}</span>
-                  {g.daten?.[p.spiel]?.status?.spieler && <span style={{ fontSize: 12, color: SUB }}>{g.daten[p.spiel].status.spieler} · {g.daten[p.spiel].status.kills}/{g.daten[p.spiel].status.deaths}</span>}
-                </div>
-              ))}
-            </div>
-          )}
-          <DokuLinks spiel="gep" />
-        </Section>
-      </div>
-      <div>
-        <Section title="Weitere Spiele">
-          <div style={{ border: `1px solid ${LINE}`, borderRadius: 8, overflow: "hidden" }}>
-            {SPIELE.filter((s) => !s.quelle).map((s) => (
-              <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderBottom: `1px solid ${LINE}`, fontSize: 13 }}>
-                <SpielChip spiel={s.id} aktiv={false} />
-                <span style={{ flex: 1, color: SUB }}>{s.name}</span>
-                <span style={{ fontSize: 12, color: MUTED }}>{s.id === "valorant" ? "keine Live-Daten (Riot gibt keine frei)" : "noch keine Datenquelle"}</span>
-              </div>
-            ))}
-          </div>
+        <Section title="Valorant und The Finals" subtitle="Ohne offizielle Schnittstelle: Die App erkennt die Aktionen am Bild dieses PCs. Einrichten im Tab „Bilderkennung“: Gameplay aufnehmen, Bereiche als Aktionen anlegen oder die Datei eines anderen PCs importieren."
+          right={goTab && <button style={S.primaryBtn} onClick={() => goTab("bild")}><ScanEye size={14} /> Bilderkennung</button>}>
+          {check?.bild && <Liste punkte={check.bild} />}
+          <p style={S.hint}>Spiel im randlosen Fenstermodus starten, sonst kann die Aufnahme schwarz bleiben.</p>
         </Section>
       </div>
     </>

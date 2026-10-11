@@ -12,11 +12,12 @@ import SessionTab from "./SessionTab.jsx";
 import AnleitungTab from "../AnleitungTab.jsx";
 import AppEinstellungen from "../AppEinstellungen.jsx";
 import GpSetupTab from "../gamepc/SetupTab.jsx";
-import { Gauge, ListChecks, Send, FlaskConical, BookOpen, Power, Radio, KeyRound, TriangleAlert, Settings, Gamepad2, MonitorPlay } from "lucide-react";
+import BildTab from "../gamepc/BildTab.jsx";
+import { Gauge, ListChecks, Send, FlaskConical, BookOpen, Power, Radio, KeyRound, TriangleAlert, Settings, Gamepad2, MonitorPlay, ScanEye } from "lucide-react";
 
 const TABS_REGIE = [["control", "Control", Gauge], ["signale", "Signale", ListChecks], ["ziele", "Ziele", Send], ["session", "Session", KeyRound], ["setup", "Setup", Settings], ["sim", "Simulator", FlaskConical], ["hilfe", "Anleitung", BookOpen]];
 // Standalone: dazu der Tab „Spiele“ mit dem Setup der Spiele auf diesem PC (wie auf einem Game-PC)
-const TABS_STANDALONE = [...TABS_REGIE.slice(0, 5), ["spiele", "Spiele", Gamepad2], ...TABS_REGIE.slice(5)];
+const TABS_STANDALONE = [...TABS_REGIE.slice(0, 5), ["spiele", "Spiele", Gamepad2], ["bild", "Bilderkennung", ScanEye], ...TABS_REGIE.slice(5)];
 const LOG_MAX = 300;
 // Neuer Eintrag oben; kommt dieselbe ID wieder (z. B. mit einem Sendefehler), wird er ersetzt.
 // Echte und verworfene Events haben je eigene Obergrenze.
@@ -82,7 +83,8 @@ export default function RegieApp({ cfg: alles, mutate: mutateAlles, status: st, 
           <div style={{ animation: "npFade .18s ease" }}>
             {tab === "control" && <ControlTab {...shared} />}
             {tab === "setup" && <><SetupTab {...shared} /><AppEinstellungen cfg={alles} status={st} mutate={mutateAlles} notify={notify} /></>}
-            {tab === "spiele" && standalone && <GpSetupTab cfg={alles.gamepc} mutate={(fn) => mutateAlles((d) => fn(d.gamepc))} g={st.gamepc} jetzt={jetzt} notify={notify} standalone />}
+            {tab === "spiele" && standalone && <GpSetupTab cfg={alles.gamepc} mutate={(fn) => mutateAlles((d) => fn(d.gamepc))} g={st.gamepc} jetzt={jetzt} notify={notify} standalone goTab={setTab} />}
+            {tab === "bild" && standalone && <BildTab cfg={alles.gamepc} mutate={(fn) => mutateAlles((d) => fn(d.gamepc))} g={{ ...st.gamepc, client: { ...st.gamepc.client, aktivesSpiel: cfg.aktivesSpiel } }} notify={notify} />}
             {tab === "signale" && <SignaleTab {...shared} />}
             {tab === "ziele" && <ZieleTab {...shared} />}
             {tab === "sim" && <SimTab {...shared} />}

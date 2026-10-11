@@ -6,6 +6,17 @@ const REPO = "Nomisimo/Advanced-Lan";
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
+  "0.1.0-beta.5": [
+    "Valorant und The Finals über Bilderkennung: Der Game-PC schaut auf seinen Bildschirm und meldet Aktionen wie Runde gewonnen, Spike gelegt, Kill oder Cashout an die Regie",
+    "Neuer Tab „Bilderkennung“ mit Editor: Gameplay in der App aufzeichnen, Bereich aufziehen, Frames wählen, Event zuordnen, Schwelle und Pause einstellen, „Erkennung testen“ auf der Aufnahme",
+    "Texterkennung (Englisch und Deutsch, offline): Eine Aktion kann zusätzlich verlangen, dass ein Wort im Bereich steht, z. B. „ROUND WON|RUNDE GEWONNEN“",
+    "Spiel-Konfiguration exportieren und auf den anderen Game-PCs importieren. Bei anderem Seitenverhältnis rechnet die App die Bereiche um",
+    "Die Aufnahme bleibt nur im Arbeitsspeicher; gespeichert werden nur die kleinen Frames der Aktionen",
+    "Warnung bei schwarzem Bild (exklusives Vollbild): im Spiel „Randloses Fenster“ einstellen",
+    "Valorant: nur ein Signal beim Legen des Spikes, kein Spike-Timer (Riot-Regel)",
+    "Simulator für Valorant (10 PCs, bis 13 Runden), Statistik mit Aces und Spikes",
+    "Overwolf-Spiele entfernt: Overwatch 2, Rainbow Six Siege, Marvel Rivals, Fortnite, Apex Legends und PUBG. Die App nutzt keine Overwolf-Spielereignisse (GEP) mehr",
+  ],
   "0.1.0-beta.4": [
     "Windows: erster Installer für Windows (x64), noch unsigniert. Windows SmartScreen warnt deshalb: Weitere Informationen → Trotzdem ausführen",
     "Einführung beim ersten Start: was die App macht, die drei Modi, das Tastenkürzel und Datenschutz mit Zustimmung zu Nutzungsbedingungen und Datenschutzerklärung",

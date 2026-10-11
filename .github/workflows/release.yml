@@ -25,7 +25,6 @@ jobs:
         timeout-minutes: 5
       - run: npm run build
       # Ohne Zertifikat und ohne Overwolf-Schlüssel: der Build läuft durch, ow-electron-builder warnt nur.
-      # GEP und Overlay laden in so einem Build nicht, die übrige App läuft.
       - run: npx ow-electron-builder --win --x64 --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
@@ -100,12 +99,12 @@ jobs:
             Beta von Advanced LAN für Windows und macOS mit Intel-Prozessor.
 
             **Windows:** `Advanced-LAN-…-win-x64.exe` ausführen. Die App ist noch nicht signiert, deshalb warnt Windows SmartScreen:
-            **Weitere Informationen** → **Trotzdem ausführen**. Overwolf-Spiele (GEP) laden erst in einer signierten Version, CS2, Rocket League und Dota 2 gehen schon.
+            **Weitere Informationen** → **Trotzdem ausführen**.
 
             **macOS:** `.dmg` öffnen und Advanced LAN in den Programme-Ordner ziehen. Beim ersten Start im Finder mit Rechtsklick → **Öffnen** starten
             (oder Systemeinstellungen → Datenschutz & Sicherheit → „Trotzdem öffnen“).
 
             **Enthalten:** Regie, Game-PC und Standalone in einer App, Sessions per mDNS, OSC-Befehle an Licht, Audio und Video (Ziel-Datenbank, Signale-Matrix),
-            CS2 und Dota 2 (Game State Integration), Rocket League (Stats API), Overwolf-Spiele (GEP), Simulator, Mini-Overlay, Game-Stats-Screen (Fenster, NDI).
+            CS2 und Dota 2 (Game State Integration), Rocket League (Stats API), Valorant und The Finals (Bilderkennung), Simulator, Mini-Overlay, Game-Stats-Screen (Fenster, NDI).
 
             Nutzungsbedingungen: https://github.com/Nomisimo/Advanced-Lan/blob/main/docs/TERMS.md · Datenschutz: https://github.com/Nomisimo/Advanced-Lan/blob/main/docs/PRIVACY.md

@@ -1,6 +1,6 @@
 # Advanced LAN – Privacy Policy
 
-_Last updated: 4 October 2026_
+_Last updated: 11 October 2026_
 
 Advanced LAN ("the app") is a free, open-source desktop app published by Momo (GitHub: [Nomisimo](https://github.com/Nomisimo)). It turns in-game events into OSC commands for stage lighting, audio and video. This policy explains which data the app processes.
 
@@ -9,6 +9,7 @@ Advanced LAN ("the app") is a free, open-source desktop app published by Momo (G
 - The app shows **no ads** and has **no user accounts**.
 - The publisher **does not collect, store or sell personal data**. There is no server operated by the publisher.
 - Game events stay in your local network and go only to the devices you configure.
+- For Valorant and The Finals the app captures the screen of the game PC. The image is analysed on that PC only and never leaves it.
 - The Overwolf runtime that the app is built on sends anonymous usage data to Overwolf (see below).
 
 ## Data processed on your computer and in your local network
@@ -18,13 +19,14 @@ Advanced LAN ("the app") is a free, open-source desktop app published by Momo (G
 | In-game events (for example kills, rounds, goals, match results, player names shown in the game, team) | Trigger lighting, audio and video cues; show the Game Stats Screen | From the game PC to the control PC ("Regie") in your local network, and as OSC/NDI to the devices you add. Never to the publisher. |
 | PC name you enter, host name, local IP address, MAC address, app version, ping | Show which game PCs are connected | Sent from game PCs to the control PC in the same local network |
 | Session name and password | Protect a session in your local network | Stored locally; the password itself is never sent, only an HMAC challenge-response |
+| Screen image of the game PC (Valorant, The Finals) | Recognise game actions such as round won or spike planted, including text recognition (English, German) that runs offline on the PC | Analysed in memory on the game PC. Only the recognised event goes to the control PC. A recording made in the editor stays in memory until you delete it or close the app; only small cut-outs you pick as frames are saved in your settings and in files you export yourself. |
 | Settings (targets, signals, hotkey, consent date) | Remember your configuration | Stored locally in your user profile (`advanced-lan.json`) |
 
-Game data is read only from official interfaces: Valve Game State Integration (Counter-Strike 2, Dota 2), the Psyonix Rocket League Stats API, and Overwolf Game Events (GEP). The app does not read game memory and does not modify games.
+Game data is read only from official interfaces: Valve Game State Integration (Counter-Strike 2, Dota 2), and the Psyonix Rocket League Stats API. For Valorant and The Finals the app only looks at the screen image, like a viewer would. The app does not read game memory, does not inject into games and does not modify them.
 
 ## Data sent to third parties
 
-- **Overwolf**: The app runs on Overwolf's ow-electron runtime. Overwolf collects anonymous analytics (for example a machine identifier, app version, crash and performance data) and loads its game-event packages. This processing is covered by the privacy policies Overwolf publishes at [legal.overwolf.com](https://legal.overwolf.com/). You can review your choices in the app under **Setup → App → Privacy settings**.
+- **Overwolf**: The app runs on Overwolf's ow-electron runtime. Overwolf collects anonymous analytics (for example a machine identifier, app version, crash and performance data). The app uses no Overwolf game-event packages. This processing is covered by the privacy policies Overwolf publishes at [legal.overwolf.com](https://legal.overwolf.com/). You can review your choices in the app under **Setup → App → Privacy settings**.
 - **GitHub**: To check for updates, the app requests the public release list from `api.github.com` and downloads updates from `github.com`. GitHub receives your IP address as part of these requests ([GitHub Privacy Statement](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement)).
 - **Feedback**: If you click **Report** in the app, your browser opens a new GitHub issue that already contains the app version, your operating system and the selected mode. Nothing is sent unless you submit the issue yourself.
 

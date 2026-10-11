@@ -1,15 +1,13 @@
 {
   "name": "advanced-lan",
-  "version": "0.1.0-beta.4",
+  "version": "0.1.0-beta.5",
   "private": true,
-  "description": "Advanced LAN: Game-PCs melden Spielereignisse, die Regie sendet OSC-Befehle an Licht, Audio und Video",
+  "description": "Advanced LAN: Game-PCs melden Spielereignisse (offizielle Schnittstellen oder Bilderkennung), die Regie sendet OSC-Befehle an Licht, Audio und Video",
   "author": "Momo",
   "license": "MIT",
   "main": "src/main/main.js",
   "overwolf": {
-    "packages": [
-      "gep"
-    ]
+    "packages": []
   },
   "scripts": {
     "build": "node scripts/build.js --minify",
@@ -30,11 +28,19 @@
       "src/core/**",
       "src/preload/**",
       "dist-app/index.html",
+      "dist-app/erkennung.html",
+      "dist-ocr/**",
       "assets/app-icon/**",
-      "package.json"
+      "package.json",
+      "!node_modules/tesseract.js-core/tesseract-core{,-simd,-relaxedsimd}.{js,wasm,wasm.js}",
+      "!node_modules/@tesseract.js-data/**",
+      "!node_modules/**/*.map"
     ],
     "asarUnpack": [
-      "**/node_modules/@stagetimerio/grandiose/dist/**"
+      "**/node_modules/@stagetimerio/grandiose/dist/**",
+      "**/node_modules/tesseract.js/**",
+      "**/node_modules/tesseract.js-core/**",
+      "dist-ocr/**"
     ],
     "npmRebuild": false,
     "overwolf": {
@@ -100,8 +106,11 @@
     "react-dom": "^18.3.1"
   },
   "dependencies": {
+    "@tesseract.js-data/deu": "^1.0.0",
+    "@tesseract.js-data/eng": "^1.0.0",
     "bonjour-service": "^1.4.4",
     "electron-updater": "^6.8.9",
+    "tesseract.js": "^7.0.0",
     "ws": "^8.22.0"
   },
   "optionalDependencies": {

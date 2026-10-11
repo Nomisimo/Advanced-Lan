@@ -9,7 +9,7 @@
 
 <p align="center"><img src="docs/screenshots/ablauf.jpg" alt="Ablauf: Game-PCs melden Events, die Regie schickt OSC-Befehle an Licht, Audio und Video" width="820"></p>
 
-Eine App für die LAN-Party: Die Game-PCs melden Spielereignisse aus CS2, Rocket League, Dota 2, Overwatch 2, Rainbow Six Siege, Marvel Rivals, Fortnite, Apex Legends und PUBG, die Regie sendet daraus OSC-Befehle an Lichtpulte, Audio- und Videosoftware (z. B. grandMA3, QLab, Reaper, Resolume). Design und Aufbau wie [Netzwerkplaner](https://github.com/Nomisimo/Netzwerkplaner) und Stromplaner, Akzentfarbe Lila.
+Eine App für die LAN-Party: Die Game-PCs melden Spielereignisse aus CS2, Rocket League und Dota 2 über ihre offiziellen Schnittstellen, Valorant und The Finals über eine Bilderkennung, die Regie sendet daraus OSC-Befehle an Lichtpulte, Audio- und Videosoftware (z. B. grandMA3, QLab, Reaper, Resolume). Design und Aufbau wie [Netzwerkplaner](https://github.com/Nomisimo/Netzwerkplaner) und Stromplaner, Akzentfarbe Lila.
 
 Gebaut mit **Overwolf Electron** (`@overwolf/ow-electron`), React 18 und esbuild. Die Oberfläche wird zu einer einzelnen Datei `dist-app/index.html` gebündelt.
 
@@ -17,7 +17,7 @@ Gebaut mit **Overwolf Electron** (`@overwolf/ow-electron`), React 18 und esbuild
 
 | Modus | Läuft auf | Tabs |
 |---|---|---|
-| **Game-PC** | jedem PC, auf dem gespielt wird | Session (PC-ID, Sessions im Netz, beitreten), Setup (CS2, Dota 2 und Rocket League einrichten, Overwolf-Spiele, „Ist korrekt aufgesetzt?“-Check, Mini-Overlay, Netzwerkkarte), Events, Simulator (nur mit Session), Anleitung |
+| **Game-PC** | jedem PC, auf dem gespielt wird | Session (PC-ID, Sessions im Netz, beitreten), Setup (CS2, Dota 2 und Rocket League einrichten, „Ist korrekt aufgesetzt?“-Check, Mini-Overlay, Netzwerkkarte), Bilderkennung (Editor für Valorant und The Finals), Events, Simulator (nur mit Session), Anleitung |
 | **Regie** | dem Regie-PC (ohne Spiel) | Control (aktives Spiel, Ausgabe, Verbindungscheck, Statistik, Events), Signale, Ziele, Session (mit Übersicht: PC-ID, Hostname, IP, MAC, Ping, App-Version), Setup (genutzte Spiele, Check, Game-Stats-Screen, Netzwerkkarten), Simulator, Anleitung |
 | **Standalone** | einem einzelnen PC: Regie und Spiel zusammen | wie die Regie, dazu Spiele (Setup der Spiele auf diesem PC wie beim Game-PC). Die Spiele melden direkt an die Regie, eine Session braucht es nur für zusätzliche Game-PCs |
 
@@ -37,7 +37,7 @@ Der Modus wird beim ersten Start gewählt (Standalone: Textknopf unten in der Mi
 - **Updates wie im Netzwerkplaner:** Die App prüft beim Start die GitHub-Releases und zeigt eine neuere Version als grünen Knopf neben der Versionsnummer. Mac: Klick lädt das DMG in den Download-Ordner und öffnet es, dann die App nach „Programme“ ziehen (unsigniert, deshalb kein Austausch im Hintergrund). Windows: `electron-updater` lädt und installiert selbst, sobald es Windows-Releases gibt. Klick auf die Versionsnummer öffnet „Was ist neu?“ (`src/core/version.js`, dort bei jeder Version die Änderungen eintragen).
 - **Game-Stats-Screen (Regie, Standalone):** Spielstand, Runde oder Spielzeit, Zahlen des Matches, beste Spieler und letzte Events des aktiven Spiels, gestaltet für 1920×1080. Einschalten in Regie → Setup. Ausgabe als **Pop-out-Fenster** (Knopf „Stats“ in der Kopfzeile, Doppelklick = Vollbild) und/oder als **NDI-Quelle** mit eigenem Namen (30 fps, für OBS, vMix, NDI Studio Monitor). NDI rendert die Seite in einem unsichtbaren Offscreen-Fenster und schickt jedes Bild über [`@stagetimerio/grandiose`](https://github.com/stagetimerio/grandiose) (NDI SDK 6, Apache-2.0). Das Paket ist optional: Es lädt beim Installieren das NDI SDK von ndi.tv und baut sich mit node-gyp. Fehlt es, zeigt das Setup „NDI nicht verfügbar“, alles andere läuft. NDI® ist eine eingetragene Marke von Vizrt NDI AB.
 - **Startanimation** wie im Netzwerkplaner: Controller, dessen Knöpfe nacheinander gedrückt werden.
-- CS2, Rocket League und die Overwolf-Spiele gibt es als Game-PC nur unter Windows, Dota 2 auch auf dem Mac. Auf dem Mac läuft vor allem die Regie; der Game-PC-Modus meldet dort, welche Spiele fehlen.
+- CS2, Rocket League, Valorant und The Finals gibt es als Game-PC nur unter Windows, Dota 2 auch auf dem Mac. Auf dem Mac läuft vor allem die Regie; der Game-PC-Modus meldet dort, welche Spiele fehlen.
 
 ## Spiele
 
@@ -46,14 +46,10 @@ Der Modus wird beim ersten Start gewählt (Standalone: Textknopf unten in der Mi
 | Counter-Strike 2 | Valve Game State Integration | CT, T | 10 PCs, Runde |
 | Rocket League | Psyonix Stats API | BLUE, ORANGE | 6 PCs, bis zum Tor |
 | Dota 2 | Valve Game State Integration | RADIANT, DIRE | 10 PCs, 5 Minuten |
-| Overwatch 2 | Overwolf GEP | TEAM 1, TEAM 2 | 10 PCs, Runde |
-| Rainbow Six Siege | Overwolf GEP | ATK, DEF (Seite der Runde) | 10 PCs, Runde |
-| Marvel Rivals | Overwolf GEP | TEAM 1, TEAM 2 | 12 PCs, Runde |
-| Fortnite | Overwolf GEP | – (Battle Royale) | 8 PCs (2 Squads), Zone |
-| Apex Legends | Overwolf GEP | – (Battle Royale) | 6 PCs (2 Trios), Zone |
-| PUBG: Battlegrounds | Overwolf GEP | – (Battle Royale) | 8 PCs (2 Squads), Zone |
+| Valorant | Bilderkennung | TEAM A, TEAM B (stellt jeder PC ein) | 10 PCs, Runde |
+| The Finals | Bilderkennung | TEAM A bis TEAM D | – |
 
-Riot-Spiele (Valorant, League of Legends, TFT) bleiben draußen: Riot gibt keine Live-Daten frei.
+Overwolf ist raus: Die App nutzt keine Overwolf-Spielereignisse (GEP) und wird nur über GitHub verteilt.
 
 ## Screenshots
 
@@ -69,7 +65,7 @@ Riot-Spiele (Valorant, League of Legends, TFT) bleiben draußen: Riot gibt keine
 
 ## CS2
 
-CS2 liefert seine Daten über Valves offizielle [Game State Integration](https://developer.valvesoftware.com/wiki/Counter-Strike:_Global_Offensive_Game_State_Integration): Eine cfg-Datei im CS2-Ordner (`…\game\csgo\cfg\gamestate_integration_advancedlan.cfg`) lässt das Spiel seinen Zustand per HTTP an die App auf demselben PC schicken (`127.0.0.1:3000`). Der Game-PC installiert die Datei per Knopfdruck im Tab „Setup“ und prüft dort, ob alles stimmt. Dafür braucht es keine Overwolf-Spielereignisse (GEP) und keine Freigabe.
+CS2 liefert seine Daten über Valves offizielle [Game State Integration](https://developer.valvesoftware.com/wiki/Counter-Strike:_Global_Offensive_Game_State_Integration): Eine cfg-Datei im CS2-Ordner (`…\game\csgo\cfg\gamestate_integration_advancedlan.cfg`) lässt das Spiel seinen Zustand per HTTP an die App auf demselben PC schicken (`127.0.0.1:3000`). Der Game-PC installiert die Datei per Knopfdruck im Tab „Setup“ und prüft dort, ob alles stimmt. Dafür braucht es keine Freigabe.
 
 Erkannte Ereignisse: Match startet/vorbei, Freezetime, Runde läuft, Runde gewonnen (mit Team), Bombe gelegt/entschärft/explodiert, Kill, Headshot, 3 und 4 Kills, Ace, Tod, geblendet, Runden-MVP.
 
@@ -85,11 +81,18 @@ Dota 2 liefert seine Daten wie CS2 über Valves [Game State Integration](https:/
 
 Erkannte Ereignisse: Heldenwahl, Vorbereitung, Horn, Ancient zerstört (mit Sieger), Tag, Nacht, Roshan getötet, Aegis, Turm und Kaserne zerstört (Team = wer zerstört hat), Kill, Double Kill, Triple Kill, Ultra Kill, Rampage, Assist, Tod.
 
-## Overwolf-Spiele (GEP)
+## Valorant und The Finals (Bilderkennung)
 
-Overwatch 2, Rainbow Six Siege, Marvel Rivals, Fortnite, Apex Legends und PUBG liefern ihre Events über [Overwolf Game Events](https://dev.overwolf.com/ow-electron/live-game-data-gep/live-game-data-gep-intro/) (`"overwolf": { "packages": ["gep"] }` in `package.json`, Anbindung in `src/main/gep.js`, Events je Spiel in `src/core/gep-spiele.js`). Die App erkennt das laufende Spiel selbst; jeder PC meldet, was sein Spieler erlebt.
+Riot und Embark geben keine Live-Daten frei. Deshalb schaut die App auf dem Game-PC selbst auf den Bildschirm (Tab „Bilderkennung“):
 
-Overwolf liefert GEP nur an freigegebene Apps und in verteilten Builds nur mit Code-Signatur. Bis dahin kommen keine echten Events, der Simulator läuft aber mit denselben GEP-Nachrichten. Spiele, die Overwolf noch nicht in PROD hat, zum Testen mit `--owepm-packages-url=https://electronapi-qa.overwolf.com/v2/packages` starten. Rainbow Six: Die App zeigt nur den Namen, den das Spiel gerade zeigt (Overwolf-Regeln für R6).
+1. **Aufnehmen:** Im Editor eine Runde spielen und aufzeichnen (oder ein eigenes Video laden). Die Aufnahme bleibt nur im Arbeitsspeicher und ist weg, sobald man sie löscht oder die App schließt.
+2. **Aktionen anlegen:** Zum passenden Moment spulen, einen Bereich aufziehen (z. B. das Banner „Runde gewonnen“) und ihn als Aktion mit einem Event übernehmen. Je Aktion bis zu 12 Frames, eine Schwelle für die Ähnlichkeit, eine Pause und optional ein Wort, das dort stehen muss (Texterkennung mit Tesseract.js, Englisch und Deutsch, lokal ohne Internet). Mehrere Wörter mit `|` trennen.
+3. **Testen:** „Erkennung testen“ läuft über die Aufnahme und zeigt, wann welche Aktion erkannt würde.
+4. **Teilen:** Export schreibt eine `.json`-Datei mit Bereichen und Frames (ohne Team), Import auf den anderen Game-PCs übernimmt sie. Hat der andere Bildschirm ein anderes Seitenverhältnis, rechnet die App die Bereiche nach ihrem Anker (links/mitte/rechts, oben/mitte/unten) um.
+
+Erkannt wird nur im Spiel, das gerade aktiv ist, mit 2 bis 10 Bildern pro Sekunde. Verglichen werden verkleinerte Graustufen-Signaturen (`src/core/bild-erkennung.js`), die Ereignisse daraus macht `src/core/bild-spiele.js`, die Aufnahme läuft in einem unsichtbaren Fenster (`src/main/bild.js`, `src/renderer/erkennung.js`). Exklusives Vollbild lässt sich oft nicht aufnehmen (schwarzes Bild); die App warnt dann und empfiehlt „Randloses Fenster“.
+
+Valorant: Riot erlaubt keine Hinweise auf den Spike-Timer. Die App meldet deshalb nur „Spike gelegt“ und „Spike entschärft“, ohne Countdown.
 
 ## OSC: Ziele und Signale
 
@@ -113,14 +116,14 @@ npm run dist:win   # Windows-Installer mit ow-electron-builder
 npm run dist:mac   # macOS Intel (dmg), nur auf einem Mac
 ```
 
-**Beta-Releases:** Ein Tag `v*` (z. B. `v0.1.0-beta.1`) oder Actions → Release startet `.github/workflows/release.yml`: Builds für Windows (x64) und macOS Intel auf GitHub-Runnern, Ergebnis als Vorabversion unter Releases. Beide sind noch unsigniert: Windows warnt mit SmartScreen (Weitere Informationen → Trotzdem ausführen), auf dem Mac beim ersten Start Rechtsklick → Öffnen. Overwolf-Spiele (GEP) laden erst in einer signierten Windows-Version, siehe [docs/zertifikat.md](docs/zertifikat.md). Apple Silicon folgt.
+**Beta-Releases:** Ein Tag `v*` (z. B. `v0.1.0-beta.1`) oder Actions → Release startet `.github/workflows/release.yml`: Builds für Windows (x64) und macOS Intel auf GitHub-Runnern, Ergebnis als Vorabversion unter Releases. Beide sind noch unsigniert: Windows warnt mit SmartScreen (Weitere Informationen → Trotzdem ausführen), auf dem Mac beim ersten Start Rechtsklick → Öffnen. Apple Silicon folgt.
 
 `dist-app/index.html` lässt sich auch direkt im Browser öffnen: Dann läuft eine Vorschau ohne Netzwerk, mit derselben Regie-Logik und dem Simulator.
 
 | Ordner | Inhalt |
 |---|---|
-| `src/core` | Logik ohne Electron: Ereigniserkennung je Spiel (CS2, Rocket League, Dota 2, Overwolf-Spiele), Regie, Ziel-Datenbank, Signale, Statistik, Simulator, Protokoll |
-| `src/main` | Hauptprozess: Session-Server, Game-PC-Verbindung, GSI-Empfang, Overwolf GEP, OSC, Game-Stats-Screen (Fenster, NDI) |
+| `src/core` | Logik ohne Electron: Ereigniserkennung je Spiel (CS2, Rocket League, Dota 2, Bilderkennung für Valorant und The Finals), Regie, Ziel-Datenbank, Signale, Statistik, Simulator, Protokoll |
+| `src/main` | Hauptprozess: Session-Server, Game-PC-Verbindung, GSI-Empfang, Bilderkennung mit Texterkennung, OSC, Game-Stats-Screen (Fenster, NDI) |
 | `src/renderer` | Oberfläche (React): Modus-Wahl, `regie/`, `gamepc/`, `StatsScreen.jsx` (`index.html#stats`) |
 
 ## Lizenz

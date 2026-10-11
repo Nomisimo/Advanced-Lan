@@ -3,7 +3,7 @@
 
 const FRISCH = 15000; // ms: so lange gelten Spieldaten als aktuell
 
-// weitere: { Spielname: Zeitpunkt der letzten Daten } für Dota 2 und die Overwolf-Spiele
+// weitere: { Spielname: Zeitpunkt der letzten Daten } für Dota 2 und Valorant
 function overlayStatus({ client = {}, gsi = {}, rl = {}, letzteCs2 = 0, letzteRl = 0, weitere = {}, jetzt = Date.now() }) {
   const z = client.zustand;
   if (gsi.fehler) return { farbe: "err", text: `CS2-Empfang gestört: ${gsi.fehler}` };

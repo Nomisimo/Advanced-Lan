@@ -50,11 +50,12 @@ export const TeamChip = ({ team }) => team ? (
 
 const ICONS = { Match: Trophy, Runde: Timer, Bombe: Bomb, Spieler: Crosshair };
 const RL_ICONS = { goal: Goal, assist: Handshake, hat_trick: Flame, save: Shield, epic_save: ShieldCheck, shot: Target, demolition: CarFront, crossbar: Flag, kickoff: Play, overtime: Timer, podium: Medal, mvp: Crown, replay_start: Repeat, replay_end: Repeat, match_start: Trophy, match_end: Trophy };
-// Dota 2 und Overwolf-Spiele
+// Dota 2 und die Bild-Spiele (Valorant, The Finals)
 const ALLE_ICONS = { match_start: Play, match_end: Trophy, match_won: Trophy, victory: Crown, squad_out: UserX, draft: Users, pre_game: Timer, day: Sun, night: Moon,
   roshan_killed: Swords, aegis: Shield, tower_destroyed: Castle, barracks_destroyed: Castle, round_start: Timer, round_end: Flag,
   kill: Crosshair, headshot: Target, assist: Handshake, death: Skull, knockdown: ArrowDownToLine, knockout: ArrowDownToLine, knocked: ArrowDownToLine,
-  respawn: HeartPulse, revive: HeartPulse, revived: HeartPulse, bomb_planted: Bomb, bomb_defused: ShieldOff, double_kill: Zap, triple_kill: Zap, ultra_kill: Zap, rampage: Flame };
+  respawn: HeartPulse, revive: HeartPulse, revived: HeartPulse, spike_planted: Bomb, spike_defused: ShieldOff, double_kill: Zap, triple_kill: Zap, ultra_kill: Zap, rampage: Flame,
+  ace: Zap, clutch: Flame, eliminated: UserX, team_wipe: UserX, vault_opened: Castle, cashout_started: Timer, cashout_stolen: Swords, cashout_done: Crown };
 export function EventIcon({ type, spiel = "cs2", size = 15 }) {
   if (spiel === "rl" && RL_ICONS[type]) { const Ic = RL_ICONS[type]; return <Ic size={size} />; }
   if (spiel !== "cs2" && spiel !== "rl" && ALLE_ICONS[type]) { const Ic = ALLE_ICONS[type]; return <Ic size={size} />; }

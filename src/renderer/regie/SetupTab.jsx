@@ -43,7 +43,7 @@ function RegieCheck({ cfg, status, standalone }) {
       : { label: "Session offen", ok: ses.offen, detail: ses.offen ? `„${cfg.session.name}“ auf Port ${ses.port}` : ses.fehler || "geschlossen" },
     { label: "Ziel eingetragen", ok: cfg.targets.some((t) => t.host && t.port), detail: `${cfg.targets.filter((t) => t.host && t.port).length} Ziel(e)` },
     { label: "Aktives Spiel hat eine Datenquelle", ok: !!SPIELE.find((s) => s.id === cfg.aktivesSpiel)?.quelle, detail: SPIELE.find((s) => s.id === cfg.aktivesSpiel)?.name },
-    ...(SPIELE.find((s) => s.id === cfg.aktivesSpiel)?.gep ? [{ label: "Overwolf liefert Spieldaten", ok: false, warn: true, detail: "erst mit Overwolf-Freigabe und signierter App, der Simulator geht schon" }] : []),
+    ...(SPIELE.find((s) => s.id === cfg.aktivesSpiel)?.bild ? [{ label: "Bilderkennung auf den Game-PCs eingerichtet", ok: false, warn: true, detail: "jeder Game-PC braucht die Aktionen: einmal im Editor anlegen, dann exportieren und importieren" }] : []),
     { label: "Ausgabe an", ok: !!cfg.armed, warn: true, detail: cfg.armed ? "an" : "aus (nach jedem Start)" },
   ];
   const offen = punkte.filter((p) => !p.ok && !p.warn).length;

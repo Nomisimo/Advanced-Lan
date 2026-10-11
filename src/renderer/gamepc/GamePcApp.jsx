@@ -8,10 +8,11 @@ import AppEinstellungen from "../AppEinstellungen.jsx";
 import EventsTab from "./EventsTab.jsx";
 import SimTab from "./SimTab.jsx";
 import AnleitungTab from "../AnleitungTab.jsx";
-import { Network, Settings, Activity, BookOpen, FlaskConical } from "lucide-react";
+import BildTab from "./BildTab.jsx";
+import { Network, Settings, Activity, BookOpen, FlaskConical, ScanEye } from "lucide-react";
 
 export const ZUSTAND = { verbunden: ["Verbunden", OK], verbinde: ["Verbinde …", WARN], getrennt: ["Nicht verbunden", MUTED], abgelehnt: ["Abgelehnt", ERR] };
-const TABS = [["session", "Session", Network], ["setup", "Setup", Settings], ["events", "Events", Activity], ["sim", "Simulator", FlaskConical], ["hilfe", "Anleitung", BookOpen]];
+const TABS = [["session", "Session", Network], ["setup", "Setup", Settings], ["bild", "Bilderkennung", ScanEye], ["events", "Events", Activity], ["sim", "Simulator", FlaskConical], ["hilfe", "Anleitung", BookOpen]];
 
 export default function GamePcApp({ cfg: alles, mutate: mutateAlles, status: st, jetzt, notify, version, modusWechseln }) {
   const cfg = alles.gamepc;
@@ -52,6 +53,7 @@ export default function GamePcApp({ cfg: alles, mutate: mutateAlles, status: st,
           <div style={{ animation: "npFade .18s ease" }}>
             {tab === "session" && <SessionTab {...shared} />}
             {tab === "setup" && <><SetupTab {...shared} /><AppEinstellungen cfg={alles} status={st} mutate={mutateAlles} notify={notify} /></>}
+            {tab === "bild" && <BildTab {...shared} />}
             {tab === "events" && <EventsTab {...shared} />}
             {tab === "sim" && <SimTab {...shared} />}
             {tab === "hilfe" && <AnleitungTab modus="gamepc" goTab={setTab} />}

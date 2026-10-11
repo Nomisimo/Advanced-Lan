@@ -14,7 +14,7 @@ const { RegieSim } = require('../core/regie-sim');
 const { CsQuelle } = require('../core/cs-quelle');
 const { RlQuelle } = require('../core/rl-quelle');
 const { DotaQuelle, DOTA_APPID, dotaCfg, dotaStartoptionen, DOTA_CFG_DATEI, DOTA_STARTOPTION } = require('../core/dota');
-const { BildQuelle, BILD_SPIELE, BILD_BY_ID, exportDatei, importDatei } = require('../core/bild-spiele');
+const { BildQuelle, BILD_SPIELE, BILD_BY_ID, exportDatei, importDatei, aktionBereit } = require('../core/bild-spiele');
 const { QUELLEN, SPIEL_BY_ID } = require('../core/spiele');
 const { rlIni, leseRlIni, RL_INI_DATEI } = require('../core/rl-ini');
 const { migrateKonfig, MODI } = require('../core/defaults');
@@ -308,7 +308,7 @@ async function dotaCheck() {
 function bildCheck() {
   const c = cfg.gamepc.bild, st = bild.status();
   return BILD_SPIELE.map((d) => {
-    const n = c.spiele[d.id].aktionen.filter((a) => a.an && (a.vorlagen.length || a.text)).length;
+    const n = c.spiele[d.id].aktionen.filter(aktionBereit).length;
     const l = st.spiele[d.id];
     const q = c.spiele[d.id].quelle;
     const wo = q === 'bildschirm' ? 'Bildschirm' : q.startsWith('fenster:') ? `Fenster „${q.slice(8)}“` : 'Spielfenster';

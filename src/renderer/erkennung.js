@@ -1,5 +1,5 @@
 // Unsichtbares Erkennungsfenster des Game-PCs: nimmt den eingestellten Bildschirm auf und schickt je Bild die Signaturen
-// der Bereiche an den Hauptprozess (src/main/bild.js). Bereiche mit Text gehen zusätzlich als PNG an die Texterkennung.
+// der Bereiche (Auslöser aller Aktionen) an den Hauptprozess (src/main/bild.js). Bereiche mit Text gehen zusätzlich als PNG an die Texterkennung.
 import { sigAus, istLeer, pngAus, bildGroesse } from "./bild.js";
 
 const api = window.erkennungAPI;
@@ -25,13 +25,13 @@ function bild() {
   const jetzt = Date.now();
   if (jetzt - letzteLeer > 2000) { leer = istLeer(video); letzteLeer = jetzt; }
   const sigs = {};
-  for (const a of start.aktionen) sigs[a.id] = sigAus(video, a.region);
+  for (const t of start.teile) sigs[t.key] = sigAus(video, t.region);
   const g = bildGroesse(video);
   api.frame({ t: jetzt, b: g.b, h: g.h, sigs, leer });
   // Texterkennung ist teurer: höchstens alle 700 ms
   if (jetzt - letzteTexte > 700) {
     letzteTexte = jetzt;
-    for (const a of start.aktionen.filter((x) => x.text)) pngAus(video, a.region).then((png) => api.text(a.id, png)).catch(() => {});
+    for (const t of start.teile.filter((x) => x.text)) pngAus(video, t.region).then((png) => api.text(t.key, png)).catch(() => {});
   }
 }
 

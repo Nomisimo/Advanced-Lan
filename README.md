@@ -86,7 +86,7 @@ Erkannte Ereignisse: Heldenwahl, Vorbereitung, Horn, Ancient zerstört (mit Sieg
 Riot und Embark geben keine Live-Daten frei. Deshalb schaut die App auf dem Game-PC selbst auf den Bildschirm (Tab „Bilderkennung“):
 
 1. **Aufnehmen:** Im Editor eine Runde spielen und aufzeichnen (oder ein eigenes Video laden). Die Aufnahme bleibt nur im Arbeitsspeicher und ist weg, sobald man sie löscht oder die App schließt.
-2. **Aktionen anlegen:** Zum passenden Moment spulen, einen Bereich aufziehen (z. B. das Banner „Runde gewonnen“) und ihn als Aktion mit einem Event übernehmen. Je Aktion bis zu 12 Frames, eine Schwelle für die Ähnlichkeit, eine Pause und optional ein Wort, das dort stehen muss (Texterkennung mit Tesseract.js, Englisch und Deutsch, lokal ohne Internet). Mehrere Wörter mit `|` trennen.
+2. **Aktionen anlegen:** Zum passenden Moment spulen, einen Bereich aufziehen (z. B. das Banner „Runde gewonnen“) und ihn als Aktion mit einem Event übernehmen. Eine Aktion kann bis zu 6 Bereiche als Auslöser haben (ein Bereich reicht oder alle gleichzeitig), je Bereich bis zu 12 Frames, eine Schwelle für die Ähnlichkeit, eine Pause und optional ein Wort, das dort stehen muss (Texterkennung mit Tesseract.js, Englisch und Deutsch, lokal ohne Internet). Mehrere Wörter mit `|` trennen.
 3. **Testen:** „Erkennung testen“ läuft über die Aufnahme und zeigt, wann welche Aktion erkannt würde.
 4. **Teilen:** Export schreibt eine `.json`-Datei mit Bereichen und Frames (ohne Team), Import auf den anderen Game-PCs übernimmt sie. Hat der andere Bildschirm ein anderes Seitenverhältnis, rechnet die App die Bereiche nach ihrem Anker (links/mitte/rechts, oben/mitte/unten) um.
 

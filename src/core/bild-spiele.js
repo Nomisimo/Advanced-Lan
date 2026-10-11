@@ -74,23 +74,58 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 const text = (x, max = 60) => (typeof x === "string" ? x.slice(0, max) : "");
 const num = (x, min, max, std) => (Number.isFinite(Number(x)) ? Math.min(max, Math.max(min, Number(x))) : std);
 
-// Eine Aktion: welcher Bereich wie aussieht (Frames) oder welches Wort dort steht, und welches Event dann an die Regie geht
+// Eine Aktion: ein oder mehrere Bereiche (Auslöser), je mit Frames und/oder einem Wort, das dort stehen muss,
+// und welches Event dann an die Regie geht. modus: "eines" = ein Auslöser reicht, "alle" = alle gleichzeitig.
+const MAX_BEREICHE = 6, MAX_FRAMES = 12;
+function migrateBereich(b, i) {
+  if (!b || typeof b !== "object") return null;
+  const r = region(b.region);
+  const anker = { h: ANKER_H.includes(b.anker?.h) ? b.anker.h : ankerVon(r).h, v: ANKER_V.includes(b.anker?.v) ? b.anker.v : ankerVon(r).v };
+  const vorlagen = (Array.isArray(b.vorlagen) ? b.vorlagen : [])
+    .filter((v) => v && typeof v.sig === "string" && dekodieren(v.sig)?.length === SIG_LAENGE)
+    .slice(0, MAX_FRAMES).map((v) => ({ sig: v.sig, bild: typeof v.bild === "string" && v.bild.startsWith("data:image/") ? v.bild : "" }));
+  return { id: text(b.id, 20) || `b${i + 1}`, region: r, anker, vorlagen, text: text(b.text, 120).trim() };
+}
 function migrateAktion(a, spiel) {
   const def = BILD_BY_ID[spiel];
   if (!a || typeof a !== "object" || !def) return null;
   const event = def.events.some((e) => e.id === a.event) ? a.event : null;
   if (!event) return null;
-  const r = region(a.region);
-  const anker = { h: ANKER_H.includes(a.anker?.h) ? a.anker.h : ankerVon(r).h, v: ANKER_V.includes(a.anker?.v) ? a.anker.v : ankerVon(r).v };
-  const vorlagen = (Array.isArray(a.vorlagen) ? a.vorlagen : [])
-    .filter((v) => v && typeof v.sig === "string" && dekodieren(v.sig)?.length === SIG_LAENGE)
-    .slice(0, 12).map((v) => ({ sig: v.sig, bild: typeof v.bild === "string" && v.bild.startsWith("data:image/") ? v.bild : "" }));
+  // Bis Beta 7 hatte eine Aktion genau einen Bereich (region, anker, vorlagen, text direkt an der Aktion)
+  const roh = Array.isArray(a.bereiche) && a.bereiche.length ? a.bereiche : [{ region: a.region, anker: a.anker, vorlagen: a.vorlagen, text: a.text }];
+  const bereiche = roh.slice(0, MAX_BEREICHE).map(migrateBereich).filter(Boolean);
+  const ids = new Set();
+  for (const b of bereiche) { while (ids.has(b.id)) b.id = uid(); ids.add(b.id); }
+  if (!bereiche.length) bereiche.push(migrateBereich({}, 0));
   return {
     id: text(a.id, 20) || uid(), name: text(a.name) || def.events.find((e) => e.id === event).label, event,
     seite: a.seite === "gegner" && def.teams.length === 2 ? "gegner" : "eigen",
-    region: r, anker, vorlagen, text: text(a.text, 120).trim(),
+    bereiche, modus: a.modus === "alle" ? "alle" : "eines",
     schwelle: num(a.schwelle, 0.5, 0.99, 0.8), pause: num(a.pause, 200, 60000, 2000), an: a.an !== false,
   };
+}
+// Hat der Bereich etwas zum Vergleichen? Ist die Aktion eingerichtet?
+const bereichBereit = (b) => !!(b.vorlagen.length || b.text);
+const aktionBereit = (a) => a.an && a.bereiche.some(bereichBereit);
+
+// Aufträge für die Erkennung aus den Aktionen eines Spiels (Hauptprozess und Editor-Test):
+// teile: [{ key, region, text }] für das Aufnahmefenster, aktionen und vorlagen für BildErkennung
+function erkennungsAuftrag(aktionen) {
+  const bereit = aktionen.filter(aktionBereit);
+  const ort = (a) => JSON.stringify(a.bereiche.filter(bereichBereit).map((b) => b.region));
+  // Aktionen mit denselben Bereichen bilden eine Gruppe: nur die ähnlichste zählt (z. B. Runde gewonnen/verloren)
+  const gruppe = (a) => (bereit.filter((x) => ort(x) === ort(a)).length > 1 ? ort(a) : undefined);
+  const teile = [], vorlagen = {};
+  const liste = bereit.map((a) => ({
+    id: a.id, gruppe: gruppe(a), pause: a.pause, schwelle: a.schwelle, modus: a.modus,
+    teile: a.bereiche.filter(bereichBereit).map((b) => {
+      const key = `${a.id}.${b.id}`;
+      teile.push({ key, region: b.region, text: !!b.text });
+      vorlagen[key] = b.vorlagen.map((v) => v.sig);
+      return { key, text: b.text };
+    }),
+  }));
+  return { teile, aktionen: liste, vorlagen };
 }
 
 function standardBildSpiel(id) {
@@ -143,7 +178,7 @@ function erkennungsPlan(bild, fenster = [], aktiv = null) {
   if (!bild?.an) return plan;
   for (const def of BILD_SPIELE) {
     const sc = bild.spiele?.[def.id];
-    if (!sc || !sc.aktionen.some((a) => a.an && (a.vorlagen.length || a.text))) continue;
+    if (!sc || !sc.aktionen.some(aktionBereit)) continue;
     const f = fensterFuer(def, sc, fenster);
     if (f) plan[def.id] = { art: "fenster", id: f.id, name: f.name.trim() };
     else if (sc.quelle === "bildschirm" && (spielFenster(def, fenster) || aktiv === def.id)) plan[def.id] = { art: "bildschirm", name: "Bildschirm" };
@@ -168,7 +203,7 @@ function importDatei(json, bildschirm) {
   if (!aktionen.length) return { fehler: "Die Datei enthält keine Aktionen" };
   // Anderes Seitenverhältnis: Bereiche nach ihrem Anker verschieben. Die Frames bleiben gültig, sie werden ohnehin verkleinert verglichen.
   const korrigiert = !!(von && nach && Math.abs(von.b / von.h - nach.b / nach.h) > 0.01);
-  if (korrigiert) aktionen = aktionen.map((a) => ({ ...a, region: umrechnen(a.region, von, nach, a.anker) }));
+  if (korrigiert) aktionen = aktionen.map((a) => ({ ...a, bereiche: a.bereiche.map((b) => ({ ...b, region: umrechnen(b.region, von, nach, b.anker) })) }));
   return { spiel: d.spiel, aufloesung: korrigiert ? nach : von || nach, aktionen, korrigiert };
 }
 
@@ -240,4 +275,4 @@ class BildQuelle {
   }
 }
 
-module.exports = { erkennungsPlan, spielFenster, fensterFuer, BILD_SPIELE, BILD_BY_ID, FPS, standardBild, migrateBild, migrateAktion, exportDatei, importDatei, EXPORT_FORMAT, BildQuelle, uid };
+module.exports = { erkennungsAuftrag, aktionBereit, bereichBereit, migrateBereich, MAX_BEREICHE, MAX_FRAMES, erkennungsPlan, spielFenster, fensterFuer, BILD_SPIELE, BILD_BY_ID, FPS, standardBild, migrateBild, migrateAktion, exportDatei, importDatei, EXPORT_FORMAT, BildQuelle, uid };

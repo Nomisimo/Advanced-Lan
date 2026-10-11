@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { SIG_B, SIG_H, SIG_LAENGE, signatur, normiert, aehnlichkeit, bildLeer, kodieren, dekodieren, region, umrechnen, textPasst, BildErkennung } = require("../src/core/bild-erkennung");
-const { standardBild, migrateBild, exportDatei, importDatei, erkennungsPlan, fensterFuer, BILD_BY_ID } = require("../src/core/bild-spiele");
+const { standardBild, migrateBild, migrateAktion, exportDatei, importDatei, erkennungsPlan, fensterFuer, erkennungsAuftrag, BILD_BY_ID } = require("../src/core/bild-spiele");
 
 // Testbild: b × h Pixel RGBA, farbe(x, y) → Grauwert
 const bild = (b, h, farbe) => {
@@ -81,7 +81,7 @@ test("Spiel-Konfiguration: Migration, Export ohne Team, Import mit Korrektur", (
   const v = cfg.spiele.valorant;
   assert.equal(v.team, "TEAM B");
   assert.equal(v.aktionen.length, 1);
-  assert.equal(v.aktionen[0].vorlagen.length, 1);
+  assert.equal(v.aktionen[0].bereiche[0].vorlagen.length, 1, "alte Aktion mit einem Bereich wird übernommen");
   assert.equal(v.aktionen[0].schwelle, 0.99);
   assert.equal(cfg.spiele.finals.team, "TEAM A");
 
@@ -89,11 +89,11 @@ test("Spiel-Konfiguration: Migration, Export ohne Team, Import mit Korrektur", (
   assert.ok(!datei.includes("TEAM B"), "Team stellt jeder PC selbst ein");
   const gleich = importDatei(datei, { b: 2560, h: 1440 });
   assert.equal(gleich.korrigiert, false);
-  assert.deepEqual(gleich.aktionen[0].region, v.aktionen[0].region);
+  assert.deepEqual(gleich.aktionen[0].bereiche[0].region, v.aktionen[0].bereiche[0].region);
   const breit = importDatei(datei, { b: 2560, h: 1080 });
   assert.equal(breit.korrigiert, true);
   assert.deepEqual(breit.aufloesung, { b: 2560, h: 1080 });
-  assert.ok(breit.aktionen[0].region.x > 0.9);
+  assert.ok(breit.aktionen[0].bereiche[0].region.x > 0.9);
   assert.equal(breit.aktionen[0].seite, "gegner");
 
   assert.match(importDatei("{kaputt", null).fehler, /JSON/);
@@ -132,4 +132,34 @@ test("Bildquellen: Spielfenster automatisch, mehrere Spiele gleichzeitig, Fenste
 test("Texterkennung: alle Tesseract-Kerne sind im Build (Node lädt je nach CPU einen anderen)", () => {
   const pkg = require("../package.json");
   assert.ok(!pkg.build.files.some((f) => f.startsWith("!") && f.includes("tesseract.js-core")), "kein Kern ausgeschlossen");
+});
+
+test("Mehrere Bereiche je Aktion: einer reicht oder alle gleichzeitig, auch nur Texte", () => {
+  const A = streifen(64, 24, 8), B = streifen(64, 24, 3), weg = verlauf(64, 24);
+  const sigA = kodieren(A), sigB = kodieren(B);
+  const aktion = (id, modus, bereiche) => migrateAktion({ id, event: "kill", modus, pause: 0, bereiche }, "valorant");
+  const aktionen = [
+    aktion("eins", "eines", [{ id: "oben", region: { x: 0.4, y: 0, b: 0.2, h: 0.1 }, vorlagen: [{ sig: sigA }] }, { id: "rechts", region: { x: 0.8, y: 0.1, b: 0.2, h: 0.1 }, vorlagen: [{ sig: sigB }] }]),
+    aktion("beide", "alle", [{ id: "t1", region: { x: 0, y: 0, b: 0.1, h: 0.1 }, text: "ACE" }, { id: "t2", region: { x: 0, y: 0.5, b: 0.1, h: 0.1 }, text: "CLUTCH" }]),
+  ];
+  const auftrag = erkennungsAuftrag(aktionen);
+  assert.deepEqual(auftrag.teile.map((t) => t.key), ["eins.oben", "eins.rechts", "beide.t1", "beide.t2"]);
+  const e = new BildErkennung({ aktionen: auftrag.aktionen });
+  e.setVorlagen(auftrag.vorlagen);
+  const ids = (sigs, t, texte) => e.frame(sigs, t, texte).erkannt.map((x) => x.id);
+  // Nur der zweite Bereich zeigt sein Bild: „eines“ reicht
+  ids({ "eins.oben": weg, "eins.rechts": B }, 0);
+  assert.deepEqual(ids({ "eins.oben": weg, "eins.rechts": B }, 100), ["eins"]);
+  // „alle“: ein Text allein reicht nicht, beide zusammen schon
+  ids({}, 200, { "beide.t1": "ACE" }); assert.deepEqual(ids({}, 300, { "beide.t1": "ACE" }), []);
+  ids({}, 400, { "beide.t1": "ACE", "beide.t2": "Clutch" });
+  assert.deepEqual(ids({}, 500, { "beide.t1": "ACE", "beide.t2": "Clutch" }), ["beide"]);
+  // Alte Konfiguration (ein Bereich direkt an der Aktion) und Import-Korrektur je Bereich
+  const alt = migrateAktion({ event: "kill", region: { x: 0.9, y: 0.1, b: 0.05, h: 0.05 }, text: "KILL" }, "valorant");
+  assert.equal(alt.bereiche.length, 1);
+  assert.equal(alt.bereiche[0].text, "KILL");
+  assert.equal(alt.modus, "eines");
+  const d = importDatei({ format: "advanced-lan-spiel", spiel: "valorant", aufloesung: { b: 1920, h: 1080 }, aktionen }, { b: 2560, h: 1080 });
+  assert.ok(d.aktionen[0].bereiche[1].region.x > 0.8, "rechter Bereich rutscht mit dem Rand");
+  assert.ok(Math.abs(d.aktionen[0].bereiche[0].region.x + d.aktionen[0].bereiche[0].region.b / 2 - 0.5) < 1e-6, "mittiger Bereich bleibt mittig");
 });

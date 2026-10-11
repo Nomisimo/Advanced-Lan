@@ -171,7 +171,7 @@ const Bild = () => (
     </P>
     <L>
       <li><b>Aufnehmen:</b> Im Tab <b>Bilderkennung</b> auf „Gameplay aufnehmen“, ins Spiel wechseln, die Momente spielen (Kill, Runde gewonnen und verloren, Spike gelegt …), zurück und stoppen. Oder ein vorhandenes Video laden.</li>
-      <li><b>Aktionen anlegen:</b> Zum passenden Frame spulen (Frame für Frame), einen Rahmen um die Stelle ziehen, eine Aktion aus den Vorschlägen anlegen und „Aktuellen Frame hinzufügen“. Mehrere Frames je Aktion erkennen Varianten.</li>
+      <li><b>Aktionen anlegen:</b> Zum passenden Frame spulen (Frame für Frame), einen Rahmen um die Stelle ziehen, eine Aktion aus den Vorschlägen anlegen und „Aktuellen Frame hinzufügen“. Mehrere Frames je Bereich erkennen Varianten. Eine Aktion kann mehrere Bereiche als Auslöser haben (Rahmen ziehen, „Als weiteren Bereich“), je mit eigenen Frames oder eigenem Text; einstellbar ist, ob ein Bereich reicht oder alle gleichzeitig passen müssen.</li>
       <li><b>Threshold und Text:</b> Der Threshold legt fest, wie ähnlich das Bild sein muss. Mit „Erkennung testen“ läuft die Erkennung auf der Aufnahme und zeigt jeden Treffer. Wörter mit <Kbd>|</Kbd> trennen, z. B. <Kbd>ROUND WIN|RUNDE GEWONNEN</Kbd>.</li>
       <li><b>Teilen:</b> Exportieren und auf den anderen Game-PCs importieren. Hat ein PC ein anderes Seitenverhältnis, verschiebt der Import die Bereiche nach ihrem Anker (links/Mitte/rechts, oben/Mitte/unten). Das Team stellt jeder PC selbst ein.</li>
       <li><b>Aufnahme löschen:</b> Die Aufnahme liegt nur im Arbeitsspeicher und ist beim Schließen weg. Gespeichert werden nur die kleinen Frames der Aktionen.</li>

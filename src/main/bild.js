@@ -8,7 +8,7 @@ const { BrowserWindow, desktopCapturer, screen, session, webContents } = require
 const path = require('path');
 const fs = require('fs');
 const { BildErkennung } = require('../core/bild-erkennung');
-const { BILD_BY_ID, erkennungsPlan, fensterFuer } = require('../core/bild-spiele');
+const { BILD_BY_ID, erkennungsPlan, fensterFuer, erkennungsAuftrag, aktionBereit } = require('../core/bild-spiele');
 
 const TEXT_GILT = 2500; // so lange zählt ein gelesener Text
 const FENSTER_ALLE = 3000; // so oft nach geöffneten und geschlossenen Spielen sehen
@@ -104,8 +104,8 @@ class BildDienst {
     let geaendert = false;
     for (const spiel of [...this.laeufe.keys()]) if (!plan[spiel]) { this.stop(spiel); geaendert = true; }
     for (const [spiel, quelle] of Object.entries(plan)) {
-      const aktionen = c.spiele[spiel].aktionen.filter((a) => a.an && (a.vorlagen.length || a.text));
-      const sig = JSON.stringify([quelle.art, quelle.id, c.display, c.fps, aktionen.map((a) => [a.id, a.region, a.text, a.schwelle, a.pause, a.vorlagen.length])]);
+      const aktionen = c.spiele[spiel].aktionen.filter(aktionBereit);
+      const sig = JSON.stringify([quelle.art, quelle.id, c.display, c.fps, aktionen.map((a) => [a.id, a.modus, a.schwelle, a.pause, a.bereiche.map((b) => [b.id, b.region, b.text, b.vorlagen.length])])]);
       const alt = this.laeufe.get(spiel);
       if (alt && alt.signatur === sig && alt.fenster) continue;
       geaendert = true;
@@ -117,15 +117,15 @@ class BildDienst {
   }
 
   starten(spiel, quelle, aktionen, signatur, c) {
-    // Aktionen mit demselben Bereich bilden eine Gruppe: nur die ähnlichste zählt (z. B. Runde gewonnen/verloren)
-    const gruppe = (a) => aktionen.filter((b) => JSON.stringify(b.region) === JSON.stringify(a.region)).length > 1 ? JSON.stringify(a.region) : undefined;
-    const erkennung = new BildErkennung({ aktionen: aktionen.map((a) => ({ id: a.id, gruppe: gruppe(a), pause: a.pause, schwelle: a.schwelle, text: a.text })) });
-    erkennung.setVorlagen(Object.fromEntries(aktionen.map((a) => [a.id, a.vorlagen.map((v) => v.sig)])));
+    // Je Aktion ein oder mehrere Auslöser (Bereiche); das Aufnahmefenster liefert je Auslöser eine Signatur und ggf. Text
+    const auftrag = erkennungsAuftrag(aktionen);
+    const erkennung = new BildErkennung({ aktionen: auftrag.aktionen });
+    erkennung.setVorlagen(auftrag.vorlagen);
     const alt = this.laeufe.get(spiel);
     const lauf = alt || { spiel, fenster: null, letzte: {}, info: { fehler: '', leer: false, b: 0, h: 0, bilder: 0, t: 0 } };
-    Object.assign(lauf, { quelle, aktionen, signatur, erkennung, display: c.display, texte: {}, werte: {} });
+    Object.assign(lauf, { quelle, aktionen, signatur, erkennung, display: c.display, texte: {}, werte: {}, teilWerte: {} });
     this.laeufe.set(spiel, lauf);
-    const start = { fps: c.fps, aktionen: aktionen.map((a) => ({ id: a.id, region: a.region, text: !!a.text })) };
+    const start = { fps: c.fps, teile: auftrag.teile };
     if (lauf.fenster) return lauf.fenster.webContents.send('erkennung-start', start);
     const w = new BrowserWindow({
       name: `erkennung-${spiel}`, show: false, width: 320, height: 200, skipTaskbar: true,
@@ -154,7 +154,7 @@ class BildDienst {
     const texte = {};
     for (const [id, x] of Object.entries(l.texte)) if (now - x.t < TEXT_GILT) texte[id] = x.text;
     const r = l.erkennung.frame(d.sigs || {}, now, texte);
-    l.werte = r.werte;
+    l.werte = r.werte; l.teilWerte = r.teilWerte;
     Object.assign(l.info, { fehler: '', leer: !!d.leer, b: d.b, h: d.h, bilder: l.info.bilder + 1, t: now });
     for (const e of r.erkannt) {
       const a = l.aktionen.find((x) => x.id === e.id);
@@ -196,7 +196,7 @@ class BildDienst {
     const spiele = {};
     for (const l of this.laeufe.values()) {
       const alt = l.info.t ? Date.now() - l.info.t : null;
-      spiele[l.spiel] = { ...l.info, laeuft: !!l.fenster && alt != null && alt < 3000, quelle: l.quelle, werte: l.werte, letzte: l.letzte };
+      spiele[l.spiel] = { ...l.info, laeuft: !!l.fenster && alt != null && alt < 3000, quelle: l.quelle, werte: l.werte, teilWerte: l.teilWerte, letzte: l.letzte };
     }
     return { spiele, fehler: this.fehler, fenster: this.fenster.map((f) => f.name.trim()), bildschirm: this.bildschirm() };
   }

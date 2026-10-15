@@ -6,6 +6,10 @@ const REPO = "Nomisimo/Advanced-Lan";
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
+  "0.1.0-beta.9": [
+    "Mac: NDI-Quelle ist im Netz sichtbar. Die App meldet den Bonjour-Dienst _ndi._tcp jetzt bei macOS an, ohne den macOS die NDI-Ankündigung blockiert hat",
+    "Setup auf dem Mac: Hinweis auf die Freigabe „Lokales Netzwerk“, solange kein NDI-Empfänger verbunden ist",
+  ],
   "0.1.0-beta.8": [
     "NDI-Stream sendet immer in 1920×1080, auch wenn der Regie-PC einen kleineren Bildschirm hat",
     "NDI startet zuverlässig: das NDI SDK wird vor dem ersten Sender gestartet. Kommt nach 4 Sekunden kein Bild, steht das als Fehler im Setup",

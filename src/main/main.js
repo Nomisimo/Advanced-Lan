@@ -581,7 +581,11 @@ ipcMain.handle('config-set', async (_, neu) => {
     for (const d of BILD_SPIELE) if (quellen[d.id]) { quellen[d.id].team = cfg.gamepc.bild.spiele[d.id].team; quellen[d.id].name = cfg.gamepc.pcId || ''; }
     bild.anwenden();
   }
-  if (istRegie() && JSON.stringify(cfg.regie.stats) !== JSON.stringify(alt.regie.stats)) await stats.anwenden();
+  if (istRegie() && JSON.stringify(cfg.regie.stats) !== JSON.stringify(alt.regie.stats)) {
+    // Neues Layout aus dem Editor sofort an Pop-out-Fenster und NDI geben
+    for (const wc of stats.webContents()) wc.send('stats-config', cfg);
+    await stats.anwenden();
+  }
   if (cfg.modus === 'gamepc' && cfg.gamepc.netz !== alt.gamepc.netz) {
     // Andere Karte: Sessions dort neu suchen und eine bestehende Verbindung darüber neu aufbauen
     discovery.stop(); discovery.start();

@@ -4,7 +4,7 @@ import { Section, Check, Field, KartenWahl, useKarten, Toggle, Dot } from "../ui
 import { api } from "../api.js";
 import { StatsBuehne } from "../StatsScreen.jsx";
 import { SPIELE } from "../../core/spiele.js";
-import { MonitorPlay, X, Cast } from "lucide-react";
+import { MonitorPlay, X, Cast, LayoutTemplate } from "lucide-react";
 
 // Welche Spiele die Regie nutzt. Nur diese erscheinen in „Control“ und „Signale“.
 function Spiele({ cfg, mutate, notify }) {
@@ -55,7 +55,7 @@ function RegieCheck({ cfg, status, standalone }) {
 }
 
 // Game-Stats-Screen: Pop-out-Fenster und NDI-Stream (nur Regie und Standalone)
-function StatsScreenSetup({ cfg, mutate, status, log }) {
+function StatsScreenSetup({ cfg, mutate, status, log, goTab }) {
   const s = cfg.stats || {}, st = status.stats || {}, ndi = st.ndi || {};
   const [ndiCheck, setNdiCheck] = useState(null);
   const [name, setName] = useState(s.ndiName || "");
@@ -63,7 +63,7 @@ function StatsScreenSetup({ cfg, mutate, status, log }) {
   useEffect(() => setName(s.ndiName || ""), [s.ndiName]);
   const set = (k, v) => mutate((d) => { d.stats = { ...d.stats, [k]: v }; });
   const an = !!s.an, ndiGeht = ndiCheck?.verfuegbar !== false;
-  const ndiText = !an ? "aus" : !s.ndi ? "aus" : ndi.fehler ? ndi.fehler : ndi.laeuft ? `sendet als „${ndi.name}“ · ${ndi.aufloesung}, ${ndi.fps} fps · ${ndi.verbindungen || 0} Empfänger` : "startet …";
+  const ndiText = !an ? "aus" : !s.ndi ? "aus" : ndi.fehler ? ndi.fehler : ndi.laeuft ? `sendet als „${ndi.name}“ · ${ndi.aufloesung}, ${ndi.fps} fps · ${ndi.verbindungen || 0} Empfänger · ${ndi.bilder || 0} Bilder` : "startet …";
   const ndiFarbe = !an || !s.ndi ? MUTED : ndi.fehler ? ERR : ndi.laeuft ? OK : WARN;
   return (
     <Section title="Game-Stats-Screen" subtitle="Spielstand, Zahlen des Matches, beste Spieler und letzte Events des aktiven Spiels für Publikum und Stream. Als eigenes Fenster (zweiter Bildschirm, Beamer) oder als NDI-Quelle für OBS, vMix und Co."
@@ -82,7 +82,8 @@ function StatsScreenSetup({ cfg, mutate, status, log }) {
             <input style={S.input} value={name} disabled={!an} maxLength={60} onChange={(e) => setName(e.target.value)} onBlur={() => name.trim() && name.trim() !== s.ndiName ? set("ndiName", name.trim()) : setName(s.ndiName || "")} onKeyDown={(e) => e.key === "Enter" && e.target.blur()} />
           </Field>
           <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, marginTop: 10, color: ndiFarbe }}><Dot color={ndiFarbe} glow={ndi.laeuft} /> {ndiGeht ? ndiText : `nicht verfügbar: ${ndiCheck?.fehler || ""}`}</div>
-          <div style={{ fontSize: 10, color: MUTED, marginTop: 8 }}>1920×1080, 30 fps, im selben Netz. NDI® ist eine eingetragene Marke von Vizrt NDI AB.</div>
+          {an && s.ndi && ndi.laeuft && !ndi.verbindungen && <div style={{ fontSize: 11, color: WARN, marginTop: 8, lineHeight: 1.5 }}>Kein Empfänger sieht die Quelle? Die Windows-Firewall muss Advanced LAN im privaten Netz erlauben (Windows-Sicherheit → Firewall → App zulassen), und Sender und Empfänger müssen im selben Netz sein.</div>}
+          <div style={{ fontSize: 10, color: MUTED, marginTop: 8 }}>1920×1080, 30 fps, im selben Netz.{ndi.version ? ` ${ndi.version}.` : ""} NDI® ist eine eingetragene Marke von Vizrt NDI AB.</div>
         </div>
         <div>
           <div style={{ width: 384, height: 216, borderRadius: 8, overflow: "hidden", border: `1px solid ${an ? ACCENT : LINE}`, boxShadow: an ? GLOW : "none", position: "relative" }}>
@@ -90,7 +91,10 @@ function StatsScreenSetup({ cfg, mutate, status, log }) {
               <StatsBuehne status={status} cfg={{ regie: cfg }} log={log} />
             </div>
           </div>
-          <div style={{ fontSize: 10, color: MUTED, marginTop: 6, textAlign: "center" }}>Vorschau</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
+            <span style={{ fontSize: 10, color: MUTED, flex: 1 }}>Vorschau</span>
+            {goTab && <button style={S.smallBtn} onClick={() => goTab("screen")}><LayoutTemplate size={12} /> Layout bearbeiten</button>}
+          </div>
         </div>
       </div>
     </Section>

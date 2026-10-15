@@ -40,6 +40,7 @@ contextBridge.exposeInMainWorld('regieAPI', {
   statsFenster:    call('stats-fenster'),
   statsVollbild:   call('stats-vollbild'),
   ndiPruefen:      call('ndi-pruefen'),
+  onStatsConfig:   abo('stats-config'),
   // Game-PC
   gamePcLog:       call('gamepc-log'),
   verbinden:       call('verbinden'),

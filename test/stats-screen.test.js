@@ -4,6 +4,8 @@ const { statsDaten, statsEvents } = require("../src/core/stats-screen");
 const { Statistik } = require("../src/core/statistik");
 const { SPIEL_BY_ID } = require("../src/core/spiele");
 const { migrateKonfig, standardKonfig } = require("../src/core/defaults");
+const { standardLayout, migrateLayout, textEinsetzen, einrasten, ANZEIGEN, B, H } = require("../src/core/stats-layout");
+const { statsBeispiel } = require("../src/core/stats-beispiel");
 
 test("Stats-Screen ohne Daten: leer, mit Teams für CS2", () => {
   const d = statsDaten(SPIEL_BY_ID.cs2, null, null);
@@ -76,12 +78,74 @@ test("Stats-Screen: letzte Events nur echte des aktiven Spiels", () => {
 
 test("Einstellungen: Standalone-Modus und Stats-Screen", () => {
   const k = standardKonfig();
-  assert.deepEqual(k.regie.stats, { an: false, ndi: false, ndiName: "Advanced LAN Stats" });
+  assert.deepEqual(k.regie.stats, { an: false, ndi: false, ndiName: "Advanced LAN Stats", layout: standardLayout() });
   k.modus = "standalone";
   k.regie.stats = { an: true, ndi: true, ndiName: "  Bühne  ", fremd: 1 };
   const m = migrateKonfig(JSON.parse(JSON.stringify(k)));
   assert.equal(m.modus, "standalone");
-  assert.deepEqual(m.regie.stats, { an: true, ndi: true, ndiName: "Bühne" });
+  assert.deepEqual(m.regie.stats, { an: true, ndi: true, ndiName: "Bühne", layout: standardLayout() });
   assert.equal(migrateKonfig({ ...k, modus: "quatsch" }).modus, null);
   assert.equal(migrateKonfig({ ...k, regie: { ...k.regie, stats: { an: 1, ndiName: "" } } }).regie.stats.ndiName, "Advanced LAN Stats");
+});
+
+test("Screen-Layout: Standard hat jede Anzeige einmal, sichtbar", () => {
+  const l = standardLayout();
+  assert.deepEqual(l.elemente.map((e) => e.typ), ANZEIGEN.map((a) => a.typ));
+  assert.ok(l.elemente.every((e) => e.sichtbar && e.x + e.b <= B && e.y + e.h <= H));
+  assert.deepEqual(migrateLayout(l), l);
+  assert.deepEqual(migrateLayout(null), l);
+});
+
+test("Screen-Layout: gespeichertes Layout wird geprüft", () => {
+  const l = migrateLayout({ hintergrund: "lila", elemente: [
+    { typ: "events", x: 1800, y: -50, b: 500, h: 20, titel: "Feed" },
+    { typ: "events", x: 0, y: 0, b: 100, h: 100 },
+    { typ: "quatsch" }, null,
+    { typ: "text", id: "t1", x: 10, y: 10, b: 300, h: 80, text: "Hallo {spiel}", groesse: 9999, farbe: "rot", ausrichtung: "oben" },
+    { typ: "text", id: "t1", text: "doppelte ID" },
+  ] });
+  assert.equal(l.hintergrund, "verlauf");
+  const ev = l.elemente.find((e) => e.typ === "events");
+  assert.deepEqual([ev.x, ev.y, ev.b, ev.h, ev.titel], [B - 500, 0, 500, 40, "Feed"]);
+  assert.equal(l.elemente.filter((e) => e.typ === "events").length, 1);
+  const t = l.elemente.filter((e) => e.typ === "text");
+  assert.equal(t.length, 2);
+  assert.notEqual(t[0].id, t[1].id);
+  assert.deepEqual([t[0].groesse, t[0].farbe, t[0].ausrichtung], [400, "#ffffff", "mitte"]);
+  // Fehlende Anzeigen kommen ausgeblendet dazu
+  assert.equal(l.elemente.find((e) => e.typ === "spielstand").sichtbar, false);
+});
+
+test("Screen-Layout: Platzhalter in Texten", () => {
+  assert.equal(textEinsetzen("{team1} {score1}:{score2} {team2}", { team1: "CT", team2: "T", score1: 9, score2: 0 }), "CT 9:0 T");
+  assert.equal(textEinsetzen("Live: {session}", {}), "Live: ");
+  assert.equal(textEinsetzen("{tippfehler}", {}), "{tippfehler}");
+});
+
+test("Screen-Layout: Einrasten an Raster, Kanten und Mitte", () => {
+  // Raster
+  assert.deepEqual((({ x, y }) => [x, y])(einrasten({ x: 103, y: 47, b: 200, h: 100 }, [], { raster: 20, abstand: 0 })), [100, 40]);
+  // Mitte der Fläche: Element 200 breit, Mitte bei 955 → rastet auf 960
+  const m = einrasten({ x: 855, y: 300, b: 200, h: 100 }, [], { abstand: 8 });
+  assert.equal(m.x, 860);
+  assert.ok(m.linien.some((l) => l.achse === "x" && l.pos === B / 2));
+  // Kante eines anderen Elements
+  const k = einrasten({ x: 505, y: 600, b: 100, h: 100 }, [{ x: 0, y: 0, b: 500, h: 300 }], { abstand: 8 });
+  assert.equal(k.x, 500);
+  // Größe ändern: rechte Kante rastet, links bleibt
+  const r = einrasten({ x: 100, y: 100, b: 396, h: 100 }, [{ x: 0, y: 0, b: 500, h: 50 }], { abstand: 8, kanten: ["r"] });
+  assert.deepEqual([r.x, r.b], [100, 400]);
+  // Bleibt in der Fläche
+  const a = einrasten({ x: 1900, y: 1070, b: 200, h: 100 }, [], { abstand: 0 });
+  assert.deepEqual([a.x, a.y], [B - 200, H - 100]);
+});
+
+test("Screen-Editor: Beispieldaten füllen den Screen für jedes Spiel", () => {
+  for (const sp of Object.values(SPIEL_BY_ID)) {
+    const { regie, log } = statsBeispiel(sp, 1000);
+    const d = statsDaten(sp, regie.statistik, regie.stand);
+    assert.equal(d.leer, false, sp.id);
+    assert.ok(d.top.length > 0, sp.id);
+    assert.ok(statsEvents(log, sp.id).length > 0, sp.id);
+  }
 });

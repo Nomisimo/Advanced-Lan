@@ -2,6 +2,7 @@
 // Einstellungen der App. Eine Datei für beide Modi: Regie und Game-PC.
 const { STANDARD_HOTKEY, gueltigerHotkey } = require("./app-info");
 const { standardBild, migrateBild } = require("./bild-spiele");
+const { standardLayout, migrateLayout } = require("./stats-layout");
 
 const PORTS = { session: 47801, gsi: 3000, rl: 49124 };
 
@@ -25,7 +26,7 @@ function standardRegie() {
     // Tab „Signale“: welches Event welchen Befehl an welches Ziel sendet
     signale: {}, // { [spiel]: { [event]: [{ id, ziel, befehl, werte, pc, team }] } }
     // Tab „Setup“: Game-Stats-Screen (Spielstand, beste Spieler, letzte Events) als Pop-out-Fenster oder NDI-Stream
-    stats: { an: false, ndi: false, ndiName: "Advanced LAN Stats" },
+    stats: { an: false, ndi: false, ndiName: "Advanced LAN Stats", layout: standardLayout() },
   };
 }
 
@@ -92,7 +93,7 @@ const MODI = ["regie", "gamepc", "standalone"];
 function migrateStats(s, std) {
   if (!s || typeof s !== "object") return { ...std };
   const name = typeof s.ndiName === "string" && s.ndiName.trim() ? s.ndiName.trim().slice(0, 60) : std.ndiName;
-  return { an: !!s.an, ndi: !!s.ndi, ndiName: name };
+  return { an: !!s.an, ndi: !!s.ndi, ndiName: name, layout: migrateLayout(s.layout) };
 }
 
 // Gespeicherte Einstellungen einlesen, fehlende Felder ergänzen

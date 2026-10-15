@@ -6,6 +6,14 @@ const REPO = "Nomisimo/Advanced-Lan";
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
+  "0.1.0-beta.8": [
+    "NDI-Stream sendet immer in 1920×1080, auch wenn der Regie-PC einen kleineren Bildschirm hat",
+    "NDI startet zuverlässig: das NDI SDK wird vor dem ersten Sender gestartet. Kommt nach 4 Sekunden kein Bild, steht das als Fehler im Setup",
+    "Setup zeigt die gesendeten Bilder, die NDI-Version und einen Firewall-Hinweis, solange kein Empfänger verbunden ist",
+    "Neuer Tab „Screen“ in der Regie: Anzeigen des Stats-Screens verschieben, Größe ändern, ein- und ausblenden, eigene Texte mit Platzhaltern wie {spiel}, {team1} oder {score1}",
+    "Screen-Editor: Raster und Einrasten an Kanten und Mitten (Alt = frei), Pfeiltasten, Strg+Z/Y, Strg+D, Hintergrund Verlauf, Schwarz oder Grün. Beispieldaten des aktiven Spiels füllen die Vorschau",
+    "Pop-out-Fenster und NDI-Stream übernehmen ein geändertes Layout sofort beim Speichern",
+  ],
   "0.1.0-beta.7": [
     "Textfelder bleiben nach Rückfragen bedienbar: eigene Dialoge statt der Windows-Dialoge, die den Tastatur-Fokus verloren haben",
     "Release-Ablauf wie im Netzwerkplaner: Release-Text aus „Was ist neu?“, Tag muss zur Version passen",

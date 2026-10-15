@@ -302,7 +302,8 @@ const StatsHilfe = ({ goTab }) => (
     </P>
     <L>
       <li><b>Pop-out-Fenster:</b> Knopf <b>Stats</b> oben in der Kopfzeile oder im Setup. Das Fenster auf einen zweiten Bildschirm oder Beamer ziehen, Doppelklick schaltet Vollbild.</li>
-      <li><b>NDI-Stream:</b> im Setup einschalten und einen Namen vergeben. OBS (mit NDI-Plugin), vMix oder ein NDI-Monitor im selben Netz sehen die Quelle unter diesem Namen, 1920×1080 mit 30 Bildern pro Sekunde. NDI braucht kein offenes Fenster.</li>
+      <li><b>NDI-Stream:</b> im Setup einschalten und einen Namen vergeben. OBS (mit NDI-Plugin), vMix oder ein NDI-Monitor im selben Netz sehen die Quelle unter diesem Namen, 1920×1080 mit 30 Bildern pro Sekunde. NDI braucht kein offenes Fenster. Im Setup zählt die Zeile die gesendeten Bilder und Empfänger mit. Sieht kein Empfänger die Quelle, muss die Windows-Firewall Advanced LAN im privaten Netz erlauben.</li>
+      <li><b>Screen-Editor (Tab Screen):</b> Anzeigen (Logo, Spiel, Session, LIVE, Spielstand, Zahlen, Bestenliste, Events) per Drag and Drop verschieben, an den Griffen vergrößern, ausblenden und eigene Texte dazulegen. Texte kennen Platzhalter wie <Kbd>{"{spiel}"}</Kbd>, <Kbd>{"{session}"}</Kbd> oder <Kbd>{"{score1}"}</Kbd>. Jede Änderung wird gespeichert und gilt sofort im Fenster und im NDI-Stream. Hintergrund auch schwarz oder grün für Chroma-Key.</li>
     </L>
     <P><span style={{ color: SUB }}>NDI® ist eine eingetragene Marke von Vizrt NDI AB.</span></P>
     {goTab && <button style={S.smallBtn} onClick={() => goTab("setup")}>Zum Setup</button>}

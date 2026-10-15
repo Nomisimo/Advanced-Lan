@@ -72,3 +72,5 @@ jobs:
           if ! hdiutil imageinfo dist/*.dmg | grep -q "Apple_HFS"; then echo "::error::Intel-DMG ist kein HFS+-Image"; exit 1; fi
           codesign -dv dist/mac/*.app 2>&1 | tee /dev/stderr | grep -q "Signature=adhoc" || { echo "::error::App nicht ad-hoc signiert"; exit 1; }
           /usr/libexec/PlistBuddy -c "Print :NSLocalNetworkUsageDescription" dist/mac/*.app/Contents/Info.plist
+          # Ohne _ndi._tcp blockiert macOS die Bonjour-Ankündigung der NDI-Quelle
+          /usr/libexec/PlistBuddy -c "Print :NSBonjourServices" dist/mac/*.app/Contents/Info.plist | grep -q "_ndi._tcp" || { echo "::error::_ndi._tcp fehlt in NSBonjourServices"; exit 1; }

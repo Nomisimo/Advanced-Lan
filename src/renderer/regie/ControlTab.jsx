@@ -297,7 +297,7 @@ function Verbindungscheck({ cfg, status, jetzt }) {
               const c = pruefen(p), s = p.status || {};
               return (
                 <tr key={p.pcId} style={{ opacity: p.verbunden ? 1 : 0.55 }}>
-                  <td style={td({ fontWeight: 700, whiteSpace: "nowrap" })}><Dot color={c.ok ? OK : p.verbunden ? WARN : "#4d475c"} glow={c.ok} /> <span style={{ marginLeft: 4 }}>{p.pcId}</span>{p.sim && <span style={{ ...S.badge, marginLeft: 6, background: "#2f2c3a", color: SUB }}>SIM</span>}</td>
+                  <td style={td({ fontWeight: 700, whiteSpace: "nowrap" })}><Dot color={c.ok ? OK : p.verbunden ? WARN : "#4d475c"} glow={c.ok} /> <span style={{ marginLeft: 4 }}>{p.pcId}</span>{p.spieler && <span style={{ marginLeft: 6, fontWeight: 400, color: SUB }}>{p.spieler}</span>}{p.sim && <span style={{ ...S.badge, marginLeft: 6, background: "#2f2c3a", color: SUB }}>SIM</span>}</td>
                   <td style={td({ textAlign: "center" })}><Ampel ok={c.verbunden} title={c.verbunden ? "verbunden" : "getrennt"} /></td>
                   <td style={td({ textAlign: "center" })}><Ampel ok={c.daten} teil={c.verbunden} title={c.daten ? "Daten kommen" : "keine aktuellen Daten"} /></td>
                   <td style={td({ textAlign: "center" })}>{p.spiel ? <SpielChip spiel={p.spiel} aktiv={c.spiel} /> : <span style={{ color: MUTED }}>–</span>}</td>

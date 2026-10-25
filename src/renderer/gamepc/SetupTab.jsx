@@ -8,6 +8,7 @@ import { SPIELE } from "../../core/spiele.js";
 import { CFG_ORDNER, CFG_DATEI } from "../../core/cfg.js";
 import { RL_INI_DATEI, RL_INI_ORDNER } from "../../core/rl-ini.js";
 import { DOTA_CFG_DATEI, DOTA_CFG_ORDNER, DOTA_STARTOPTION } from "../../core/dota.js";
+import SpielerName from "./SpielerName.jsx";
 import { FileDown, Download, RefreshCw, LocateFixed, BookOpen, ScanEye } from "lucide-react";
 
 // Offizielle Dokumentation der Datenquellen, öffnet im Browser
@@ -93,7 +94,7 @@ export default function SetupTab({ cfg, mutate, g, jetzt, notify, goTab, standal
         {check && <span style={{ fontSize: 13, fontWeight: 800, color: offen ? WARN : OK, textShadow: offen ? "none" : `0 0 8px ${OK}` }}>{offen ? `${offen} von ${alle.length} offen` : "Alles bereit"}</span>}
         <button style={S.smallBtn} onClick={laden}><RefreshCw size={12} /> Prüfen</button>
       </span>}>
-        {standalone ? <LokalName cfg={cfg} mutate={mutate} /> : check ? <Liste punkte={check.allgemein} /> : <div style={S.empty}>Prüfe …</div>}
+        {standalone ? <><LokalName cfg={cfg} mutate={mutate} /><SpielerName cfg={cfg} mutate={mutate} g={g} notify={notify} pcId={cfg.pcId.trim() || "Dieser PC"} /></> : check ? <Liste punkte={check.allgemein} /> : <div style={S.empty}>Prüfe …</div>}
         {standalone && <p style={S.hint}>Standalone: Die Spiele auf diesem PC melden ihre Events direkt an die Regie. Eine Session braucht es dafür nicht.</p>}
       </Section>
 

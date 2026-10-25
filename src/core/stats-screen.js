@@ -67,9 +67,11 @@ function statsDaten(spiel, statistik, stand) {
   return out;
 }
 
-// Letzte Events für den Screen: nur echte (nicht verworfene) des aktiven Spiels, neueste zuerst
-function statsEvents(log, spiel, max = 8) {
-  return (log || []).filter((e) => !e.verworfen && e.ev?.spiel === spiel).slice(0, max);
+// Letzte Events für den Screen: nur echte (nicht verworfene) des aktiven Spiels, neueste zuerst.
+// namen: regie.namen(), Spielername statt Name im Spiel oder PC-ID
+function statsEvents(log, spiel, max = 8, namen = {}) {
+  return (log || []).filter((e) => !e.verworfen && e.ev?.spiel === spiel).slice(0, max)
+    .map((e) => (e.ev.player && namen[e.ev.player] ? { ...e, ev: { ...e.ev, player: namen[e.ev.player] } } : e));
 }
 
 module.exports = { statsDaten, statsEvents };

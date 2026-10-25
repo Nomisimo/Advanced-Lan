@@ -3,6 +3,7 @@ import { S, ACCENT, LINE, SUB, MUTED, ERR, OK } from "../theme.js";
 import { api } from "../api.js";
 import { Section, Field, Toggle, Dot, SpielChip } from "../ui.jsx";
 import { ZUSTAND } from "./GamePcApp.jsx";
+import SpielerName from "./SpielerName.jsx";
 import { Plug, Unplug, Radar, Eye, EyeOff, Lock, Server } from "lucide-react";
 
 export default function SessionTab({ cfg, mutate, g, notify }) {
@@ -25,6 +26,7 @@ export default function SessionTab({ cfg, mutate, g, notify }) {
             {aktiv && <Lock size={15} color={MUTED} style={{ position: "absolute", right: 11, top: 13 }} />}
           </div>
         </Field>
+        <SpielerName cfg={cfg} mutate={mutate} g={g} notify={notify} pcId={cfg.pcId.trim()} />
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 16, fontSize: 14, fontWeight: 700, color: zFarbe }}>
           <Dot color={zFarbe} glow={c.zustand === "verbunden"} size={10} /> {zText}{c.grund ? <span style={{ fontWeight: 400, fontSize: 12 }}>: {c.grund}</span> : null}
         </div>

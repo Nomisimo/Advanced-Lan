@@ -6,6 +6,7 @@ const { Dedupe } = require("./events");
 const { befehleFuer, zeigeNachricht } = require("./signal");
 const { Statistik } = require("./statistik");
 const { SPIEL_BY_ID } = require("./spiele");
+const { leseSpieler } = require("./protokoll");
 
 const LOG_MAX = 300;
 // Zählen dasselbe wie die Filter im Event-Log, nur ohne dessen Grenze von LOG_MAX Einträgen.
@@ -18,7 +19,7 @@ class Regie {
     this.send = send; // ({ ziel, address, args }) → Promise
     this.emit = emit || (() => {}); // (typ, daten)
     this.now = now;
-    this.pcs = new Map(); // pcId → { pcId, spiele, spiel (zuletzt gemeldet), verbunden, remote, sim, t, status, stand }
+    this.pcs = new Map(); // pcId → { pcId, spieler, spiele, spiel (zuletzt gemeldet), verbunden, remote, sim, t, status, stand }
     this.stand = null; // letzter Spielstand des aktiven Spiels
     this.log = [];
     this.verworfenLog = [];
@@ -30,10 +31,29 @@ class Regie {
 
   aktiv() { return this.getConfig().aktivesSpiel; }
 
-  pcVerbunden(pcId, { spiele = [], remote = "", sim = false, geraet = {} } = {}) {
+  pcVerbunden(pcId, { spiele = [], remote = "", sim = false, geraet = {}, spieler = "" } = {}) {
     const alt = this.pcs.get(pcId) || {};
-    this.pcs.set(pcId, { ...alt, pcId, spiele, remote, sim, geraet, verbunden: true, t: this.now() });
+    this.pcs.set(pcId, { ...alt, pcId, spiele, remote, sim, geraet, spieler: leseSpieler(spieler), verbunden: true, t: this.now() });
     this.emit("status");
+  }
+
+  // Spielername aus dem Namens-Popup des Game-PCs, leer = PC-ID zeigen
+  pcSpieler(pcId, name) {
+    const p = this.pcs.get(pcId);
+    if (p) { p.spieler = leseSpieler(name); this.emit("status"); }
+  }
+
+  // Namen für den Game-Stats-Screen: { Name im Spiel oder PC-ID → Spielername, sonst PC-ID }.
+  // Nur der eigene Spieler eines PCs (sein Status nennt ihn) bekommt dessen Namen. Wen ein PC nicht als sich selbst meldet
+  // (Rocket League meldet alle Spieler des Matches), der behält den Namen aus dem Spiel.
+  namen() {
+    const out = {};
+    for (const p of this.pcs.values()) {
+      const name = p.spieler || p.pcId;
+      if (p.status?.spieler && !(p.status.spieler in out)) out[p.status.spieler] = name;
+      out[p.pcId] = name;
+    }
+    return out;
   }
 
   pcGetrennt(pcId) {
@@ -143,7 +163,8 @@ class Regie {
   }
 
   snapshot() {
-    return { pcs: [...this.pcs.values()], stand: this.stand, zaehler: { ...this.zaehler }, aktivesSpiel: this.aktiv(), statistik: this.statistik.json() };
+    const namen = this.namen();
+    return { pcs: [...this.pcs.values()], stand: this.stand, zaehler: { ...this.zaehler }, aktivesSpiel: this.aktiv(), statistik: this.statistik.json((n) => namen[n]), namen };
   }
 }
 

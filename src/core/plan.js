@@ -13,7 +13,7 @@
 // In den Signalen: {nr} Platznummer, {nr2} mit führender Null, {plan} Wert der Spalte des Ziels für den auslösenden PC.
 // Simulierte PCs („SIM 03“) spielen Platz 3, damit sich der Plan ohne echte PCs testen lässt.
 
-const { einsetzen } = require("./platzhalter");
+const { einsetzen, zaehlen } = require("./platzhalter");
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 const STANDARD_REGEL = "{nr}";
@@ -81,7 +81,7 @@ function planWert(plan, nr, zielId) {
   if (!platz) return "";
   const eigen = platz.werte?.[zielId];
   const regel = eigen != null && eigen !== "" ? eigen : plan.regeln?.[zielId] || STANDARD_REGEL;
-  return einsetzen(regel, { ...nrVars(nr), pc: platz.pcId });
+  return einsetzen(zaehlen(regel), { ...nrVars(nr), pc: platz.pcId });
 }
 
 // Platzhalter eines Ereignisses für ein Ziel: {nr} {nr2} {plan}. Leer, wenn der PC nicht im Plan steht.

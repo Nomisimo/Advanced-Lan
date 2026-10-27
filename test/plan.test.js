@@ -198,3 +198,18 @@ test("Session: Regie vergibt die PC-ID aus dem Plan und verteilt die Vorlage", a
   assert.equal(server.einrichten(), 1, "An alle verteilen");
   assert.deepEqual(gemerkt, []);
 });
+
+test("Hochzählen: Startzahl vor {nr} wird gerechnet, nicht angehängt", () => {
+  const { zaehlen } = require("../src/core/platzhalter");
+  assert.equal(zaehlen("10{nr}"), "{100+nr}");
+  assert.equal(zaehlen("10{nr2}"), "{1000+nr}");
+  assert.equal(zaehlen("Seq 10{nr}"), "Seq 10{nr}", "nur der ganze Wert");
+  const p = plan10();
+  p.pcs.push(...plaetzeAnlegen(p, 11).pcs.slice(10));
+  p.regeln.m = "10{nr}";
+  assert.deepEqual([1, 9, 10, 11].map((n) => planWert(p, n, "m")), ["101", "109", "110", "111"]);
+  p.regeln.m = "10{nr2}";
+  assert.deepEqual([1, 10].map((n) => planWert(p, n, "m")), ["1001", "1010"]);
+  const cfg = { ...standardRegie(), targets: [ma3], plan: plan10(), signale: { cs2: { kill: [{ id: "1", ziel: "m", befehl: "go", werte: { seq: "20{nr}" } }] } } };
+  assert.equal(befehleFuer(cfg, { spiel: "cs2", type: "kill", pcId: "PC 10" })[0].nachrichten.map(zeigeNachricht)[0], '/gma3/cmd "Go+ Sequence 210"');
+});

@@ -42,8 +42,11 @@ export default function App() {
     cfgRef.current = c; setCfg(c); setStatus(s);
   };
 
+  // Ganze Einstellungen ersetzen, z. B. nach dem Laden einer Show (der Hauptprozess hat sie schon übernommen)
+  const ersetzen = useCallback((c, s) => { cfgRef.current = c; setCfg(c); if (s) setStatus(s); }, []);
+
   if (!cfg || !status) return <div style={S.app} />;
-  const shared = { cfg, mutate, status, jetzt, notify, version, modusWechseln: () => modusSetzen(null) };
+  const shared = { cfg, mutate, ersetzen, status, jetzt, notify, version, modusWechseln: () => modusSetzen(null) };
 
   return (
     <>

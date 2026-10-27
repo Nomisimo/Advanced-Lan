@@ -50,8 +50,17 @@ function standardApp() {
   return { einfuehrung: false, bedingungen: "", hotkey: STANDARD_HOTKEY };
 }
 
+// Geladene Show je Modus (core/show.js): Name und Fingerabdruck beim letzten Speichern, leer = keine Show
+const standardShows = () => ({ regie: { name: "", stand: "" }, gamepc: { name: "", stand: "" } });
+const sauberName = (n) => String(n ?? "").replace(/[\u0000-\u001f]/g, "").trim().slice(0, 60);
+function migrateShows(s) {
+  const out = standardShows();
+  if (s && typeof s === "object") for (const a of Object.keys(out)) if (s[a] && typeof s[a] === "object") out[a] = { name: sauberName(s[a].name), stand: typeof s[a].stand === "string" ? s[a].stand : "" };
+  return out;
+}
+
 function standardKonfig() {
-  return { format: "advanced-lan", version: 5, modus: null, app: standardApp(), regie: standardRegie(), gamepc: standardGamePc() };
+  return { format: "advanced-lan", version: 5, modus: null, app: standardApp(), regie: standardRegie(), gamepc: standardGamePc(), shows: standardShows() };
 }
 
 function migrateApp(a, std) {
@@ -105,6 +114,7 @@ function migrateKonfig(k) {
     ...d,
     modus: MODI.includes(k.modus) ? k.modus : null,
     app: migrateApp(k.app, d.app),
+    shows: migrateShows(k.shows),
     regie: {
       ...d.regie,
       ...r,
@@ -124,4 +134,4 @@ function migrateKonfig(k) {
   return m;
 }
 
-module.exports = { MODI, standardKonfig, standardApp, migrateKonfig, genutzteSpiele, standardRegie, standardGamePc, neuerToken, uid, PORTS };
+module.exports = { MODI, standardKonfig, standardApp, migrateKonfig, genutzteSpiele, standardRegie, standardGamePc, standardShows, migrateShows, sauberName, neuerToken, uid, PORTS };

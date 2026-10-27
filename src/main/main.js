@@ -19,6 +19,7 @@ const { QUELLEN, SPIEL_BY_ID } = require('../core/spiele');
 const { rlIni, leseRlIni, RL_INI_DATEI } = require('../core/rl-ini');
 const { migrateKonfig, MODI } = require('../core/defaults');
 const { gsiCfg, CFG_DATEI } = require('../core/cfg');
+const { SHOW_ENDUNG, ART_NAME, arten: showArten, showDatei, leseShow, showAnwenden, leereShow, alsGespeichert, dateiName: showDateiName } = require('../core/show');
 const { testNachricht, zeigeNachricht } = require('../core/signal');
 const { overlayStatus } = require('../core/overlay-status');
 const { kartenListe, lokaleIp } = require('../core/netzwerk');
@@ -558,7 +559,9 @@ ipcMain.handle('feedback-oeffnen', () => {
 ipcMain.handle('app-version', () => app.getVersion());
 const updates = einrichtenUpdates({ app, ipcMain, shell, getWin: () => mainWin });
 ipcMain.handle('config-get', () => cfg);
-ipcMain.handle('config-set', async (_, neu) => {
+ipcMain.handle('config-set', (_, neu) => konfigUebernehmen(neu));
+// Neue Einstellungen übernehmen und anwenden (aus der Oberfläche oder beim Laden einer Show)
+async function konfigUebernehmen(neu) {
   const alt = cfg;
   cfg = { ...migrateKonfig(neu), modus: alt.modus };
   cfg.regie.armed = !!neu.regie?.armed;
@@ -593,6 +596,79 @@ ipcMain.handle('config-set', async (_, neu) => {
   }
   statusMelden();
   return gesamtStatus();
+}
+
+/* ── Shows ────────────────────────────────────────────────────────────── */
+// Gespeicherte Shows liegen je Art in einem eigenen Ordner, exportiert und importiert wird eine einzelne Datei
+const SHOW_ORDNER = (art) => path.join(app.getPath('userData'), 'shows', art);
+const showErlaubt = (art) => showArten(cfg.modus).includes(art);
+function showsListe() {
+  const out = {};
+  for (const art of showArten(cfg.modus)) {
+    let dateien = [];
+    try { dateien = fs.readdirSync(SHOW_ORDNER(art)).filter((f) => f.endsWith(`.${SHOW_ENDUNG}`)); } catch {}
+    out[art] = dateien.map((datei) => {
+      try { const d = leseShow(fs.readFileSync(path.join(SHOW_ORDNER(art), datei), 'utf8'), [art]); return d.fehler ? null : { datei, name: d.name, gespeichert: d.gespeichert }; }
+      catch { return null; }
+    }).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name, 'de'));
+  }
+  return out;
+}
+// Nur Dateinamen aus der eigenen Liste, nie Pfade
+const showPfad = (art, datei) => (typeof datei === 'string' && datei === path.basename(datei) && datei.endsWith(`.${SHOW_ENDUNG}`) ? path.join(SHOW_ORDNER(art), datei) : null);
+async function showUebernehmen(neu, meldungText) {
+  const status = await konfigUebernehmen(neu);
+  meldung(meldungText);
+  return { ok: true, cfg, status, liste: showsListe() };
+}
+ipcMain.handle('shows-liste', () => showsListe());
+ipcMain.handle('show-speichern', (_, art, name) => {
+  if (!showErlaubt(art)) return { fehler: 'In diesem Modus nicht möglich.' };
+  const datei = showDatei(cfg, art, name, { appVersion: app.getVersion() });
+  try { fs.mkdirSync(SHOW_ORDNER(art), { recursive: true }); fs.writeFileSync(path.join(SHOW_ORDNER(art), showDateiName(datei.name, art)), JSON.stringify(datei, null, 1)); }
+  catch (e) { return { fehler: `Show nicht gespeichert: ${e.message}` }; }
+  cfg = alsGespeichert(cfg, art, datei.name);
+  speichereKonfig();
+  return { ok: true, cfg, name: datei.name, liste: showsListe() };
+});
+ipcMain.handle('show-laden', async (_, art, dateiName) => {
+  const p = showErlaubt(art) && showPfad(art, dateiName);
+  if (!p) return { fehler: 'Show nicht gefunden.' };
+  let d;
+  try { d = leseShow(fs.readFileSync(p, 'utf8'), [art]); } catch (e) { return { fehler: e.message }; }
+  if (d.fehler) return d;
+  return showUebernehmen(showAnwenden(cfg, art, d.daten, d.name), `Show „${d.name}“ geladen. Ausgabe ist aus.`);
+});
+ipcMain.handle('show-loeschen', (_, art, dateiName) => {
+  const p = showErlaubt(art) && showPfad(art, dateiName);
+  if (!p) return { fehler: 'Show nicht gefunden.' };
+  try { fs.unlinkSync(p); } catch (e) { return { fehler: e.message }; }
+  return { ok: true, liste: showsListe() };
+});
+ipcMain.handle('show-leer', (_, art) => {
+  if (!showErlaubt(art)) return { fehler: 'In diesem Modus nicht möglich.' };
+  return showUebernehmen(leereShow(cfg, art), `Leere ${ART_NAME[art]}-Show geladen.`);
+});
+ipcMain.handle('show-export', async (_, art, name) => {
+  if (!showErlaubt(art)) return { fehler: 'In diesem Modus nicht möglich.' };
+  const datei = showDatei(cfg, art, name, { appVersion: app.getVersion() });
+  const r = await dialogMitFokus('showSaveDialog', { defaultPath: showDateiName(datei.name, art), filters: [{ name: `Advanced LAN ${ART_NAME[art]}-Show`, extensions: [SHOW_ENDUNG] }] });
+  if (r.canceled || !r.filePath) return { abgebrochen: true };
+  try { fs.writeFileSync(r.filePath, JSON.stringify(datei, null, 1)); } catch (e) { return { fehler: e.message }; }
+  return { ok: true, pfad: r.filePath };
+});
+ipcMain.handle('show-import', async () => {
+  const erlaubt = showArten(cfg.modus);
+  if (!erlaubt.length) return { fehler: 'Zuerst einen Modus wählen.' };
+  const r = await dialogMitFokus('showOpenDialog', { properties: ['openFile'], filters: [{ name: 'Advanced LAN Show', extensions: [SHOW_ENDUNG, 'json'] }] });
+  if (r.canceled || !r.filePaths?.[0]) return { abgebrochen: true };
+  let inhalt;
+  try { inhalt = fs.readFileSync(r.filePaths[0], 'utf8'); } catch (e) { return { fehler: e.message }; }
+  const d = leseShow(inhalt, erlaubt);
+  if (d.fehler) return d;
+  // Importierte Show auch in die eigene Liste legen
+  try { fs.mkdirSync(SHOW_ORDNER(d.art), { recursive: true }); fs.writeFileSync(path.join(SHOW_ORDNER(d.art), showDateiName(d.name, d.art)), inhalt); } catch {}
+  return { ...(await showUebernehmen(showAnwenden(cfg, d.art, d.daten, d.name), `${ART_NAME[d.art]}-Show „${d.name}“ importiert. Ausgabe ist aus.`)), art: d.art };
 });
 ipcMain.handle('modus-setzen', async (_, modus) => {
   cfg.modus = MODI.includes(modus) ? modus : null;

@@ -6,6 +6,13 @@ const REPO = "Nomisimo/Advanced-Lan";
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
+  "0.1.0-beta.9": [
+    "Shows: die ganze Einrichtung als Show speichern, laden, exportieren und importieren. Knopf „Show“ oben im Kopf",
+    "Regie und Game-PC haben getrennte Shows. Standalone nutzt beide und importiert Regie- und Game-PC-Shows",
+    "„Leere Show laden“ setzt die Einstellungen des Modus auf Standard zurück",
+    "Game-PC-Shows passen auf alle Game-PCs: PC-ID, GSI-Token und Overlay-Position bleiben von jedem PC",
+    "Nach dem Laden einer Regie-Show ist die Ausgabe immer aus. Ungespeicherte Änderungen zeigt ein Punkt am Knopf, vor dem Verwerfen fragt die App nach",
+  ],
   "0.1.0-beta.8": [
     "NDI-Stream sendet immer in 1920×1080, auch wenn der Regie-PC einen kleineren Bildschirm hat",
     "NDI startet zuverlässig: das NDI SDK wird vor dem ersten Sender gestartet. Kommt nach 4 Sekunden kein Bild, steht das als Fehler im Setup",

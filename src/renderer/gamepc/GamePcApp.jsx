@@ -5,6 +5,7 @@ import Kopf from "../Kopf.jsx";
 import SessionTab from "./SessionTab.jsx";
 import SetupTab from "./SetupTab.jsx";
 import AppEinstellungen from "../AppEinstellungen.jsx";
+import { ShowKnopf } from "../Shows.jsx";
 import EventsTab from "./EventsTab.jsx";
 import SimTab from "./SimTab.jsx";
 import AnleitungTab from "../AnleitungTab.jsx";
@@ -14,7 +15,7 @@ import { Network, Settings, Activity, BookOpen, FlaskConical, ScanEye } from "lu
 export const ZUSTAND = { verbunden: ["Verbunden", OK], verbinde: ["Verbinde …", WARN], getrennt: ["Nicht verbunden", MUTED], abgelehnt: ["Abgelehnt", ERR] };
 const TABS = [["session", "Session", Network], ["setup", "Setup", Settings], ["bild", "Bilderkennung", ScanEye], ["events", "Events", Activity], ["sim", "Simulator", FlaskConical], ["hilfe", "Anleitung", BookOpen]];
 
-export default function GamePcApp({ cfg: alles, mutate: mutateAlles, status: st, jetzt, notify, version, modusWechseln }) {
+export default function GamePcApp({ cfg: alles, mutate: mutateAlles, ersetzen, status: st, jetzt, notify, version, modusWechseln }) {
   const cfg = alles.gamepc;
   const g = st.gamepc;
   const mutate = (fn) => mutateAlles((d) => fn(d.gamepc));
@@ -36,7 +37,9 @@ export default function GamePcApp({ cfg: alles, mutate: mutateAlles, status: st,
       <Kopf modus="GAME-PC" version={version} modusWechseln={modusWechseln} meta={<>
         <b style={{ color: "#fff" }}>{cfg.pcId || "ohne PC-ID"}</b>
         <span style={{ color: zFarbe }}> · {zText}{c.zustand === "verbunden" && c.session ? ` mit „${c.session}“` : ""}</span>
-      </>} />
+      </>}>
+        <ShowKnopf cfg={alles} ersetzen={ersetzen} notify={notify} />
+      </Kopf>
       <nav style={S.nav}>
         {TABS.map(([k, label, Ic]) => (
           <button key={k} style={{ ...S.navBtn, ...(tab === k ? S.navBtnActive : {}) }} onClick={() => setTab(k)}>

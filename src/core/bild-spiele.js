@@ -25,6 +25,8 @@ const BILD_SPIELE = [
       R("round_start", "Kaufphase (Runde startet)", { art: "start" }), R("round_end", "Runde gewonnen", { team: true, art: "ende" }),
       R("spike_planted", "Spike gelegt"), R("spike_defused", "Spike entschärft"),
       P("kill", "Kill"), P("death", "Spieler stirbt"), P("ace", "Ace"), P("clutch", "Clutch"),
+      // Liefert auch Automation Overdrive (overdrive.js): Match vorbei ohne Sieger, Assist, Headshot
+      M("match_end", "Match vorbei", { art: "matchende" }), P("assist", "Assist"), P("headshot", "Headshot"),
       ...EIGENE,
     ],
     // Vorschläge im Editor: Name, Event, Seite (eigen = dieser PC gewinnt, gegner = der andere), typischer Bereich bei 16:9
@@ -252,7 +254,7 @@ class BildQuelle {
     } else if (ev.art === "matchende") {
       if (!z.laeuft) return this.ergebnis([], now); // nur nach erkannten Runden, und nur einmal
       z.laeuft = false;
-      global(ev.id, { team });
+      global(ev.id, ev.team ? { team } : {});
     } else if (ev.id === "match_start") matchStart();
     else if (ev.spieler) {
       z.n[ev.id] = (z.n[ev.id] || 0) + 1;

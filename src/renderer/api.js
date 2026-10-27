@@ -240,6 +240,11 @@ function browserApi() {
         const n = cfg.gamepc.bild.spiele[id].aktionen.length;
         return { id: `${id}-aktionen`, spiel: id, label: `${id === "valorant" ? "Valorant" : "The Finals"}: Aktionen eingerichtet`, ok: n > 0, warn: true, detail: n ? `${n} Aktionen` : "noch keine: im Tab „Bilderkennung“ anlegen oder importieren" };
       }),
+      overdrive: [
+        { id: "od-empfang", label: "Empfang bereit", ok: true, detail: "localhost:44206" },
+        { id: "od-verbunden", label: "Automation Overdrive verbunden", ok: false, warn: true, detail: "In der Vorschau kein Overwolf" },
+        { id: "od-daten", label: "Valorant-Events kommen an", ok: false, warn: true, detail: "noch keins, kommt beim ersten Kill" },
+      ],
     }),
     trennen: async () => { gp.zustand = "getrennt"; gpSim.stop(); statusMelden(); },
     gamePcSimStart: async (m) => { if (gp.zustand !== "verbunden") return { fehler: "Nur mit verbundener Session" }; if (!gpSim.match) gpQuelle = new CsQuelle(); gpSim.start(m); return { ok: true }; },

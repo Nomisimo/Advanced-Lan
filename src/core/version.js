@@ -12,6 +12,8 @@ const CHANGELOG = {
     "„Leere Show laden“ setzt die Einstellungen des Modus auf Standard zurück",
     "Game-PC-Shows passen auf alle Game-PCs: PC-ID, GSI-Token und Overlay-Position bleiben von jedem PC",
     "Nach dem Laden einer Regie-Show ist die Ausgabe immer aus. Ungespeicherte Änderungen zeigt ein Punkt am Knopf, vor dem Verwerfen fragt die App nach",
+    "Mac: NDI-Quelle ist im Netz sichtbar. Die App meldet den Bonjour-Dienst _ndi._tcp jetzt bei macOS an, ohne den macOS die NDI-Ankündigung blockiert hat",
+    "Setup auf dem Mac: Hinweis auf die Freigabe „Lokales Netzwerk“, solange kein NDI-Empfänger verbunden ist",
   ],
   "0.1.0-beta.8": [
     "NDI-Stream sendet immer in 1920×1080, auch wenn der Regie-PC einen kleineren Bildschirm hat",

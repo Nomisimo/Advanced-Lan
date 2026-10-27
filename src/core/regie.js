@@ -31,10 +31,17 @@ class Regie {
 
   aktiv() { return this.getConfig().aktivesSpiel; }
 
-  pcVerbunden(pcId, { spiele = [], remote = "", sim = false, geraet = {}, spieler = "" } = {}) {
+  // vorlage: Stand der Game-PC-Vorlage auf diesem PC (Fingerabdruck), "eigene" = PC nimmt keine Vorlage an, "" = unbekannt
+  pcVerbunden(pcId, { spiele = [], remote = "", sim = false, geraet = {}, spieler = "", vorlage = "" } = {}) {
     const alt = this.pcs.get(pcId) || {};
-    this.pcs.set(pcId, { ...alt, pcId, spiele, remote, sim, geraet, spieler: leseSpieler(spieler), verbunden: true, t: this.now() });
+    this.pcs.set(pcId, { ...alt, pcId, spiele, remote, sim, geraet, spieler: leseSpieler(spieler), vorlage: String(vorlage || ""), verbunden: true, t: this.now() });
     this.emit("status");
+  }
+
+  // Antwort eines Game-PCs auf die verteilte Vorlage
+  pcVorlage(pcId, stand) {
+    const p = this.pcs.get(pcId);
+    if (p) { p.vorlage = String(stand || ""); this.emit("status"); }
   }
 
   // Spielername aus dem Namens-Popup des Game-PCs, leer = PC-ID zeigen
@@ -126,7 +133,9 @@ class Regie {
   // Test-Knopf einer Zuweisung im Tab „Signale“: sendet sofort, auch wenn die Ausgabe aus ist
   testeZuweisung(spiel, type, zuweisung) {
     const cfg = this.getConfig();
-    const ev = { type, spiel, team: zuweisung.team || SPIEL_BY_ID[spiel]?.teams?.[0] || "", player: "Testspieler", pc: zuweisung.pc || "Regie", pcId: zuweisung.pc || "Regie", round: 1 };
+    // Ohne PC-Filter spielt der erste Platz aus dem Plan den Auslöser, damit {nr} und {plan} einen Wert haben
+    const pc = zuweisung.pc || cfg.plan?.pcs?.[0]?.pcId || "Regie";
+    const ev = { type, spiel, team: zuweisung.team || SPIEL_BY_ID[spiel]?.teams?.[0] || "", player: "Testspieler", pc, pcId: pc, round: 1 };
     const [b] = befehleFuer({ ...cfg, signale: { [spiel]: { [type]: [{ ...zuweisung, aus: false }] } } }, ev);
     const k = { nachrichten: b ? b.nachrichten.map(zeigeNachricht) : [], ziel: b?.ziel?.name || "", fehler: b?.fehler ? [b.fehler] : [] };
     if (b && !b.fehler) this.ausgeben(b, k);

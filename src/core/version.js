@@ -6,6 +6,17 @@ const REPO = "Nomisimo/Advanced-Lan";
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
+  "0.1.0-beta.10": [
+    "Neuer Tab „Plan“ in der Regie: Game-PCs vorab als Plätze anlegen (PC 01 bis PC 10), auch ohne verbundenen Rechner. Geplante PCs stehen grau im Verbindungscheck",
+    "Je Ziel eine Spalte im Plan: eine Regel für alle Plätze, z. B. {100+nr} für die MA3-Sequenz (PC 1 → 101, PC 2 → 102 …), einzelne Zellen überschreiben sie",
+    "Neue Platzhalter in den Signalen: {plan} (Spalte des Ziels für den auslösenden PC), {nr}, {nr2} und Rechnen wie {100+nr} oder {nr*10}. Eine Zuweisung reicht für alle PCs",
+    "Signale: Bereich „Allgemein“ für Kill, Tod, Headshot, Assist, Ace, MVP, Objective, Runde, Match-Start und Sieg. Gilt in jedem Spiel, im Spiel ergänzen oder ersetzen",
+    "Signale zeigen je Spiel standardmäßig nur noch, was vom Allgemeinen abweicht",
+    "Rechner im Plan (Hostname oder MAC): der Game-PC bekommt beim Beitreten die PC-ID seines Platzes, am Game-PC muss keiner sie eintippen. Unbekannte PCs lassen sich einem Platz zuweisen oder automatisch verteilen",
+    "Game-PC-Vorlage: Spiele, Bilderkennung, Overlay und Namens-Popup aus einer Game-PC-Show oder von einem verbundenen PC an alle Game-PCs verteilen. PC-ID, Spielername, Session und Overlay-Position bleiben",
+    "Einrichtungspaket: je Platz eine Game-PC-Show mit fertiger PC-ID in einen Ordner, z. B. für den USB-Stick",
+    "Game-PC: Schalter „Einstellungen von der Regie übernehmen“ im Tab „Session“",
+  ],
   "0.1.0-beta.9": [
     "Shows: die ganze Einrichtung als Show speichern, laden, exportieren und importieren. Knopf „Show“ oben im Kopf",
     "Regie und Game-PC haben getrennte Shows. Standalone nutzt beide und importiert Regie- und Game-PC-Shows",

@@ -45,7 +45,13 @@ class Discovery {
 // Verbindung zur Regie. Verbindet sich nach Abbruch selbst neu, solange nicht bewusst getrennt wurde.
 class SessionClient {
   // geraet(): Angaben für die Übersicht der Regie. karte(): Name der gewählten Netzwerkkarte. spieler(): Name aus dem Namens-Popup.
-  constructor({ onChange, onAntwort, geraet, karte, spieler }) {
+  // vorlage(): Stand der Game-PC-Vorlage oder "eigene". onPcId(id): PC-ID aus dem Plan der Regie.
+  // onEinrichtung(m) → Stand nach dem Übernehmen (oder "eigene"). onVorlageHolen() → { name, daten } dieses PCs.
+  constructor({ onChange, onAntwort, geraet, karte, spieler, vorlage, onPcId, onEinrichtung, onVorlageHolen }) {
+    this.vorlageStand = vorlage || (() => '');
+    this.onPcId = onPcId || (() => {});
+    this.onEinrichtung = onEinrichtung || (async () => 'eigene');
+    this.onVorlageHolen = onVorlageHolen || (() => null);
     this.geraetInfo = geraet || (() => ({}));
     this.spielerName = spieler || (() => '');
     this.karte = karte || (() => '');
@@ -85,10 +91,16 @@ class SessionClient {
       if (m.t === 'hallo') {
         this.session = m.session || '';
         this.aktivesSpiel = m.aktivesSpiel || '';
-        ws.send(JSON.stringify({ t: 'anmelden', pcId: this.ziel.pcId, spiele: this.ziel.spiele, version: PROTOKOLL_VERSION, beweis: beweis(this.ziel.passwort, m.nonce), geraet: this.geraet(ws), spieler: this.spielerName() }));
+        ws.send(JSON.stringify({ t: 'anmelden', pcId: this.ziel.pcId, spiele: this.ziel.spiele, version: PROTOKOLL_VERSION, beweis: beweis(this.ziel.passwort, m.nonce), geraet: this.geraet(ws), spieler: this.spielerName(), vorlage: this.vorlageStand() }));
       } else if (m.t === 'ok') {
         this.aktivesSpiel = m.aktivesSpiel || this.aktivesSpiel;
+        if (typeof m.pcId === 'string' && m.pcId && m.pcId !== this.ziel?.pcId) { this.ziel.pcId = m.pcId; this.onPcId(m.pcId); }
         this.setze('verbunden', '');
+      } else if (m.t === 'einrichtung' && m.daten && typeof m.daten === 'object') {
+        Promise.resolve(this.onEinrichtung(m)).then((stand) => this.sende({ t: 'einrichtung-ok', stand: String(stand || '') })).catch(() => {});
+      } else if (m.t === 'vorlage-holen') {
+        const v = this.onVorlageHolen();
+        if (v) this.sende({ t: 'vorlage', name: v.name, daten: v.daten });
       } else if (m.t === 'abgelehnt') {
         this.setze('abgelehnt', m.grund || 'abgelehnt');
       } else if (m.t === 'aktivesSpiel') {
@@ -105,6 +117,7 @@ class SessionClient {
       if (this.zustand === 'abgelehnt') { this.ziel = null; return this.onChange(); } // falsches Passwort: nicht endlos neu versuchen
       this.setze('getrennt', code === 4002 ? 'Ein anderer PC hat sich mit derselben PC-ID angemeldet' : String(reason || '') || this.grund || 'Verbindung verloren');
       if (code === 4002 || code === 4003) { this.ziel = null; return; }
+      if (code === 4004) return this.spaeter(300); // im Plan neu zugeordnet: gleich wieder anmelden
       this.spaeter();
     });
     ws.on('error', (e) => { this.grund = e.code === 'ECONNREFUSED' ? 'Regie nicht erreichbar' : e.message; });
@@ -117,9 +130,9 @@ class SessionClient {
     return { hostname: os.hostname(), plattform: process.platform, ...this.geraetInfo(), mac: k?.mac || '', karte: k ? `${k.name} (${k.ip})` : lokal };
   }
 
-  spaeter() {
+  spaeter(ms = 3000) {
     clearTimeout(this.retry);
-    if (this.ziel) this.retry = setTimeout(() => this.aufbauen(), 3000);
+    if (this.ziel) this.retry = setTimeout(() => this.aufbauen(), ms);
   }
 
   trennen() {

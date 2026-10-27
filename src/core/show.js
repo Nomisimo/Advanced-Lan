@@ -1,7 +1,8 @@
 "use strict";
 // Show-Files: die ganze Einrichtung eines Modus als eine Datei. Regie und Game-PC haben getrennte Shows,
 // Standalone nutzt beide. Reine Funktionen, laufen in der Oberfläche, im Hauptprozess und in den Tests.
-const { migrateKonfig, standardRegie, standardGamePc, standardShows, migrateShows, sauberName } = require("./defaults");
+const { migrateKonfig, standardKonfig, standardRegie, standardGamePc, standardShows, migrateShows, sauberName } = require("./defaults");
+const { istLeer } = require("./plan");
 
 const SHOW_FORMAT = "advanced-lan-show";
 const SHOW_VERSION = 1;
@@ -19,10 +20,14 @@ function showDaten(cfg, art) {
     const d = kopie(cfg.regie);
     delete d.armed;
     delete d.session.offen;
+    // Ohne Plan und ohne ersetzte Events wie vor beta.10: ältere Shows gelten nicht als geändert
+    if (istLeer(d.plan)) delete d.plan;
+    if (d.ersetzt && !Object.keys(d.ersetzt).length) delete d.ersetzt;
     return d;
   }
   const d = kopie(cfg.gamepc);
   delete d.pcId;
+  delete d.verwaltet;
   delete d.spieler;
   delete d.gsiToken;
   delete d.overlay.x;
@@ -70,12 +75,15 @@ function leseShow(inhalt, arten = ARTEN) {
   if (!ARTEN.includes(d.art)) return { fehler: "Unbekannte Show-Art." };
   if (!d.daten || typeof d.daten !== "object") return { fehler: "Die Show enthält keine Einstellungen." };
   if (!arten.includes(d.art)) return { fehler: `Das ist eine ${ART_NAME[d.art]}-Show. In diesem Modus lassen sich nur ${arten.map((a) => ART_NAME[a]).join("- und ")}-Shows laden.` };
-  return { art: d.art, name: sauberName(d.name) || ART_NAME[d.art], daten: d.daten, gespeichert: typeof d.gespeichert === "string" ? d.gespeichert : "" };
+  // pcId: nur in Game-PC-Shows aus einem Einrichtungspaket der Regie
+  const pcId = d.art === "gamepc" && typeof d.pcId === "string" ? d.pcId.trim().slice(0, 40) : "";
+  return { art: d.art, name: sauberName(d.name) || ART_NAME[d.art], daten: d.daten, gespeichert: typeof d.gespeichert === "string" ? d.gespeichert : "", ...(pcId ? { pcId } : {}) };
 }
 
 // Show in die Einstellungen übernehmen. Was nicht in der Show steht (siehe showDaten), bleibt von diesem PC.
 // Die Ausgabe ist danach immer aus: neue Ziele und Signale erst bewusst scharf schalten.
-function showAnwenden(cfg, art, daten, name) {
+// pcId: PC-ID aus einem Einrichtungspaket (nur Game-PC), sonst bleibt die eigene.
+function showAnwenden(cfg, art, daten, name, { pcId = "" } = {}) {
   const roh = kopie(cfg);
   roh.version = 5;
   if (art === "regie") {
@@ -83,7 +91,9 @@ function showAnwenden(cfg, art, daten, name) {
     roh.regie = { ...kopie(daten), session: { ...(daten.session || {}), offen } };
   } else {
     const g = cfg.gamepc;
-    roh.gamepc = { ...kopie(daten), pcId: g.pcId, spieler: g.spieler, gsiToken: g.gsiToken, overlay: { ...(daten.overlay || {}), x: g.overlay?.x ?? null, y: g.overlay?.y ?? null } };
+    // Session-Wahl und Netzwerkkarte bleiben, wenn die Show sie nicht enthält (Vorlage der Regie, Einrichtungspaket)
+    const lokal = Object.fromEntries(VORLAGE_LOKAL.map((k) => [k, kopie(g[k] ?? null)]).filter(([, v]) => v != null));
+    roh.gamepc = { ...lokal, ...kopie(daten), pcId: pcId || g.pcId, spieler: g.spieler, gsiToken: g.gsiToken, verwaltet: g.verwaltet, overlay: { ...(daten.overlay || {}), x: g.overlay?.x ?? null, y: g.overlay?.y ?? null } };
   }
   const neu = migrateKonfig(roh);
   neu.modus = cfg.modus;
@@ -115,7 +125,27 @@ function dateiName(name, art) {
   return `${n}.${SHOW_ENDUNG}`;
 }
 
+// Game-PC-Vorlage der Regie (Tab „Plan“): eine Game-PC-Show ohne das, was zur Verbindung dieses PCs gehört.
+// stand: Fingerabdruck, an dem Regie und Game-PC erkennen, ob die Vorlage auf dem PC aktuell ist.
+const VORLAGE_LOKAL = ["regie", "passwort", "autoVerbinden", "netz"];
+function vorlageDaten(showDatenGamepc) {
+  const d = kopie(showDatenGamepc);
+  for (const k of VORLAGE_LOKAL) delete d[k];
+  return d;
+}
+const vorlageStand = (cfg) => fingerabdruck(vorlageDaten(showDaten(cfg, "gamepc")));
+// Aus einer Game-PC-Show (Datei, verbundener PC oder Standalone) eine Vorlage machen. Über Standard-Einstellungen
+// angewendet, damit der Fingerabdruck dem entspricht, den der Game-PC nach dem Übernehmen selbst ausrechnet.
+function vorlageAus(daten, name) {
+  const tmp = showAnwenden(standardKonfig(), "gamepc", daten, name);
+  const d = vorlageDaten(showDaten(tmp, "gamepc"));
+  return { name: sauberName(name) || ART_NAME.gamepc, daten: d, stand: fingerabdruck(d) };
+}
+const vorlageAnwenden = (cfg, vorlage, opt) => showAnwenden(cfg, "gamepc", vorlage.daten, vorlage.name, opt);
+// Einrichtungspaket: je Platz eine Game-PC-Show mit fertiger PC-ID
+const paketDatei = (vorlage, pcId, opt = {}) => ({ ...showDatei(standardKonfig(), "gamepc", vorlage.name, opt), daten: kopie(vorlage.daten), pcId });
+
 // Modi und ihre Shows: Standalone hat beide
 const arten = (modus) => (modus === "regie" ? ["regie"] : modus === "gamepc" ? ["gamepc"] : modus === "standalone" ? ["regie", "gamepc"] : []);
 
-module.exports = { SHOW_FORMAT, SHOW_VERSION, SHOW_ENDUNG, ARTEN, ART_NAME, showDaten, fingerabdruck, standardShows, migrateShows, showInfo, ungesichert, showDatei, leseShow, showAnwenden, leereShow, alsGespeichert, dateiName, arten, sauberName };
+module.exports = { SHOW_FORMAT, SHOW_VERSION, SHOW_ENDUNG, ARTEN, ART_NAME, showDaten, fingerabdruck, standardShows, migrateShows, showInfo, ungesichert, showDatei, leseShow, showAnwenden, leereShow, alsGespeichert, dateiName, arten, sauberName, VORLAGE_LOKAL, vorlageDaten, vorlageStand, vorlageAus, vorlageAnwenden, paketDatei };

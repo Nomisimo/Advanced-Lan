@@ -21,7 +21,7 @@ const { rlIni, leseRlIni, RL_INI_DATEI } = require('../core/rl-ini');
 const { OVERDRIVE_PORT } = require('../core/overdrive');
 const { migrateKonfig, MODI } = require('../core/defaults');
 const { gsiCfg, CFG_DATEI } = require('../core/cfg');
-const { SHOW_ENDUNG, ART_NAME, arten: showArten, showDatei, leseShow, showAnwenden, leereShow, alsGespeichert, dateiName: showDateiName } = require('../core/show');
+const { SHOW_ENDUNG, ART_NAME, arten: showArten, showDatei, leseShow, showAnwenden, leereShow, alsGespeichert, dateiName: showDateiName, showDaten, vorlageStand, vorlageAus, vorlageAnwenden, paketDatei, sauberName } = require('../core/show');
 const { testNachricht, zeigeNachricht } = require('../core/signal');
 const { overlayStatus } = require('../core/overlay-status');
 const { kartenListe, lokaleIp } = require('../core/netzwerk');
@@ -94,7 +94,22 @@ function oscSenden(s) {
   const l = lokaleIp(karten(), s.ziel.netz || cfg.regie.netz?.senden);
   return l.fehler ? Promise.reject(new Error(l.fehler)) : osc.send({ ...s, lokal: l.ip });
 }
-const session = new SessionServer({ regie, getConfig: () => cfg.regie, onChange: statusMelden, lokal: () => lokaleIp(karten(), cfg.regie.netz?.empfang) });
+const session = new SessionServer({
+  regie, getConfig: () => cfg.regie, onChange: statusMelden, lokal: () => lokaleIp(karten(), cfg.regie.netz?.empfang),
+  // Plan merkt sich den Rechner, der sich auf einen Platz angemeldet hat
+  onMerken: (platzId, rechner) => planAendern((plan) => { const p = plan.pcs.find((x) => x.id === platzId); if (p && !p.rechner) p.rechner = rechner; }),
+  onVorlage: (pcId, name, daten) => {
+    planAendern((plan) => { plan.vorlage = vorlageAus(daten, name || pcId); });
+    meldung(`Game-PC-Vorlage von ${pcId} übernommen`);
+  },
+});
+// Plan im Hauptprozess ändern (Session, Knöpfe im Tab „Plan“): speichern und der Oberfläche die neuen Einstellungen geben
+function planAendern(fn) {
+  fn(cfg.regie.plan);
+  speichereKonfig();
+  an('config', cfg);
+  statusMelden();
+}
 const regieSim = new RegieSim({ regie, onChange: statusMelden });
 const stats = new StatsAusgabe({
   root, preload: path.join(root, 'src', 'preload', 'preload.js'), icon: path.join(root, 'assets', 'app-icon', 'icon.png'),
@@ -147,6 +162,26 @@ const client = new SessionClient({
   geraet: () => ({ app: app.getVersion() }),
   karte: () => cfg.gamepc.netz,
   spieler: () => cfg.gamepc.spieler,
+  vorlage: () => (cfg.gamepc.verwaltet === false ? 'eigene' : vorlageStand(cfg)),
+  // PC-ID aus dem Plan der Regie
+  onPcId: (id) => {
+    cfg.gamepc.pcId = id;
+    for (const d of BILD_SPIELE) if (quellen[d.id]) quellen[d.id].name = id;
+    speichereKonfig();
+    an('config', cfg);
+    meldung(`PC-ID von der Regie: ${id}`);
+    statusMelden();
+  },
+  // Game-PC-Vorlage der Regie: wie eine Game-PC-Show laden. PC-ID, Spielername, GSI-Token, Overlay-Position und Session bleiben.
+  onEinrichtung: async (m) => {
+    if (cfg.gamepc.verwaltet === false) return 'eigene';
+    const name = sauberName(m.name) || 'Vorlage der Regie';
+    await konfigUebernehmen(vorlageAnwenden(cfg, { name, daten: m.daten }));
+    an('config', cfg);
+    meldung(`Einstellungen von der Regie übernommen („${name}“)`);
+    return vorlageStand(cfg);
+  },
+  onVorlageHolen: () => ({ name: cfg.shows.gamepc.name || cfg.gamepc.pcId.trim() || 'Game-PC', daten: showDaten(cfg, 'gamepc') }),
 });
 const discovery = new Discovery({ onChange: () => discoveryGeaendert(), karte: () => cfg.gamepc.netz });
 const gsi = new GsiServer({ onPayload: (b) => gamePcPayload(b), onStatus: statusMelden });
@@ -262,7 +297,7 @@ function rlNachricht(m, sim = false) {
 function gamePcVerbinden() {
   const g = cfg.gamepc;
   const s = discovery.liste().find((x) => x.id === g.regie.id) || discovery.liste().find((x) => x.session === g.regie.session);
-  if (!g.pcId.trim()) return { fehler: 'Zuerst eine PC-ID eintragen' };
+  // Ohne PC-ID vergibt die Regie sie aus ihrem Plan (Rechnername oder MAC)
   if (!g.regie.id) return { fehler: 'Zuerst eine Session wählen' };
   if (!g.passwort) return { fehler: 'Passwort fehlt' };
   if (s) g.regie = { id: s.id, session: s.session, host: s.ip, port: s.port };
@@ -352,7 +387,7 @@ async function setupCheck() {
   const g = cfg.gamepc, c = client.info(), gs = gsi.status();
   // Standalone: keine Session nötig, die Spiele melden direkt an die Regie auf diesem PC
   const allgemein = cfg.modus === 'standalone' ? [] : [
-    { id: 'pcid', label: 'PC-ID eingetragen', ok: !!g.pcId.trim(), detail: g.pcId.trim() || 'fehlt' },
+    { id: 'pcid', label: 'PC-ID eingetragen', ok: !!g.pcId.trim(), warn: true, detail: g.pcId.trim() || 'leer: die Regie vergibt sie, wenn dieser Rechner in ihrem Plan steht' },
     { id: 'session', label: 'Mit einer Session verbunden', ok: c.zustand === 'verbunden', detail: c.zustand === 'verbunden' ? c.session : c.grund || 'nicht verbunden' },
   ];
   // Dota 2 läuft auch auf dem Mac; Valorant und The Finals gibt es nur für Windows, der Editor geht trotzdem
@@ -454,7 +489,7 @@ async function modusStarten() {
   bild.anwenden();
   if (cfg.modus === 'gamepc') {
     discovery.start();
-    autoWartet = !!(cfg.gamepc.autoVerbinden && cfg.gamepc.regie.id && cfg.gamepc.passwort && cfg.gamepc.pcId);
+    autoWartet = !!(cfg.gamepc.autoVerbinden && cfg.gamepc.regie.id && cfg.gamepc.passwort);
   }
   if (cfg.modus === 'standalone') lokalAnmelden();
   await stats.anwenden();
@@ -702,7 +737,7 @@ ipcMain.handle('show-laden', async (_, art, dateiName) => {
   let d;
   try { d = leseShow(fs.readFileSync(p, 'utf8'), [art]); } catch (e) { return { fehler: e.message }; }
   if (d.fehler) return d;
-  return showUebernehmen(showAnwenden(cfg, art, d.daten, d.name), `Show „${d.name}“ geladen. Ausgabe ist aus.`);
+  return showUebernehmen(showAnwenden(cfg, art, d.daten, d.name, { pcId: d.pcId }), `Show „${d.name}“ geladen.${d.pcId ? ` PC-ID ${d.pcId}.` : ' Ausgabe ist aus.'}`);
 });
 ipcMain.handle('show-loeschen', (_, art, dateiName) => {
   const p = showErlaubt(art) && showPfad(art, dateiName);
@@ -733,7 +768,7 @@ ipcMain.handle('show-import', async () => {
   if (d.fehler) return d;
   // Importierte Show auch in die eigene Liste legen
   try { fs.mkdirSync(SHOW_ORDNER(d.art), { recursive: true }); fs.writeFileSync(path.join(SHOW_ORDNER(d.art), showDateiName(d.name, d.art)), inhalt); } catch {}
-  return { ...(await showUebernehmen(showAnwenden(cfg, d.art, d.daten, d.name), `${ART_NAME[d.art]}-Show „${d.name}“ importiert. Ausgabe ist aus.`)), art: d.art };
+  return { ...(await showUebernehmen(showAnwenden(cfg, d.art, d.daten, d.name, { pcId: d.pcId }), `${ART_NAME[d.art]}-Show „${d.name}“ importiert.${d.pcId ? ` PC-ID ${d.pcId}.` : ' Ausgabe ist aus.'}`)), art: d.art };
 });
 ipcMain.handle('modus-setzen', async (_, modus) => {
   cfg.modus = MODI.includes(modus) ? modus : null;
@@ -751,6 +786,49 @@ ipcMain.handle('zaehler-zuruecksetzen', () => { regie.zuruecksetzen(); return tr
 ipcMain.handle('session-oeffnen', async () => { const ok = await session.oeffnen(); cfg.regie.session.offen = ok; speichereKonfig(); return gesamtStatus(); });
 ipcMain.handle('session-schliessen', async () => { await session.schliessen(); cfg.regie.session.offen = false; speichereKonfig(); return gesamtStatus(); });
 ipcMain.handle('pc-trennen', (_, pcId) => { session.trennen(pcId); });
+// Tab „Plan“
+ipcMain.handle('plan-verteilen', (_, pcId) => ({ n: session.einrichten(pcId || '') }));
+ipcMain.handle('plan-vorlage-holen', (_, pcId) => ({ ok: session.vorlageHolen(pcId) }));
+// Verbundenen PC einem Platz zuweisen: Platz merkt sich den Rechner, der PC meldet sich neu an und bekommt die PC-ID
+ipcMain.handle('plan-zuordnen', (_, pcId, platzId) => {
+  const g = regie.pcs.get(pcId)?.geraet || {};
+  const rechner = g.hostname || g.mac;
+  if (!rechner) return { fehler: 'Der PC meldet keinen Rechnernamen (ältere App-Version)' };
+  planAendern((plan) => {
+    for (const p of plan.pcs) if (p.rechner && p.rechner.toLowerCase() === rechner.toLowerCase()) p.rechner = '';
+    const p = plan.pcs.find((x) => x.id === platzId);
+    if (p) p.rechner = rechner;
+  });
+  session.neuAnmelden(pcId);
+  return { ok: true };
+});
+ipcMain.handle('plan-vorlage-datei', async () => {
+  const r = await dialogMitFokus('showOpenDialog', { properties: ['openFile'], filters: [{ name: 'Advanced LAN Game-PC-Show', extensions: [SHOW_ENDUNG, 'json'] }] });
+  if (r.canceled || !r.filePaths?.[0]) return { abbruch: true };
+  let inhalt;
+  try { inhalt = fs.readFileSync(r.filePaths[0], 'utf8'); } catch (e) { return { fehler: e.message }; }
+  const d = leseShow(inhalt, ['gamepc']);
+  if (d.fehler) return d;
+  planAendern((plan) => { plan.vorlage = vorlageAus(d.daten, d.name); });
+  return { ok: true, name: d.name };
+});
+// Standalone: die Spiele-Einstellungen dieses PCs als Vorlage
+ipcMain.handle('plan-vorlage-eigene', () => {
+  planAendern((plan) => { plan.vorlage = vorlageAus(showDaten(cfg, 'gamepc'), cfg.shows.gamepc.name || 'Standalone'); });
+  return { ok: true };
+});
+// Einrichtungspaket: je Platz eine Game-PC-Show mit PC-ID in einen Ordner
+ipcMain.handle('plan-paket', async () => {
+  const { vorlage, pcs } = cfg.regie.plan;
+  if (!vorlage) return { fehler: 'Zuerst eine Game-PC-Vorlage wählen' };
+  if (!pcs.length) return { fehler: 'Der Plan hat noch keine Plätze' };
+  const r = await dialogMitFokus('showOpenDialog', { title: 'Ordner für das Einrichtungspaket', properties: ['openDirectory', 'createDirectory'] });
+  if (r.canceled || !r.filePaths?.[0]) return { abbruch: true };
+  try {
+    for (const p of pcs) fs.writeFileSync(path.join(r.filePaths[0], showDateiName(p.pcId, 'gamepc')), JSON.stringify(paketDatei(vorlage, p.pcId, { appVersion: app.getVersion() }), null, 1));
+  } catch (e) { return { fehler: e.message }; }
+  return { ok: true, n: pcs.length, ordner: r.filePaths[0] };
+});
 ipcMain.handle('event-ausloesen', (_, ev) => regie.fire({ round: regie.stand?.runde, map: regie.stand?.map, ...ev, spiel: cfg.regie.aktivesSpiel, pc: 'Regie', pcId: 'regie' }, 'manuell'));
 ipcMain.handle('signal-testen', (_, spiel, type, zuweisung) => regie.testeZuweisung(spiel, type, zuweisung));
 ipcMain.handle('ziel-testen', async (_, zielId) => {

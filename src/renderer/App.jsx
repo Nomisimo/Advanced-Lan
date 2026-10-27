@@ -22,7 +22,8 @@ export default function App() {
     api.getConfig().then((c) => { cfgRef.current = c; setCfg(c); });
     api.status().then(setStatus);
     api.appVersion().then(setVersion);
-    const ab = [api.onStatus(setStatus), api.onMeldung((m) => notify(m.text, m.art))];
+    // Der Hauptprozess ändert Einstellungen auch selbst (Plan, PC-ID und Vorlage von der Regie)
+    const ab = [api.onStatus(setStatus), api.onMeldung((m) => notify(m.text, m.art)), api.onConfig?.((c) => { cfgRef.current = c; setCfg(c); })];
     const t = setInterval(() => setJetzt(Date.now()), 1000);
     return () => { ab.forEach((f) => f && f()); clearInterval(t); };
   }, []);

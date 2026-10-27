@@ -55,16 +55,28 @@ const Regie = ({ goTab }) => (
       Unten in der <b>Ziel-Datenbank</b> die Software oder das Gerät wählen und <b>Anlegen</b>. Dann IP-Adresse eintragen; der Port ist auf den Standard des Geräts gesetzt.
       Auf dem Gerät selbst muss OSC-Empfang eingeschaltet sein (siehe „Ziele einrichten“ unten). <b>Test</b> schickt eine harmlose Nachricht, bei QLab zum Beispiel <Kbd>/thump</Kbd>.
     </Schritt>
-    <Schritt n={4} titel="Signale belegen" onGo={goTab && (() => goTab("signale"))} goLabel="Signale">
-      Ein Abschnitt je genutztem Spiel, darin jedes Event. <b>+ Befehl</b> legt fest: Ziel, Befehl und Werte (zum Beispiel Sequenz und Cue). Ein Event kann beliebig viele Befehle an verschiedene Ziele senden.
-      Auswählbar sind nur Ziele aus dem Tab Ziele. <b>Test</b> sendet den Befehl sofort, auch bei Ausgabe aus.
+    <Schritt n={4} titel="Plan anlegen" onGo={goTab && (() => goTab("plan"))} goLabel="Plan">
+      Im Tab <b>Plan</b> mit <b>Plätze anlegen</b> die Game-PCs vorab eintragen (PC 01 bis PC 10), auch ohne dass ein Rechner verbunden ist. Je Ziel gibt es eine Spalte:
+      oben die Regel für alle Plätze, z. B. <Kbd>{"{100+nr}"}</Kbd> für die MA3-Sequenz, ergibt 101, 102 …; eine Zelle überschreibt die Regel für einen PC.
+      Trägt man beim Platz den <b>Rechner</b> ein (Hostname oder MAC), bekommt der Game-PC beim Beitreten die PC-ID des Platzes, am Game-PC muss keiner sie eintippen.
+      Verbundene PCs ohne Platz stehen unter „Nicht im Plan“ und lassen sich dort einem Platz zuweisen.
+      Die <b>Game-PC-Vorlage</b> (aus einer Game-PC-Show oder von einem verbundenen PC) verteilt die Regie an alle Game-PCs, beim Verbinden oder mit <b>An alle verteilen</b>.
+      <b>Einrichtungspaket exportieren</b> legt je Platz eine Game-PC-Show mit fertiger PC-ID ab, z. B. für den USB-Stick.
     </Schritt>
-    <Schritt n={5} titel="Proben" onGo={goTab && (() => goTab("sim"))} goLabel="Simulator">
+    <Schritt n={5} titel="Signale belegen" onGo={goTab && (() => goTab("signale"))} goLabel="Signale">
+      Oben steht <b>Allgemein</b>: Kill, Tod, Headshot, Assist, Ace, MVP, Objective, Runde, Match-Start und Sieg einmal einrichten, das gilt sofort in jedem Spiel
+      (in Rocket League ist der Kill die Demolition, das Objective das Tor). Darunter ein Abschnitt je genutztem Spiel. Standardmäßig zeigt er nur, was vom Allgemeinen abweicht;
+      mit <b>+ Event einrichten</b> kommt ein Event dazu. Eigene Befehle <b>ergänzen</b> die allgemeinen, <b>Ersetzen</b> lässt für dieses Event nur die eigenen gelten.
+      <b> + Befehl</b> legt fest: Ziel, Befehl und Werte (zum Beispiel Sequenz und Cue). Werte können Platzhalter enthalten: <Kbd>{"{plan}"}</Kbd> (Spalte des Ziels im Plan für den auslösenden PC),
+      <Kbd>{"{nr}"}</Kbd>, <Kbd>{"{spieler}"}</Kbd>, <Kbd>{"{team}"}</Kbd>, <Kbd>{"{runde}"}</Kbd> und Rechnungen wie <Kbd>{"{100+nr}"}</Kbd>.
+      <b> Test</b> sendet den Befehl sofort, auch bei Ausgabe aus (ohne PC-Filter als erster Platz des Plans).
+    </Schritt>
+    <Schritt n={6} titel="Proben" onGo={goTab && (() => goTab("sim"))} goLabel="Simulator">
       Der Simulator spielt das aktive Spiel mit virtuellen Game-PCs und derselben Erkennung wie echte PCs: CS2, Dota 2, Overwatch 2 und Rainbow Six mit 10 PCs (5 gegen 5), Marvel Rivals mit 12 (6 gegen 6), Rocket League mit 6 (3 gegen 3),
       Fortnite und PUBG mit 8 PCs in zwei Vierer-Squads, Apex mit 6 PCs in zwei Trios. Bei Battle Royales spielen die LAN-Squads in einer vollen Lobby, eine Runde ist eine Zone.
-      Einzelne Events lassen sich direkt auslösen.
+      Einzelne Events lassen sich direkt auslösen. Simulierte PCs spielen die Plätze aus dem Plan (SIM 03 ist Platz 3), so lassen sich Befehle mit <Kbd>{"{plan}"}</Kbd> ohne echte PCs proben.
     </Schritt>
-    <Schritt n={6} titel="Live gehen" onGo={goTab && (() => goTab("control"))} goLabel="Control">
+    <Schritt n={7} titel="Live gehen" onGo={goTab && (() => goTab("control"))} goLabel="Control">
       Im Tab <b>Control</b> das aktive Spiel wählen (nur dort) und oben <b>Ausgabe</b> einschalten (grün: AUSGABE AN, rot: AUSGABE AUS). Nach jedem Start der App ist die Ausgabe aus.
     </Schritt>
     <div style={{ marginTop: 14 }}>
@@ -87,6 +99,8 @@ const GamePc = ({ goTab }) => (
   <Section title="Game-PC">
     <Schritt n={1} titel="PC-ID eintragen" onGo={goTab && (() => goTab("session"))} goLabel="Session">
       Am besten wie das Schild am Platz, z. B. <Kbd>PC 01</Kbd>. Die PC-ID lässt sich nur ändern, solange der PC in keiner Session ist.
+      Steht dieser Rechner im Plan der Regie, darf das Feld leer bleiben: die Regie trägt die PC-ID beim Beitreten ein. Mit „Einstellungen von der Regie übernehmen“ (an)
+      kommen Spiele, Bilderkennung, Overlay und Namens-Popup aus der Vorlage der Regie.
     </Schritt>
     <Schritt n={2} titel="Session beitreten">
       Alle Sessions im Netz erscheinen von selbst, auch wenn es mehrere Regien gibt. Session antippen, Passwort eingeben, <b>Beitreten</b>.

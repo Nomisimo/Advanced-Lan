@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, ipcMain, dialog, screen, globalShortcut } = require('electron');
+const { app, BrowserWindow, shell, ipcMain, dialog, screen, globalShortcut, powerMonitor } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { execFile } = require('child_process');
@@ -33,6 +33,9 @@ const { ValSimMatch } = require('../core/val-sim');
 const { einrichtenUpdates } = require('./updates');
 const { restoreFocus, mitFokus } = require('./fokus');
 const { StatsAusgabe } = require('./stats-ausgabe');
+const { NamensAbfrage } = require('./name-abfrage');
+const { NamensWaechter } = require('../core/namen');
+const { leseSpieler } = require('../core/protokoll');
 const { hotkeyText, feedbackUrl } = require('../core/app-info');
 const os = require('os');
 
@@ -143,6 +146,7 @@ const client = new SessionClient({
   onAntwort: statusMelden,
   geraet: () => ({ app: app.getVersion() }),
   karte: () => cfg.gamepc.netz,
+  spieler: () => cfg.gamepc.spieler,
 });
 const discovery = new Discovery({ onChange: () => discoveryGeaendert(), karte: () => cfg.gamepc.netz });
 const gsi = new GsiServer({ onPayload: (b) => gamePcPayload(b), onStatus: statusMelden });
@@ -153,7 +157,7 @@ const lokalId = () => cfg.gamepc.pcId.trim() || 'Dieser PC';
 function lokalAnmelden() {
   if (lokalPc && lokalPc !== lokalId()) regie.pcEntfernen(lokalPc);
   lokalPc = lokalId();
-  regie.pcVerbunden(lokalPc, { spiele: QUELLEN, remote: 'dieser PC', geraet: { hostname: os.hostname(), app: app.getVersion(), plattform: process.platform, karte: 'lokal' } });
+  regie.pcVerbunden(lokalPc, { spiele: QUELLEN, remote: 'dieser PC', spieler: cfg.gamepc.spieler, geraet: { hostname: os.hostname(), app: app.getVersion(), plattform: process.platform, karte: 'lokal' } });
 }
 function lokalAbmelden() { if (lokalPc) regie.pcEntfernen(lokalPc); lokalPc = null; }
 // Ereignis und Status eines Spiels: im Standalone direkt an die Regie, sonst über die Session
@@ -171,6 +175,7 @@ function gamePcPayload(body, sim = false) {
   if (body?.auth?.token !== cfg.gamepc.gsiToken) { gp.fremd++; return statusMelden(); }
   if (body?.provider?.appid === DOTA_APPID) return quelleMelden('dota2', quellen.dota2.ingest(body), sim); // Dota 2 schickt an denselben Empfang
   const r = quelle.ingest(body);
+  if (!sim) spielDaten();
   Object.assign(gp, { letzte: Date.now(), status: r.status, stand: r.stand });
   const spiel = 'cs2'; // Game-PC sendet immer alles, was er erkennt. Was davon genutzt wird, entscheidet die Regie.
   for (const ev of r.events) {
@@ -184,6 +189,7 @@ function gamePcPayload(body, sim = false) {
 // Ergebnis einer Quelle (Dota 2, Bild-Spiele) → Log, Regie, Status
 function quelleMelden(spiel, r, sim = false) {
   const d = daten[spiel] = daten[spiel] || { letzte: 0, statusGesendet: 0 };
+  if (!sim) spielDaten();
   Object.assign(d, { letzte: Date.now(), stand: r.stand, status: r.status });
   for (const ev of r.events) gamePcLog({ spiel, ev, gesendet: anRegie(spiel, ev), sim });
   if (r.events.length || Date.now() - d.statusGesendet > 500) { statusAnRegie(spiel, r.status, r.stand); d.statusGesendet = Date.now(); }
@@ -243,6 +249,7 @@ let autoWartet = false;
 function rlNachricht(m, sim = false) {
   if (!hatSpiele()) return;
   const r = rlQuelle.ingest(m);
+  if (!sim) spielDaten();
   rl.letzte = Date.now();
   rl.stand = r.stand;
   for (const ev of r.events) {
@@ -375,6 +382,46 @@ async function setupCheck() {
   };
 }
 
+/* ── Spielername (Namens-Popup) ───────────────────────────────────────── */
+// Fragt bei Spielstart und nach langem Leerlauf, wer an diesem PC spielt. Der Name geht an die Regie und steht auf dem
+// Game-Stats-Screen, ohne Namen die PC-ID. Nach dem Leerlauf gilt der alte Name nicht mehr, das Popup schlägt ihn nur vor.
+const waechter = new NamensWaechter();
+let namenVorschlag = '';
+const namenPopup = new NamensAbfrage({ root, onAntwort: (name) => spielerSetzen(name), onZu: () => {} });
+const anzeigePcId = () => (cfg.modus === 'standalone' ? lokalId() : cfg.gamepc.pcId.trim() || 'diesem PC');
+
+function spielerSetzen(name) {
+  cfg.gamepc.spieler = leseSpieler(name);
+  namenVorschlag = '';
+  speichereKonfig();
+  if (cfg.modus === 'standalone') regie.pcSpieler(lokalId(), cfg.gamepc.spieler);
+  else client.spieler(cfg.gamepc.spieler);
+  statusMelden();
+}
+
+// Popup zeigen. Auch von außen aufrufbar (Knopf im Tab „Session“, später ein Befehl der Regie).
+function namenFragen(grund = 'hand') {
+  if (!cfg || !hatSpiele()) return { fehler: 'Nur auf einem Game-PC' };
+  waechter.gefragt();
+  namenPopup.zeigen({ pcId: anzeigePcId(), vorschlag: cfg.gamepc.spieler || namenVorschlag, grund });
+  return { ok: true };
+}
+
+function spielDaten() {
+  if (cfg.modus !== 'gamepc' && cfg.modus !== 'standalone') return;
+  if (waechter.spielDaten(cfg.gamepc.namensAbfrage) && !namenPopup.offen) namenFragen('spielstart');
+}
+
+// Leerlauf: Sekunden ohne Maus und Tastatur (electron.d.ts von ow-electron: powerMonitor.getSystemIdleTime(): number)
+setInterval(() => {
+  if (!cfg || !hatSpiele()) return;
+  let idle = 0;
+  try { idle = powerMonitor.getSystemIdleTime(); } catch { return; }
+  const r = waechter.leerlauf(idle, cfg.gamepc.namensAbfrage);
+  if (r === 'weg' && cfg.gamepc.spieler) { const alt = cfg.gamepc.spieler; spielerSetzen(''); namenVorschlag = alt; }
+  if (r === 'zurueck' && !namenPopup.offen) namenFragen('zurueck');
+}, 5000).unref();
+
 /* ── Modus wechseln ───────────────────────────────────────────────────── */
 async function modusStarten() {
   regieSim.stop();
@@ -386,6 +433,7 @@ async function modusStarten() {
   rlClient.stop();
   await Promise.all([gsi.stop(), overdrive.stop()]);
   lokalAbmelden();
+  namenPopup.schliessen();
   spielAufRegie = '';
   if (istRegie()) {
     // Im Standalone darf die Session offen sein: dann kommen weitere Game-PCs dazu
@@ -416,7 +464,7 @@ async function modusStarten() {
 function gesamtStatus() {
   const s = { modus: cfg.modus, jetzt: Date.now(), app: { hotkeyFehler, plattform: process.platform } };
   if (istRegie()) s.regie = { ...regie.snapshot(), session: session.status(), sim: regieSim.status(), armed: cfg.regie.armed, spielAufRegie, stats: stats.status(), lokal: lokalPc };
-  if (hatSpiele()) s.gamepc = { client: client.info(), sessions: discovery.liste(), discoveryFehler: discovery.fehler, gsi: gsi.status(), letzte: gp.letzte, status: gp.status, stand: gp.stand, fremd: gp.fremd, sim: { ...gpSim.status(), spiel: gpSimSpiel }, rl: { ...rlClient.status(), letzte: rl.letzte, stand: rl.stand }, daten, bild: bild.status(), overdrive: overdrive.status() };
+  if (hatSpiele()) s.gamepc = { spieler: cfg.gamepc.spieler, spielerAnzeige: cfg.gamepc.spieler || anzeigePcId(), client: client.info(), sessions: discovery.liste(), discoveryFehler: discovery.fehler, gsi: gsi.status(), letzte: gp.letzte, status: gp.status, stand: gp.stand, fremd: gp.fremd, sim: { ...gpSim.status(), spiel: gpSimSpiel }, rl: { ...rlClient.status(), letzte: rl.letzte, stand: rl.stand }, daten, bild: bild.status(), overdrive: overdrive.status() };
   return s;
 }
 
@@ -456,7 +504,7 @@ function createWindow() {
   mainWin.once('ready-to-show', () => { appBereit = true; zeigen(); });
   setTimeout(() => { animationFertig = true; zeigen(); }, 1900);
   for (const ev of ['minimize', 'restore', 'hide', 'show']) mainWin.on(ev, () => setImmediate(overlayAktualisieren));
-  mainWin.on('closed', () => { if (overlayWin) overlayWin.destroy(); stats.beenden(); });
+  mainWin.on('closed', () => { if (overlayWin) overlayWin.destroy(); namenPopup.beenden(); stats.beenden(); });
   // Fokus im Fenster immer auch an die Seite geben, sonst nehmen Textfelder unter Windows teils keine Eingabe an
   mainWin.on('focus', () => mainWin.webContents.focus());
   // Per window.open erzeugte Kindfenster (derzeit verweigert, siehe unten): beim Schließen Fokus zurück
@@ -584,6 +632,7 @@ async function konfigUebernehmen(neu) {
   cfg.regie.session.offen = alt.regie.session.offen; // offen/zu steuern nur die Session-Knöpfe
   if (client.zustand !== 'getrennt' && client.zustand !== 'abgelehnt') cfg.gamepc.pcId = alt.gamepc.pcId; // PC-ID nur ohne aktive Session änderbar
   cfg.gamepc.overlay = { ...cfg.gamepc.overlay, x: alt.gamepc.overlay?.x ?? null, y: alt.gamepc.overlay?.y ?? null }; // Position setzt nur das Overlay selbst
+  cfg.gamepc.spieler = alt.gamepc.spieler; // Spielername setzen nur das Namens-Popup und „spieler-setzen“
   speichereKonfig();
   if (cfg.app.hotkey !== alt.app.hotkey) hotkeyAnwenden();
   overlayAktualisieren();
@@ -772,6 +821,8 @@ ipcMain.handle('test-event', (_, type, spiel = 'cs2', team = '', kills = 1) => {
   return { ok };
 });
 ipcMain.handle('gamepc-sim-start', (_, modus) => gamePcSimStart(modus));
+ipcMain.handle('spieler-setzen', (_, name) => { spielerSetzen(name); return gesamtStatus(); });
+ipcMain.handle('name-fragen', () => namenFragen('hand'));
 // Bilderkennung: Bildschirme, Texterkennung für den Editor, Aufnahme im Hintergrund, Export und Import der Spiel-Konfiguration
 ipcMain.handle('bild-bildschirme', () => bild.bildschirme());
 // Alle offenen Fenster für die Auswahl der Bildquelle (auch wenn die Erkennung aus ist)

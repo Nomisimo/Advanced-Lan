@@ -12,6 +12,7 @@ function regieKonfig() {
   c.regie.session = { name: "LAN Herbst", passwort: "geheim", port: 47801, offen: true };
   c.regie.armed = true;
   c.gamepc.pcId = "PC 07";
+  c.gamepc.spieler = "Momo";
   c.gamepc.passwort = "geheim";
   c.gamepc.overlay = { an: false, x: 100, y: 200 };
   return c;
@@ -54,14 +55,17 @@ test("Game-PC-Show: PC-ID, Token und Overlay-Position bleiben von diesem PC", ()
   const quelle = regieKonfig();
   const daten = showDatei(quelle, "gamepc", "Game-PCs").daten;
   assert.equal(daten.pcId, undefined);
+  assert.equal(daten.spieler, undefined);
   assert.equal(daten.gsiToken, undefined);
   assert.equal(daten.overlay.x, undefined);
   const hier = migrateKonfig(null);
   hier.modus = "gamepc";
   hier.gamepc.pcId = "PC 02";
+  hier.gamepc.spieler = "Kim";
   hier.gamepc.overlay = { an: true, x: 5, y: 6 };
   const neu = showAnwenden(hier, "gamepc", daten, "Game-PCs");
   assert.equal(neu.gamepc.pcId, "PC 02");
+  assert.equal(neu.gamepc.spieler, "Kim");
   assert.equal(neu.gamepc.gsiToken, hier.gamepc.gsiToken);
   assert.deepEqual(neu.gamepc.overlay, { an: false, x: 5, y: 6 });
   assert.equal(neu.gamepc.passwort, "geheim");

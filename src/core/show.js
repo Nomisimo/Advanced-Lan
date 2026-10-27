@@ -12,7 +12,7 @@ const ART_NAME = { regie: "Regie", gamepc: "Game-PC" };
 const kopie = (x) => JSON.parse(JSON.stringify(x));
 
 // Was in eine Show gehört. Nicht dabei, weil es zu diesem PC oder zum Moment gehört:
-// Regie: Ausgabe an/aus und ob die Session gerade offen ist. Game-PC: PC-ID, GSI-Token (steht in den
+// Regie: Ausgabe an/aus und ob die Session gerade offen ist. Game-PC: PC-ID, Spielername, GSI-Token (steht in den
 // installierten cfg-Dateien) und die Position des Overlays.
 function showDaten(cfg, art) {
   if (art === "regie") {
@@ -23,6 +23,7 @@ function showDaten(cfg, art) {
   }
   const d = kopie(cfg.gamepc);
   delete d.pcId;
+  delete d.spieler;
   delete d.gsiToken;
   delete d.overlay.x;
   delete d.overlay.y;
@@ -82,7 +83,7 @@ function showAnwenden(cfg, art, daten, name) {
     roh.regie = { ...kopie(daten), session: { ...(daten.session || {}), offen } };
   } else {
     const g = cfg.gamepc;
-    roh.gamepc = { ...kopie(daten), pcId: g.pcId, gsiToken: g.gsiToken, overlay: { ...(daten.overlay || {}), x: g.overlay?.x ?? null, y: g.overlay?.y ?? null } };
+    roh.gamepc = { ...kopie(daten), pcId: g.pcId, spieler: g.spieler, gsiToken: g.gsiToken, overlay: { ...(daten.overlay || {}), x: g.overlay?.x ?? null, y: g.overlay?.y ?? null } };
   }
   const neu = migrateKonfig(roh);
   neu.modus = cfg.modus;

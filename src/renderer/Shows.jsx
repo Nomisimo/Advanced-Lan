@@ -8,7 +8,7 @@ import { Clapperboard, X, Save, Upload, Download, FilePlus, Trash2, FolderOpen }
 // Was eine Show enthält und was auf dem PC bleibt (siehe core/show.js)
 const INHALT = {
   regie: "Ziele, Signale, genutzte Spiele, aktives Spiel, Session (Name, Passwort, Port), Netzwerkkarten und Game-Stats-Screen mit Layout. Die Ausgabe ist nach dem Laden immer aus.",
-  gamepc: "Session-Wahl mit Passwort und Auto-Verbinden, Netzwerkkarte, Ports, Overlay und die Bilderkennung mit allen Aktionen. PC-ID und GSI-Token bleiben von diesem PC, so passt eine Show auf alle Game-PCs.",
+  gamepc: "Session-Wahl mit Passwort und Auto-Verbinden, Netzwerkkarte, Ports, Overlay, Namens-Popup und die Bilderkennung mit allen Aktionen. PC-ID, Spielername und GSI-Token bleiben von diesem PC, so passt eine Show auf alle Game-PCs.",
 };
 const datum = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }); };
 

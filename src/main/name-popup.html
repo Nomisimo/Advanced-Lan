@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="de"><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data:">
+<style>
+  html, body { margin: 0; background: transparent; overflow: hidden; font-family: "Segoe UI", system-ui, sans-serif; color: #ece9f2; }
+  #karte { position: absolute; inset: 8px; box-sizing: border-box; padding: 14px 16px 12px; border-radius: 14px; background: #1a1820; border: 2px solid #9d5cff;
+    box-shadow: 0 0 6px rgba(157, 92, 255, .55); -webkit-app-region: drag; }
+  h1 { margin: 0 26px 2px 0; font-size: 16px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #grund { font-size: 12px; color: #a39fb0; margin-bottom: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #zu { position: absolute; right: 8px; top: 8px; width: 26px; height: 26px; border: 0; border-radius: 7px; background: transparent; color: #a39fb0; font-size: 18px; line-height: 1; cursor: pointer; -webkit-app-region: no-drag; }
+  #zu:hover { background: #2f2c3a; color: #fff; }
+  form { display: flex; gap: 8px; -webkit-app-region: no-drag; }
+  input { flex: 1; min-width: 0; padding: 8px 10px; font-size: 15px; font-weight: 700; border-radius: 8px; border: 1px solid #3a3646; background: #131118; color: #fff; outline: none; }
+  input:focus { border-color: #9d5cff; }
+  button.ok { padding: 8px 14px; border: 0; border-radius: 8px; background: #9d5cff; color: #fff; font-weight: 800; font-size: 13px; cursor: pointer; }
+  #hinweis { margin-top: 8px; font-size: 11px; color: #7f7a8e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* Restzeit bis zum Ausblenden, stoppt beim ersten Klick oder Tippen */
+  #rest { position: absolute; left: 14px; right: 14px; bottom: 4px; height: 2px; border-radius: 1px; background: #9d5cff; transform-origin: left; }
+</style></head>
+<body>
+  <div id="karte">
+    <h1 id="titel">Wer spielt hier?</h1>
+    <div id="grund"></div>
+    <button id="zu" title="Später (Esc)">×</button>
+    <form id="form">
+      <input id="name" maxlength="32" autocomplete="off" spellcheck="false" placeholder="Dein Name">
+      <button class="ok" type="submit">Übernehmen</button>
+    </form>
+    <div id="hinweis"></div>
+    <div id="rest"></div>
+  </div>
+<script>
+  // Namens-Popup des Game-PCs: Name eintragen (Enter) oder wegklicken (×, Esc). Ohne Eingabe blendet es sich nach einer Weile aus.
+  const $ = (id) => document.getElementById(id);
+  const GRUND = { spielstart: "Spiel erkannt. Dein Name kommt auf den Stats-Screen.", zurueck: "Willkommen! Dein Name kommt auf den Stats-Screen.", regie: "Die Regie fragt nach deinem Namen für den Stats-Screen.", hand: "Dein Name kommt auf den Stats-Screen." };
+  let timer = null, rest = null;
+  const stoppen = () => { clearTimeout(timer); timer = null; if (rest) { rest.cancel(); rest = null; } $("rest").style.display = "none"; };
+  const zu = () => { stoppen(); window.nameAPI.schliessen(); };
+  window.nameAPI.onDaten((d) => {
+    $("titel").textContent = `Wer spielt an ${d.pcId}?`;
+    $("grund").textContent = GRUND[d.grund] || GRUND.hand;
+    $("name").value = d.vorschlag || "";
+    $("name").placeholder = d.pcId;
+    $("hinweis").textContent = `Leer lassen oder wegklicken: Der Screen zeigt „${d.pcId}“.`;
+    stoppen();
+    $("rest").style.display = "block";
+    rest = $("rest").animate([{ transform: "scaleX(1)" }, { transform: "scaleX(0)" }], { duration: d.sekunden * 1000, fill: "forwards" });
+    timer = setTimeout(zu, d.sekunden * 1000);
+  });
+  $("form").addEventListener("submit", (e) => { e.preventDefault(); stoppen(); window.nameAPI.antwort($("name").value); });
+  $("zu").addEventListener("click", zu);
+  // Wer klickt oder tippt, bekommt alle Zeit der Welt
+  for (const ev of ["mousedown", "keydown"]) window.addEventListener(ev, (e) => { if (e.key === "Escape") return zu(); stoppen(); });
+  window.addEventListener("focus", () => $("name").focus());
+</script>
+</body></html>

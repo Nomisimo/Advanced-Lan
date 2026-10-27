@@ -44,9 +44,10 @@ class Discovery {
 
 // Verbindung zur Regie. Verbindet sich nach Abbruch selbst neu, solange nicht bewusst getrennt wurde.
 class SessionClient {
-  // geraet(): Angaben für die Übersicht der Regie. karte(): Name der gewählten Netzwerkkarte.
-  constructor({ onChange, onAntwort, geraet, karte }) {
+  // geraet(): Angaben für die Übersicht der Regie. karte(): Name der gewählten Netzwerkkarte. spieler(): Name aus dem Namens-Popup.
+  constructor({ onChange, onAntwort, geraet, karte, spieler }) {
     this.geraetInfo = geraet || (() => ({}));
+    this.spielerName = spieler || (() => '');
     this.karte = karte || (() => '');
     this.onChange = onChange || (() => {});
     this.onAntwort = onAntwort || (() => {});
@@ -84,7 +85,7 @@ class SessionClient {
       if (m.t === 'hallo') {
         this.session = m.session || '';
         this.aktivesSpiel = m.aktivesSpiel || '';
-        ws.send(JSON.stringify({ t: 'anmelden', pcId: this.ziel.pcId, spiele: this.ziel.spiele, version: PROTOKOLL_VERSION, beweis: beweis(this.ziel.passwort, m.nonce), geraet: this.geraet(ws) }));
+        ws.send(JSON.stringify({ t: 'anmelden', pcId: this.ziel.pcId, spiele: this.ziel.spiele, version: PROTOKOLL_VERSION, beweis: beweis(this.ziel.passwort, m.nonce), geraet: this.geraet(ws), spieler: this.spielerName() }));
       } else if (m.t === 'ok') {
         this.aktivesSpiel = m.aktivesSpiel || this.aktivesSpiel;
         this.setze('verbunden', '');
@@ -144,6 +145,7 @@ class SessionClient {
     return ok;
   }
   status(spiel, status, stand) { return this.sende({ t: 'status', spiel, status, stand }); }
+  spieler(name) { return this.sende({ t: 'spieler', name }); }
 
   info() {
     return { zustand: this.zustand, grund: this.grund, session: this.session, aktivesSpiel: this.aktivesSpiel, ziel: this.ziel && { host: this.ziel.host, port: this.ziel.port }, gesendet: this.gesendet, verworfen: this.verworfen };

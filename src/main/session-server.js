@@ -4,13 +4,17 @@ const os = require('os');
 const { WebSocketServer } = require('ws');
 const { Bonjour } = require('bonjour-service');
 const { mdnsTxt, leseNachricht, leseGeraet, leseSpieler, MDNS_TYP, PROTOKOLL_VERSION } = require('../core/protokoll');
+const { zuordnen } = require('../core/plan');
 
 const beweis = (passwort, nonce) => crypto.createHmac('sha256', String(passwort)).update(nonce).digest('hex');
 const gleich = (a, b) => { const x = Buffer.from(String(a)), y = Buffer.from(String(b)); return x.length === y.length && crypto.timingSafeEqual(x, y); };
 
 class SessionServer {
-  constructor({ regie, getConfig, onChange, lokal }) {
+  // onMerken(platzId, rechner): Plan merkt sich den Rechner eines Platzes. onVorlage(pcId, name, daten): ein PC schickt seine Einstellungen.
+  constructor({ regie, getConfig, onChange, lokal, onMerken, onVorlage }) {
     this.regie = regie;
+    this.onMerken = onMerken || (() => {});
+    this.onVorlage = onVorlage || (() => {});
     this.lokal = lokal || (() => ({ ip: '' })); // gewählte Empfangskarte → { ip } oder { fehler }
     this.getConfig = getConfig; // → Regie-Einstellungen
     this.onChange = onChange || (() => {});
@@ -58,7 +62,7 @@ class SessionServer {
 
   lauschen(port, host) {
     return new Promise((resolve) => {
-      const wss = new WebSocketServer({ port, host: host || undefined, maxPayload: 256 * 1024 });
+      const wss = new WebSocketServer({ port, host: host || undefined, maxPayload: 16 * 1024 * 1024 }); // groß genug für Vorlagen mit Bildern der Bilderkennung
       wss.once('listening', () => resolve(wss));
       wss.once('error', (e) => {
         this.fehlerCode = e.code;
@@ -117,16 +121,24 @@ class SessionServer {
       if (!m) return;
       if (!pcId) {
         if (m.t !== 'anmelden') return;
-        const id = String(m.pcId || '').trim().slice(0, 40);
-        if (!id) return abweisen('PC-ID fehlt');
         if (!gleich(m.beweis, beweis(this.getConfig().session.passwort, nonce))) return abweisen('Falsches Passwort');
+        // PC-ID aus dem Plan: eingetragener Rechner, gleiche PC-ID oder nächster freier Platz
+        const geraet = leseGeraet(m.geraet);
+        const z = zuordnen(this.getConfig().plan, { pcId: String(m.pcId || '').slice(0, 40), geraet }, new Set(this.verbindungen.keys()));
+        const id = z.pcId.slice(0, 40);
+        if (!id) return abweisen('PC-ID fehlt: diesen Rechner im Plan der Regie eintragen oder eine PC-ID eingeben');
+        if (z.merken && z.platz) this.onMerken(z.platz.id, z.merken);
         const alt = this.verbindungen.get(id);
         if (alt && alt !== ws) { try { alt.close(4002, 'Gleiche PC-ID hat sich neu angemeldet'); } catch {} }
         clearTimeout(anmeldeFrist);
         pcId = id;
         this.verbindungen.set(id, ws);
-        this.regie.pcVerbunden(id, { spiele: Array.isArray(m.spiele) ? m.spiele.map(String).slice(0, 20) : [], remote, geraet: leseGeraet(m.geraet), spieler: leseSpieler(m.spieler) });
-        senden({ t: 'ok', aktivesSpiel: this.getConfig().aktivesSpiel });
+        const stand = typeof m.vorlage === 'string' ? m.vorlage.slice(0, 40) : '';
+        this.regie.pcVerbunden(id, { spiele: Array.isArray(m.spiele) ? m.spiele.map(String).slice(0, 20) : [], remote, geraet, spieler: leseSpieler(m.spieler), vorlage: stand });
+        senden({ t: 'ok', aktivesSpiel: this.getConfig().aktivesSpiel, pcId: id });
+        // Vorlage beim Verbinden schicken, wenn der PC sie noch nicht hat
+        const plan = this.getConfig().plan;
+        if (plan?.vorlage && plan.vorlageAuto && stand !== 'eigene' && stand !== plan.vorlage.stand) this.einrichten(id);
         this.onChange();
         return;
       }
@@ -137,6 +149,10 @@ class SessionServer {
         this.regie.pcStatus(pcId, { spiel: String(m.spiel || ''), status: m.status, stand: m.stand });
       } else if (m.t === 'spieler') {
         this.regie.pcSpieler(pcId, leseSpieler(m.name));
+      } else if (m.t === 'einrichtung-ok') {
+        this.regie.pcVorlage(pcId, typeof m.stand === 'string' ? m.stand.slice(0, 40) : '');
+      } else if (m.t === 'vorlage' && m.daten && typeof m.daten === 'object') {
+        this.onVorlage(pcId, String(m.name || ''), m.daten);
       }
     });
     ws.on('pong', () => { const t0 = this.pingStart.get(ws); if (pcId && t0) this.regie.pcPing(pcId, Date.now() - t0); });
@@ -155,6 +171,27 @@ class SessionServer {
   }
 
   trennen(pcId) { const ws = this.verbindungen.get(pcId); if (ws) ws.close(4003, 'Von der Regie getrennt'); }
+
+  // Nach einer Änderung im Plan: PC meldet sich sofort neu an und bekommt seine PC-ID aus dem Plan
+  neuAnmelden(pcId) { const ws = this.verbindungen.get(pcId); if (ws) ws.close(4004, 'Im Plan neu zugeordnet'); }
+
+  // Game-PC-Vorlage aus dem Plan an einen PC schicken (ohne pcId: an alle verbundenen). Antwort: Anzahl
+  einrichten(pcId) {
+    const v = this.getConfig().plan?.vorlage;
+    if (!v) return 0;
+    const m = JSON.stringify({ t: 'einrichtung', name: v.name, daten: v.daten, stand: v.stand });
+    let n = 0;
+    for (const [id, ws] of this.verbindungen) if ((!pcId || id === pcId) && ws.readyState === 1) { ws.send(m); n++; }
+    return n;
+  }
+
+  // Einstellungen eines verbundenen PCs als Vorlage anfordern (Antwort kommt über onVorlage)
+  vorlageHolen(pcId) {
+    const ws = this.verbindungen.get(pcId);
+    if (!ws || ws.readyState !== 1) return false;
+    ws.send(JSON.stringify({ t: 'vorlage-holen' }));
+    return true;
+  }
 
   status() { return { offen: this.offen, port: this.port, ip: this.offen ? this.ip || '' : '', fehler: this.fehler, verbunden: this.verbindungen.size }; }
 }

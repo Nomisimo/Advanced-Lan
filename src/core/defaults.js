@@ -5,6 +5,8 @@ const { standardBild, migrateBild } = require("./bild-spiele");
 const { standardLayout, migrateLayout } = require("./stats-layout");
 const { standardNamensAbfrage, migrateNamensAbfrage } = require("./namen");
 const { leseSpieler } = require("./protokoll");
+const { standardPlan, migratePlan } = require("./plan");
+const { migrateErsetzt } = require("./aktionen");
 
 const PORTS = { session: 47801, gsi: 3000, rl: 49124 };
 
@@ -26,7 +28,10 @@ function standardRegie() {
     // Tab „Ziele“: angelegt aus der Ziel-Datenbank (ziel-typen.js)
     targets: [], // [{ id, typ, name, host, port, optionen: {}, netz }]  netz: eigene Netzwerkkarte, leer = wie „Senden“
     // Tab „Signale“: welches Event welchen Befehl an welches Ziel sendet
-    signale: {}, // { [spiel]: { [event]: [{ id, ziel, befehl, werte, pc, team }] } }
+    signale: {}, // { [spiel | "allgemein"]: { [event | aktion]: [{ id, ziel, befehl, werte, pc, team }] } }
+    ersetzt: {}, // { [spiel]: [event] } hier gelten die allgemeinen Befehle nicht (core/aktionen.js)
+    // Tab „Plan“: Plätze der Game-PCs, je Ziel eine Spalte, Game-PC-Vorlage (core/plan.js)
+    plan: standardPlan(),
     // Tab „Setup“: Game-Stats-Screen (Spielstand, beste Spieler, letzte Events) als Pop-out-Fenster oder NDI-Stream
     stats: { an: false, ndi: false, ndiName: "Advanced LAN Stats", layout: standardLayout() },
   };
@@ -46,6 +51,7 @@ function standardGamePc() {
     rlPort: PORTS.rl, // WebSocket der Rocket-League-Stats-API
     bild: standardBild(), // Bilderkennung (Valorant, The Finals): Bildschirm, Bilder pro Sekunde, je Spiel Team und Aktionen aus dem Editor
     gsiToken: neuerToken(),
+    verwaltet: true, // Game-PC-Vorlage der Regie annehmen (Tab „Session“)
   };
 }
 
@@ -127,10 +133,12 @@ function migrateKonfig(k) {
       netz: { ...d.regie.netz, ...(r.netz && typeof r.netz === "object" ? r.netz : {}) },
       targets: Array.isArray(r.targets) ? r.targets.map(migrateZiel) : d.regie.targets,
       signale: migrateSignale(r.signale),
+      ersetzt: migrateErsetzt(r.ersetzt),
+      plan: migratePlan(r.plan),
       spiele: genutzteSpiele(r.spiele, d.regie.spiele),
       stats: migrateStats(r.stats, d.regie.stats),
     },
-    gamepc: { ...d.gamepc, ...g, regie: { ...d.gamepc.regie, ...(g.regie || {}) }, overlay: { ...d.gamepc.overlay, ...(g.overlay && typeof g.overlay === "object" ? g.overlay : {}) }, bild: migrateBild(g.bild), spieler: leseSpieler(g.spieler), namensAbfrage: migrateNamensAbfrage(g.namensAbfrage), gsiToken: g.gsiToken || d.gamepc.gsiToken },
+    gamepc: { ...d.gamepc, ...g, regie: { ...d.gamepc.regie, ...(g.regie || {}) }, overlay: { ...d.gamepc.overlay, ...(g.overlay && typeof g.overlay === "object" ? g.overlay : {}) }, bild: migrateBild(g.bild), spieler: leseSpieler(g.spieler), namensAbfrage: migrateNamensAbfrage(g.namensAbfrage), gsiToken: g.gsiToken || d.gamepc.gsiToken, verwaltet: g.verwaltet !== false },
   };
   delete m.gamepc.spiel;
   // Das aktive Spiel muss ein genutztes Spiel sein

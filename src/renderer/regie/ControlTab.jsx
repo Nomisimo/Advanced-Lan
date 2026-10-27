@@ -277,6 +277,8 @@ function Verbindungscheck({ cfg, status, jetzt }) {
     return { verbunden, daten, spiel, ok: verbunden && daten && spiel };
   };
   const ok = pcs.filter((p) => pruefen(p).ok).length;
+  // Plätze aus dem Plan, für die noch kein PC da ist (virtuelle PCs)
+  const geplant = (cfg.plan?.pcs || []).filter((x) => !pcs.some((p) => p.pcId === x.pcId));
   const mc = matchCheck(pcs, cfg.aktivesSpiel);
   const standText = (st) => !st ? "" : cfg.aktivesSpiel === "rl" ? `${st.arena || "Arena"} · ${st.blau}:${st.orange}${st.match ? ` · Match ${st.match}` : ""}`
     : cfg.aktivesSpiel === "cs2" ? `${st.map} · ${st.ct}:${st.tt}` : [st.map, st.match && `Match ${st.match}`].filter(Boolean).join(" · ");
@@ -285,7 +287,7 @@ function Verbindungscheck({ cfg, status, jetzt }) {
       {mc.gesamt > 1 && <span style={{ color: mc.anzahl === mc.gesamt ? OK : WARN }} title={`Die meisten: ${standText(mc.ref)}`}>{mc.anzahl === mc.gesamt ? "alle im selben Match" : `${mc.gesamt - mc.anzahl} in anderem Match`}</span>}
       <span style={{ color: ok === pcs.length ? OK : WARN }}>{ok} / {pcs.length} PCs ok</span>
     </span>}>
-      {pcs.length === 0 ? <Leer>Kein PC in der Session.</Leer> : (
+      {pcs.length === 0 && !geplant.length ? <Leer>Kein PC in der Session.</Leer> : (
         <div style={{ overflowX: "auto" }}>
         <table style={{ ...S.table, marginTop: 0 }}>
           <thead><tr>
@@ -311,6 +313,12 @@ function Verbindungscheck({ cfg, status, jetzt }) {
                 </tr>
               );
             })}
+            {geplant.map((x) => (
+              <tr key={`plan-${x.id}`} style={{ opacity: 0.45 }} title="Platz aus dem Tab „Plan“, noch kein PC verbunden">
+                <td style={td({ fontWeight: 700, whiteSpace: "nowrap" })}><Dot color="#4d475c" /> <span style={{ marginLeft: 4 }}>{x.pcId}</span></td>
+                <td style={td({ color: MUTED, fontSize: 12 })} colSpan={9}>geplant{x.rechner ? ` · ${x.rechner}` : ""}</td>
+              </tr>
+            ))}
           </tbody>
         </table>
         </div>

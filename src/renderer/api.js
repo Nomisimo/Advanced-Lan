@@ -12,7 +12,7 @@ import { DOTA_CFG_DATEI, DOTA_STARTOPTION, dotaCfg } from "../core/dota.js";
 import { exportDatei, importDatei } from "../core/bild-spiele.js";
 import { QUELLEN } from "../core/spiele.js";
 import { feedbackUrl } from "../core/app-info.js";
-import { SHOW_ENDUNG, ART_NAME, arten as showArten, showDatei, leseShow, showAnwenden, leereShow, alsGespeichert, dateiName as showDateiName } from "../core/show.js";
+import { SHOW_ENDUNG, ART_NAME, arten as showArten, showDatei, leseShow, showAnwenden, leereShow, alsGespeichert, dateiName as showDateiName, showDaten, vorlageAus, paketDatei } from "../core/show.js";
 import { leseSpieler } from "../core/protokoll.js";
 
 export const isElectron = typeof window !== "undefined" && !!window.regieAPI;
@@ -23,7 +23,7 @@ function browserApi() {
   let cfg;
   try { cfg = migrateKonfig(JSON.parse(localStorage.getItem(KEY))); } catch { cfg = migrateKonfig(null); }
   const speichern = () => { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch {} };
-  const hoerer = { status: new Set(), meldung: new Set(), regieEvent: new Set(), gamePcEvent: new Set() };
+  const hoerer = { status: new Set(), meldung: new Set(), regieEvent: new Set(), gamePcEvent: new Set(), config: new Set() };
   // Game-Stats-Screen der Vorschau: eigener Tab (index.html#stats), bekommt Status und Events über einen BroadcastChannel
   const istStats = typeof location !== "undefined" && location.hash === "#stats";
   const kanal = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("advancedlan-vorschau") : null;
@@ -111,6 +111,13 @@ function browserApi() {
     speichern(); statusMelden(); melde("meldung", { text, art: "ok" });
     return { ok: true, cfg, status: status(), liste: showsListe() };
   };
+  // Plan der Vorschau ändern wie im Hauptprozess: speichern und der Oberfläche die neuen Einstellungen geben
+  const planAendern = (fn) => { fn(cfg.regie.plan); speichern(); melde("config", cfg); statusMelden(); };
+  const datei = (accept) => new Promise((ok) => {
+    const i = document.createElement("input"); i.type = "file"; i.accept = accept;
+    i.onchange = async () => { const f = i.files?.[0]; ok(f ? await f.text() : null); };
+    i.click();
+  });
   const download = (name, text) => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text])); a.download = name; a.click(); };
   return {
     appVersion: async () => __APP_VERSION__,
@@ -141,7 +148,7 @@ function browserApi() {
       const inhalt = showsLesen()[art]?.[datei];
       if (!inhalt || !showArten(cfg.modus).includes(art)) return { fehler: "Show nicht gefunden." };
       const d = leseShow(inhalt, [art]);
-      return d.fehler ? d : showUebernehmen(showAnwenden(cfg, art, d.daten, d.name), `Show „${d.name}“ geladen. Ausgabe ist aus.`);
+      return d.fehler ? d : showUebernehmen(showAnwenden(cfg, art, d.daten, d.name, { pcId: d.pcId }), `Show „${d.name}“ geladen. Ausgabe ist aus.`);
     },
     showLoeschen: async (art, datei) => { const alle = showsLesen(); delete alle[art]?.[datei]; showsSchreiben(alle); return { ok: true, liste: showsListe() }; },
     showLeer: async (art) => (showArten(cfg.modus).includes(art) ? showUebernehmen(leereShow(cfg, art), `Leere ${ART_NAME[art]}-Show geladen.`) : { fehler: "In diesem Modus nicht möglich." }),
@@ -154,7 +161,7 @@ function browserApi() {
         const d = leseShow(inhalt, showArten(cfg.modus));
         if (d.fehler) return ok(d);
         showAblegen(d.art, showDateiName(d.name, d.art), inhalt);
-        ok({ ...showUebernehmen(showAnwenden(cfg, d.art, d.daten, d.name), `${ART_NAME[d.art]}-Show „${d.name}“ importiert. Ausgabe ist aus.`), art: d.art });
+        ok({ ...showUebernehmen(showAnwenden(cfg, d.art, d.daten, d.name, { pcId: d.pcId }), `${ART_NAME[d.art]}-Show „${d.name}“ importiert. Ausgabe ist aus.`), art: d.art });
       };
       i.click();
     }),
@@ -165,6 +172,7 @@ function browserApi() {
       { name: "WLAN", ip: "10.10.0.7", maske: "255.255.255.0", mac: "a4:83:e7:11:02:07" },
     ],
     onStatus: abo("status"),
+    onConfig: abo("config"),
     onMeldung: abo("meldung"),
     openExternal: async (url) => window.open(url, "_blank"),
     // Datenschutz (Overwolf CMP) gibt es nur in der App
@@ -190,6 +198,43 @@ function browserApi() {
     },
     sessionSchliessen: async () => { sessionOffen = false; for (const [id] of VORSCHAU_PCS) regie.pcGetrennt(id); return status(); },
     pcTrennen: async () => {},
+    planVerteilen: async (pcId) => {
+      const v = cfg.regie.plan.vorlage;
+      if (!v || !sessionOffen) return { n: 0 };
+      const pcs = regie.snapshot().pcs.filter((p) => p.verbunden && !p.sim && p.remote !== "dieser PC" && (!pcId || p.pcId === pcId));
+      for (const p of pcs) regie.pcVorlage(p.pcId, v.stand);
+      return { n: pcs.length };
+    },
+    planVorlageHolen: async (pcId) => { planAendern((plan) => { plan.vorlage = vorlageAus(showDaten(cfg, "gamepc"), pcId); }); return { ok: true }; },
+    planZuordnen: async (pcId, platzId) => {
+      const alt = regie.snapshot().pcs.find((p) => p.pcId === pcId);
+      const rechner = alt?.geraet?.hostname || alt?.geraet?.mac;
+      if (!rechner) return { fehler: "Der PC meldet keinen Rechnernamen" };
+      let neu = "";
+      planAendern((plan) => {
+        for (const p of plan.pcs) if (p.rechner.toLowerCase() === rechner.toLowerCase()) p.rechner = "";
+        const p = plan.pcs.find((x) => x.id === platzId);
+        if (p) { p.rechner = rechner; neu = p.pcId; }
+      });
+      if (neu && neu !== pcId) { regie.pcEntfernen(pcId); regie.pcVerbunden(neu, { spiele: alt.spiele, remote: alt.remote, geraet: alt.geraet }); }
+      return { ok: true };
+    },
+    planVorlageDatei: async () => {
+      const inhalt = await datei(`.${SHOW_ENDUNG},.json,application/json`);
+      if (inhalt == null) return { abbruch: true };
+      const d = leseShow(inhalt, ["gamepc"]);
+      if (d.fehler) return d;
+      planAendern((plan) => { plan.vorlage = vorlageAus(d.daten, d.name); });
+      return { ok: true, name: d.name };
+    },
+    planVorlageEigene: async () => { planAendern((plan) => { plan.vorlage = vorlageAus(showDaten(cfg, "gamepc"), cfg.shows.gamepc.name || "Standalone"); }); return { ok: true }; },
+    planPaket: async () => {
+      const { vorlage, pcs } = cfg.regie.plan;
+      if (!vorlage) return { fehler: "Zuerst eine Game-PC-Vorlage wählen" };
+      if (!pcs.length) return { fehler: "Der Plan hat noch keine Plätze" };
+      for (const p of pcs) download(showDateiName(p.pcId, "gamepc"), JSON.stringify(paketDatei(vorlage, p.pcId, { appVersion: __APP_VERSION__ }), null, 1));
+      return { ok: true, n: pcs.length, ordner: "Downloads" };
+    },
     eventAusloesen: async (ev) => regie.fire({ round: regie.stand?.runde, map: regie.stand?.map, ...ev, spiel: cfg.regie.aktivesSpiel, pc: "Regie", pcId: "regie" }, "manuell"),
     signalTesten: async (spiel, type, z) => regie.testeZuweisung(spiel, type, z),
     overlayZuruecksetzen: async () => {},
@@ -207,14 +252,13 @@ function browserApi() {
     gamePcLog: async () => [...gp.log],
     verbinden: async () => {
       const g = cfg.gamepc;
-      if (!g.pcId.trim()) return { fehler: "Zuerst eine PC-ID eintragen" };
       if (!g.regie.id) return { fehler: "Zuerst eine Session wählen" };
       if (!g.passwort) return { fehler: "Passwort fehlt" };
       gp.zustand = "verbunden"; statusMelden(); return { ok: true };
     },
     setupCheck: async () => ({
       allgemein: cfg.modus === "standalone" ? [] : [
-        { id: "pcid", label: "PC-ID eingetragen", ok: !!cfg.gamepc.pcId.trim(), detail: cfg.gamepc.pcId.trim() || "fehlt" },
+        { id: "pcid", label: "PC-ID eingetragen", ok: !!cfg.gamepc.pcId.trim(), warn: true, detail: cfg.gamepc.pcId.trim() || "leer: die Regie vergibt sie, wenn dieser Rechner in ihrem Plan steht" },
         { id: "session", label: "Mit einer Session verbunden", ok: gp.zustand === "verbunden", detail: gp.zustand === "verbunden" ? cfg.gamepc.regie.session : "nicht verbunden" },
       ],
       cs2: [

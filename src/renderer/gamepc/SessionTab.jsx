@@ -12,7 +12,8 @@ export default function SessionTab({ cfg, mutate, g, notify }) {
   const [zText, zFarbe] = ZUSTAND[c.zustand] || ZUSTAND.getrennt;
   const aktiv = c.zustand === "verbunden" || c.zustand === "verbinde";
   const gewaehlt = g.sessions.find((s) => s.id === cfg.regie.id);
-  const bereit = cfg.pcId.trim() && gewaehlt && cfg.passwort;
+  // Ohne PC-ID vergibt die Regie sie aus ihrem Plan (Rechnername oder MAC)
+  const bereit = gewaehlt && cfg.passwort;
   const verbinden = async () => { const r = await api.verbinden(); if (r?.fehler) notify(r.fehler, "err"); };
   const waehlen = (s) => mutate((d) => { d.regie = { id: s.id, session: s.session, host: s.ip, port: s.port }; });
 
@@ -21,11 +22,12 @@ export default function SessionTab({ cfg, mutate, g, notify }) {
       <Section title="Dieser PC">
         <Field label="PC-ID">
           <div style={{ position: "relative" }}>
-            <input style={{ ...S.input, width: "100%", fontSize: 20, fontWeight: 800, paddingRight: 34 }} value={cfg.pcId} disabled={aktiv} placeholder="PC 01"
+            <input style={{ ...S.input, width: "100%", fontSize: 20, fontWeight: 800, paddingRight: 34 }} value={cfg.pcId} disabled={aktiv} placeholder="vergibt die Regie"
               title={aktiv ? "Nur ohne aktive Session änderbar" : undefined} onChange={(e) => mutate((d) => { d.pcId = e.target.value; })} />
             {aktiv && <Lock size={15} color={MUTED} style={{ position: "absolute", right: 11, top: 13 }} />}
           </div>
         </Field>
+        {!cfg.pcId.trim() && !aktiv && <div style={{ ...S.hint, marginTop: 4 }}>Leer lassen, wenn dieser Rechner im Plan der Regie steht: die Regie trägt die PC-ID beim Beitreten ein.</div>}
         <SpielerName cfg={cfg} mutate={mutate} g={g} notify={notify} pcId={cfg.pcId.trim()} />
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 16, fontSize: 14, fontWeight: 700, color: zFarbe }}>
           <Dot color={zFarbe} glow={c.zustand === "verbunden"} size={10} /> {zText}{c.grund ? <span style={{ fontWeight: 400, fontSize: 12 }}>: {c.grund}</span> : null}
@@ -73,7 +75,11 @@ export default function SessionTab({ cfg, mutate, g, notify }) {
               : <button style={{ ...S.primaryBtn, padding: "10px 18px" }} disabled={!bereit} onClick={verbinden}><Plug size={15} /> Beitreten</button>}
           </div>
         )}
-        <div style={{ marginTop: 14 }}><Toggle checked={cfg.autoVerbinden} onChange={(v) => mutate((d) => { d.autoVerbinden = v; })} label="Beim Start automatisch beitreten" /></div>
+        <div style={{ marginTop: 14, display: "flex", gap: 18, flexWrap: "wrap" }}>
+          <Toggle checked={cfg.autoVerbinden} onChange={(v) => mutate((d) => { d.autoVerbinden = v; })} label="Beim Start automatisch beitreten" />
+          <Toggle checked={cfg.verwaltet !== false} onChange={(v) => mutate((d) => { d.verwaltet = v; })} label="Einstellungen von der Regie übernehmen"
+            title="Die Regie schickt ihre Game-PC-Vorlage (Spiele, Bilderkennung, Overlay, Namens-Popup, Ports). PC-ID, Spielername und Session bleiben von diesem PC." />
+        </div>
       </Section>
     </div>
   );

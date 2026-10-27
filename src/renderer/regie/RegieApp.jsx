@@ -10,16 +10,17 @@ import ZieleTab from "./ZieleTab.jsx";
 import SimTab from "./SimTab.jsx";
 import SessionTab from "./SessionTab.jsx";
 import ScreenTab from "./ScreenTab.jsx";
+import PlanTab from "./PlanTab.jsx";
 import AnleitungTab from "../AnleitungTab.jsx";
 import AppEinstellungen from "../AppEinstellungen.jsx";
 import { ShowKnopf } from "../Shows.jsx";
 import GpSetupTab from "../gamepc/SetupTab.jsx";
 import BildTab from "../gamepc/BildTab.jsx";
-import { Gauge, ListChecks, Send, FlaskConical, BookOpen, Power, Radio, KeyRound, TriangleAlert, Settings, Gamepad2, MonitorPlay, ScanEye } from "lucide-react";
+import { Gauge, ListChecks, Send, FlaskConical, BookOpen, Power, Radio, KeyRound, TriangleAlert, Settings, Gamepad2, MonitorPlay, ScanEye, LayoutGrid } from "lucide-react";
 
-const TABS_REGIE = [["control", "Control", Gauge], ["signale", "Signale", ListChecks], ["ziele", "Ziele", Send], ["session", "Session", KeyRound], ["setup", "Setup", Settings], ["screen", "Screen", MonitorPlay], ["sim", "Simulator", FlaskConical], ["hilfe", "Anleitung", BookOpen]];
+const TABS_REGIE = [["control", "Control", Gauge], ["signale", "Signale", ListChecks], ["ziele", "Ziele", Send], ["plan", "Plan", LayoutGrid], ["session", "Session", KeyRound], ["setup", "Setup", Settings], ["screen", "Screen", MonitorPlay], ["sim", "Simulator", FlaskConical], ["hilfe", "Anleitung", BookOpen]];
 // Standalone: dazu der Tab „Spiele“ mit dem Setup der Spiele auf diesem PC (wie auf einem Game-PC)
-const TABS_STANDALONE = [...TABS_REGIE.slice(0, 6), ["spiele", "Spiele", Gamepad2], ["bild", "Bilderkennung", ScanEye], ...TABS_REGIE.slice(6)];
+const TABS_STANDALONE = [...TABS_REGIE.slice(0, 7), ["spiele", "Spiele", Gamepad2], ["bild", "Bilderkennung", ScanEye], ...TABS_REGIE.slice(7)];
 const LOG_MAX = 300;
 // Neuer Eintrag oben; kommt dieselbe ID wieder (z. B. mit einem Sendefehler), wird er ersetzt.
 // Echte und verworfene Events haben je eigene Obergrenze.
@@ -76,6 +77,7 @@ export default function RegieApp({ cfg: alles, mutate: mutateAlles, ersetzen, st
         {TABS.map(([k, label, Ic]) => (
           <button key={k} style={{ ...S.navBtn, ...(tab === k ? S.navBtnActive : {}) }} onClick={() => setTab(k)}>
             <Ic size={14} />{label}
+            {k === "plan" && cfg.plan.pcs.length > 0 && <span style={{ ...S.badge, background: "#2f2c3a", color: SUB }}>{cfg.plan.pcs.length}</span>}
             {k === "control" && <span style={{ ...S.badge, background: verbunden.length ? OK + "33" : "#2f2c3a", color: verbunden.length ? OK : MUTED }}>{verbunden.length}</span>}
             {k === "session" && <span style={{ width: 7, height: 7, borderRadius: "50%", background: ses.offen ? OK : WARN, boxShadow: ses.offen ? `0 0 6px ${OK}` : "none" }} />}
           </button>
@@ -90,6 +92,7 @@ export default function RegieApp({ cfg: alles, mutate: mutateAlles, ersetzen, st
             {tab === "bild" && standalone && <BildTab cfg={alles.gamepc} mutate={(fn) => mutateAlles((d) => fn(d.gamepc))} g={{ ...st.gamepc, client: { ...st.gamepc.client, aktivesSpiel: cfg.aktivesSpiel } }} notify={notify} />}
             {tab === "signale" && <SignaleTab {...shared} />}
             {tab === "ziele" && <ZieleTab {...shared} />}
+            {tab === "plan" && <PlanTab {...shared} />}
             {tab === "screen" && <ScreenTab {...shared} />}
             {tab === "sim" && <SimTab {...shared} />}
             {tab === "session" && <SessionTab {...shared} />}

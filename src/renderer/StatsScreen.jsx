@@ -168,7 +168,7 @@ function TextElement({ el, werte }) {
 
 // Inhalt eines Elements des Layouts in seinem Kasten
 export function ElementInhalt({ el, ctx }) {
-  const { d, spiel, live, log, cfg, werte } = ctx;
+  const { d, spiel, live, log, cfg, werte, namen } = ctx;
   switch (el.typ) {
     case "logo": {
       const g = Math.min(70, el.h - 8);
@@ -209,7 +209,7 @@ export function ElementInhalt({ el, ctx }) {
         </div>
       ) : null;
     case "bestenliste": return <Bestenliste d={d} mitTeam={!!d.teams} titel={el.titel} zeilen={Math.max(1, Math.floor((el.h - (el.titel ? 140 : 100)) / 54))} />;
-    case "events": return <LetzteEvents titel={el.titel} events={statsEvents(log, spiel?.id, Math.max(1, Math.min(12, Math.floor((el.h - (el.titel ? 100 : 60)) / 56))))} />;
+    case "events": return <LetzteEvents titel={el.titel} events={statsEvents(log, spiel?.id, Math.max(1, Math.min(12, Math.floor((el.h - (el.titel ? 100 : 60)) / 56))), namen)} />;
     case "text": return <TextElement el={el} werte={werte} />;
     default: return null;
   }
@@ -226,7 +226,7 @@ export function buehnenDaten({ status, cfg, log, jetzt }) {
   const spiel = SPIEL_BY_ID[status?.aktivesSpiel || cfg?.regie?.aktivesSpiel];
   const d = statsDaten(spiel, status?.statistik, status?.stand);
   const live = !!(status?.stand?.t && jetzt - status.stand.t < FRISCH);
-  return { spiel, d, live, log, cfg, werte: textWerte({ spiel, d, cfg, jetzt }) };
+  return { spiel, d, live, log, cfg, namen: status?.namen || {}, werte: textWerte({ spiel, d, cfg, jetzt }) };
 }
 
 // layout: wenn nicht angegeben, das gespeicherte aus cfg.regie.stats.layout

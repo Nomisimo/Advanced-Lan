@@ -110,10 +110,16 @@ class Statistik {
     }
   }
 
-  json() {
+  // name: Name im Spiel oder PC-ID → Name für die Anzeige (Spielername aus dem Namens-Popup). Gezählt wird unter dem Namen im Spiel,
+  // so gilt ein neuer Spielername auch für das, was vorher passiert ist.
+  json(name = (n) => n) {
     const wert = this.spiel === "rl" ? (p) => p.tore * 100 + p.vorlagen * 50 + p.paraden * 50 + p.schuesse * 20 + p.demos * 10 : (p) => p.kills * 1000 - p.tode;
-    const top = [...this.spieler.values()].sort((a, b) => wert(b) - wert(a) || a.name.localeCompare(b.name)).slice(0, this.spiel === "rl" ? 6 : 5);
-    return { spiel: this.spiel, runde: { ...this.runde }, letzteRunde: this.letzteRunde && { ...this.letzteRunde }, match: { ...this.match, siege: { ...this.match.siege }, tore: { ...this.match.tore } }, top };
+    const top = [...this.spieler.values()].map((p) => ({ ...p, name: name(p.name) || p.name }))
+      .sort((a, b) => wert(b) - wert(a) || a.name.localeCompare(b.name)).slice(0, this.spiel === "rl" ? 6 : 5);
+    const anzeige = (n) => (n ? name(n) || n : n);
+    const m = this.match;
+    return { spiel: this.spiel, runde: { ...this.runde, mvp: anzeige(this.runde.mvp) }, letzteRunde: this.letzteRunde && { ...this.letzteRunde, mvp: anzeige(this.letzteRunde.mvp) },
+      match: { ...m, siege: { ...m.siege }, tore: { ...m.tore }, letztesTor: m.letztesTor && { ...m.letztesTor, spieler: anzeige(m.letztesTor.spieler) } }, top };
   }
 }
 

@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const os = require('os');
 const { WebSocketServer } = require('ws');
 const { Bonjour } = require('bonjour-service');
-const { mdnsTxt, leseNachricht, leseGeraet, MDNS_TYP, PROTOKOLL_VERSION } = require('../core/protokoll');
+const { mdnsTxt, leseNachricht, leseGeraet, leseSpieler, MDNS_TYP, PROTOKOLL_VERSION } = require('../core/protokoll');
 
 const beweis = (passwort, nonce) => crypto.createHmac('sha256', String(passwort)).update(nonce).digest('hex');
 const gleich = (a, b) => { const x = Buffer.from(String(a)), y = Buffer.from(String(b)); return x.length === y.length && crypto.timingSafeEqual(x, y); };
@@ -125,7 +125,7 @@ class SessionServer {
         clearTimeout(anmeldeFrist);
         pcId = id;
         this.verbindungen.set(id, ws);
-        this.regie.pcVerbunden(id, { spiele: Array.isArray(m.spiele) ? m.spiele.map(String).slice(0, 20) : [], remote, geraet: leseGeraet(m.geraet) });
+        this.regie.pcVerbunden(id, { spiele: Array.isArray(m.spiele) ? m.spiele.map(String).slice(0, 20) : [], remote, geraet: leseGeraet(m.geraet), spieler: leseSpieler(m.spieler) });
         senden({ t: 'ok', aktivesSpiel: this.getConfig().aktivesSpiel });
         this.onChange();
         return;
@@ -135,6 +135,8 @@ class SessionServer {
         senden({ t: 'quittung', n: m.n, verworfen: String(m.spiel) !== this.getConfig().aktivesSpiel });
       } else if (m.t === 'status') {
         this.regie.pcStatus(pcId, { spiel: String(m.spiel || ''), status: m.status, stand: m.stand });
+      } else if (m.t === 'spieler') {
+        this.regie.pcSpieler(pcId, leseSpieler(m.name));
       }
     });
     ws.on('pong', () => { const t0 = this.pingStart.get(ws); if (pcId && t0) this.regie.pcPing(pcId, Date.now() - t0); });

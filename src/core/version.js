@@ -7,6 +7,13 @@ const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
   "0.1.0-beta.9": [
+    "Shows: die ganze Einrichtung als Show speichern, laden, exportieren und importieren. Knopf „Show“ oben im Kopf",
+    "Regie und Game-PC haben getrennte Shows. Standalone nutzt beide und importiert Regie- und Game-PC-Shows",
+    "„Leere Show laden“ setzt die Einstellungen des Modus auf Standard zurück",
+    "Game-PC-Shows passen auf alle Game-PCs: PC-ID, Spielername, GSI-Token und Overlay-Position bleiben von jedem PC",
+    "Nach dem Laden einer Regie-Show ist die Ausgabe immer aus. Ungespeicherte Änderungen zeigt ein Punkt am Knopf, vor dem Verwerfen fragt die App nach",
+    "Valorant über Automation Overdrive (Overwolf): Kill, Tod, Assist, Headshot, Match-Start und Match-Ende kommen direkt als Events dieses PCs an. Anleitung mit Prüfliste im Setup",
+    "Namens-Popup auf dem Game-PC: bei Spielstart und nach langem Leerlauf fragt ein kleines Popup, wer spielt. Der Name steht auf dem Game-Stats-Screen und in der Regie",
     "Mac: NDI-Quelle ist im Netz sichtbar. Die App meldet den Bonjour-Dienst _ndi._tcp jetzt bei macOS an, ohne den macOS die NDI-Ankündigung blockiert hat",
     "Setup auf dem Mac: Hinweis auf die Freigabe „Lokales Netzwerk“, solange kein NDI-Empfänger verbunden ist",
   ],

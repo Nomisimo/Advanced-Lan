@@ -12,6 +12,8 @@ import { DOTA_CFG_DATEI, DOTA_STARTOPTION, dotaCfg } from "../core/dota.js";
 import { exportDatei, importDatei } from "../core/bild-spiele.js";
 import { QUELLEN } from "../core/spiele.js";
 import { feedbackUrl } from "../core/app-info.js";
+import { SHOW_ENDUNG, ART_NAME, arten as showArten, showDatei, leseShow, showAnwenden, leereShow, alsGespeichert, dateiName as showDateiName } from "../core/show.js";
+import { leseSpieler } from "../core/protokoll.js";
 
 export const isElectron = typeof window !== "undefined" && !!window.regieAPI;
 const VORSCHAU_BILDSCHIRM = { id: "1", name: "Bildschirm 1 (Haupt)", b: 1920, h: 1080, primaer: true };
@@ -40,6 +42,7 @@ function browserApi() {
     if (cfg.modus === "regie" || cfg.modus === "standalone") s.regie = { ...regie.snapshot(), session: { offen: sessionOffen, port: cfg.regie.session.port, ip: "", fehler: "", verbunden: regie.snapshot().pcs.filter((p) => p.verbunden && !p.sim).length }, sim: sim.status(), armed: cfg.regie.armed, spielAufRegie: "",
       stats: { fenster: statsOffen, ndi: { verfuegbar: false, laeuft: false, name: "", verbindungen: 0, fehler: "", aufloesung: "1920×1080", fps: 30 } }, lokal: cfg.modus === "standalone" ? cfg.gamepc.pcId.trim() || "Dieser PC" : null };
     if (cfg.modus === "gamepc" || cfg.modus === "standalone") s.gamepc = {
+      spieler: cfg.gamepc.spieler, spielerAnzeige: cfg.gamepc.spieler || cfg.gamepc.pcId.trim() || "Dieser PC",
       client: { zustand: gp.zustand, grund: "", session: gp.zustand === "verbunden" ? cfg.gamepc.regie.session : "", aktivesSpiel: "cs2", ziel: null, gesendet: gp.log.filter((e) => e.gesendet).length, verworfen: 0 },
       sessions: SESSIONS,
       discoveryFehler: "", gsi: { laeuft: true, port: cfg.gamepc.gsiPort, fehler: "" }, letzte: gp.letzte || 0, status: null, stand: gp.stand || null, fremd: 0,
@@ -90,13 +93,32 @@ function browserApi() {
     });
     kanal.postMessage({ k: "hallo" });
   }
+  // Shows der Vorschau: Liste im localStorage, Export als Download, Import über die Dateiauswahl
+  const SHOWS_KEY = "advancedlan_shows";
+  const showsLesen = () => { try { return JSON.parse(localStorage.getItem(SHOWS_KEY)) || {}; } catch { return {}; } };
+  const showsSchreiben = (s) => { try { localStorage.setItem(SHOWS_KEY, JSON.stringify(s)); } catch {} };
+  const showsListe = () => {
+    const alle = showsLesen(), out = {};
+    for (const art of showArten(cfg.modus)) out[art] = Object.entries(alle[art] || {}).map(([datei, inhalt]) => { const d = leseShow(inhalt, [art]); return d.fehler ? null : { datei, name: d.name, gespeichert: d.gespeichert }; })
+      .filter(Boolean).sort((a, b) => a.name.localeCompare(b.name, "de"));
+    return out;
+  };
+  const showAblegen = (art, datei, inhalt) => { const alle = showsLesen(); (alle[art] = alle[art] || {})[datei] = inhalt; showsSchreiben(alle); };
+  const showUebernehmen = (neu, text) => {
+    const pcId = cfg.gamepc.pcId;
+    cfg = neu;
+    if (gp.zustand === "verbunden") cfg.gamepc.pcId = pcId;
+    speichern(); statusMelden(); melde("meldung", { text, art: "ok" });
+    return { ok: true, cfg, status: status(), liste: showsListe() };
+  };
   const download = (name, text) => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text])); a.download = name; a.click(); };
   return {
     appVersion: async () => __APP_VERSION__,
     getConfig: async () => cfg,
     setConfig: async (neu) => {
-      const pcId = cfg.gamepc.pcId;
+      const pcId = cfg.gamepc.pcId, spieler = cfg.gamepc.spieler;
       cfg = { ...migrateKonfig(neu), modus: cfg.modus };
+      cfg.gamepc.spieler = spieler; // wie in der App: nur über spielerSetzen
       cfg.regie.armed = !!neu.regie?.armed;
       if (gp.zustand === "verbunden") cfg.gamepc.pcId = pcId; // PC-ID nur ohne aktive Session
       speichern(); return status();
@@ -104,9 +126,38 @@ function browserApi() {
     setModus: async (m) => {
       cfg.modus = m; speichern(); sim.neu();
       for (const p of regie.snapshot().pcs.filter((x) => !x.sim && !VORSCHAU_PCS.some(([id]) => id === x.pcId))) regie.pcEntfernen(p.pcId);
-      if (m === "standalone") regie.pcVerbunden(cfg.gamepc.pcId.trim() || "Dieser PC", { spiele: QUELLEN, remote: "dieser PC", geraet: { hostname: "DIESER-PC", app: __APP_VERSION__, plattform: "win32", karte: "lokal" } });
+      if (m === "standalone") regie.pcVerbunden(cfg.gamepc.pcId.trim() || "Dieser PC", { spiele: QUELLEN, remote: "dieser PC", spieler: cfg.gamepc.spieler, geraet: { hostname: "DIESER-PC", app: __APP_VERSION__, plattform: "win32", karte: "lokal" } });
       return status();
     },
+    showsListe: async () => showsListe(),
+    showSpeichern: async (art, name) => {
+      if (!showArten(cfg.modus).includes(art)) return { fehler: "In diesem Modus nicht möglich." };
+      const d = showDatei(cfg, art, name, { appVersion: __APP_VERSION__ });
+      showAblegen(art, showDateiName(d.name, art), JSON.stringify(d));
+      cfg = alsGespeichert(cfg, art, d.name); speichern();
+      return { ok: true, cfg, name: d.name, liste: showsListe() };
+    },
+    showLaden: async (art, datei) => {
+      const inhalt = showsLesen()[art]?.[datei];
+      if (!inhalt || !showArten(cfg.modus).includes(art)) return { fehler: "Show nicht gefunden." };
+      const d = leseShow(inhalt, [art]);
+      return d.fehler ? d : showUebernehmen(showAnwenden(cfg, art, d.daten, d.name), `Show „${d.name}“ geladen. Ausgabe ist aus.`);
+    },
+    showLoeschen: async (art, datei) => { const alle = showsLesen(); delete alle[art]?.[datei]; showsSchreiben(alle); return { ok: true, liste: showsListe() }; },
+    showLeer: async (art) => (showArten(cfg.modus).includes(art) ? showUebernehmen(leereShow(cfg, art), `Leere ${ART_NAME[art]}-Show geladen.`) : { fehler: "In diesem Modus nicht möglich." }),
+    showExport: async (art, name) => { const d = showDatei(cfg, art, name, { appVersion: __APP_VERSION__ }); const n = showDateiName(d.name, art); download(n, JSON.stringify(d, null, 1)); return { ok: true, pfad: n }; },
+    showImport: () => new Promise((ok) => {
+      const i = document.createElement("input"); i.type = "file"; i.accept = `.${SHOW_ENDUNG},.json,application/json`;
+      i.onchange = async () => {
+        const f = i.files?.[0]; if (!f) return ok({ abgebrochen: true });
+        const inhalt = await f.text();
+        const d = leseShow(inhalt, showArten(cfg.modus));
+        if (d.fehler) return ok(d);
+        showAblegen(d.art, showDateiName(d.name, d.art), inhalt);
+        ok({ ...showUebernehmen(showAnwenden(cfg, d.art, d.daten, d.name), `${ART_NAME[d.art]}-Show „${d.name}“ importiert. Ausgabe ist aus.`), art: d.art });
+      };
+      i.click();
+    }),
     status: async () => (istStats ? fremd || { modus: cfg.modus, regie: null } : status()),
     netzAdressen: async () => [
       { name: "Ethernet", ip: "192.168.1.20", maske: "255.255.255.0", mac: "3c:7c:3f:1a:20:00" },
@@ -202,6 +253,12 @@ function browserApi() {
     gamePcSimStart: async (m) => { if (gp.zustand !== "verbunden") return { fehler: "Nur mit verbundener Session" }; if (!gpSim.match) gpQuelle = new CsQuelle(); gpSim.start(m); return { ok: true }; },
     gamePcSimStop: async () => { gpSim.stop(); },
     gamePcSimNeu: async () => { gpSim.neu(); },
+    spielerSetzen: async (name) => {
+      cfg.gamepc.spieler = leseSpieler(name); speichern();
+      if (cfg.modus === "standalone") regie.pcSpieler(cfg.gamepc.pcId.trim() || "Dieser PC", cfg.gamepc.spieler);
+      statusMelden(); return status();
+    },
+    nameFragen: async () => ({ fehler: "Das Namens-Popup gibt es nur in der App." }),
     cs2Ordner: async () => null,
     cfgInstallieren: async () => ({ fehler: "In der Browser-Vorschau nicht möglich." }),
     dotaCfgInstallieren: async () => ({ fehler: "In der Browser-Vorschau nicht möglich." }),

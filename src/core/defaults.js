@@ -3,6 +3,8 @@
 const { STANDARD_HOTKEY, gueltigerHotkey } = require("./app-info");
 const { standardBild, migrateBild } = require("./bild-spiele");
 const { standardLayout, migrateLayout } = require("./stats-layout");
+const { standardNamensAbfrage, migrateNamensAbfrage } = require("./namen");
+const { leseSpieler } = require("./protokoll");
 
 const PORTS = { session: 47801, gsi: 3000, rl: 49124 };
 
@@ -33,6 +35,8 @@ function standardRegie() {
 function standardGamePc() {
   return {
     pcId: "",
+    spieler: "", // Name aus dem Namens-Popup, steht auf dem Game-Stats-Screen. Leer = PC-ID
+    namensAbfrage: standardNamensAbfrage(), // wann das Popup fragt: bei Spielstart, nach Leerlauf (Minuten, 0 = aus)
     regie: { id: "", session: "", host: "", port: 0 }, // gewählte Session aus mDNS, nie von Hand eingegeben
     passwort: "",
     autoVerbinden: false,
@@ -50,8 +54,17 @@ function standardApp() {
   return { einfuehrung: false, bedingungen: "", hotkey: STANDARD_HOTKEY };
 }
 
+// Geladene Show je Modus (core/show.js): Name und Fingerabdruck beim letzten Speichern, leer = keine Show
+const standardShows = () => ({ regie: { name: "", stand: "" }, gamepc: { name: "", stand: "" } });
+const sauberName = (n) => String(n ?? "").replace(/[\u0000-\u001f]/g, "").trim().slice(0, 60);
+function migrateShows(s) {
+  const out = standardShows();
+  if (s && typeof s === "object") for (const a of Object.keys(out)) if (s[a] && typeof s[a] === "object") out[a] = { name: sauberName(s[a].name), stand: typeof s[a].stand === "string" ? s[a].stand : "" };
+  return out;
+}
+
 function standardKonfig() {
-  return { format: "advanced-lan", version: 5, modus: null, app: standardApp(), regie: standardRegie(), gamepc: standardGamePc() };
+  return { format: "advanced-lan", version: 5, modus: null, app: standardApp(), regie: standardRegie(), gamepc: standardGamePc(), shows: standardShows() };
 }
 
 function migrateApp(a, std) {
@@ -105,6 +118,7 @@ function migrateKonfig(k) {
     ...d,
     modus: MODI.includes(k.modus) ? k.modus : null,
     app: migrateApp(k.app, d.app),
+    shows: migrateShows(k.shows),
     regie: {
       ...d.regie,
       ...r,
@@ -116,7 +130,7 @@ function migrateKonfig(k) {
       spiele: genutzteSpiele(r.spiele, d.regie.spiele),
       stats: migrateStats(r.stats, d.regie.stats),
     },
-    gamepc: { ...d.gamepc, ...g, regie: { ...d.gamepc.regie, ...(g.regie || {}) }, overlay: { ...d.gamepc.overlay, ...(g.overlay && typeof g.overlay === "object" ? g.overlay : {}) }, bild: migrateBild(g.bild), gsiToken: g.gsiToken || d.gamepc.gsiToken },
+    gamepc: { ...d.gamepc, ...g, regie: { ...d.gamepc.regie, ...(g.regie || {}) }, overlay: { ...d.gamepc.overlay, ...(g.overlay && typeof g.overlay === "object" ? g.overlay : {}) }, bild: migrateBild(g.bild), spieler: leseSpieler(g.spieler), namensAbfrage: migrateNamensAbfrage(g.namensAbfrage), gsiToken: g.gsiToken || d.gamepc.gsiToken },
   };
   delete m.gamepc.spiel;
   // Das aktive Spiel muss ein genutztes Spiel sein
@@ -124,4 +138,4 @@ function migrateKonfig(k) {
   return m;
 }
 
-module.exports = { MODI, standardKonfig, standardApp, migrateKonfig, genutzteSpiele, standardRegie, standardGamePc, neuerToken, uid, PORTS };
+module.exports = { MODI, standardKonfig, standardApp, migrateKonfig, genutzteSpiele, standardRegie, standardGamePc, standardShows, migrateShows, sauberName, neuerToken, uid, PORTS };

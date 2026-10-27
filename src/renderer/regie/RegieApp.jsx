@@ -12,6 +12,7 @@ import SessionTab from "./SessionTab.jsx";
 import ScreenTab from "./ScreenTab.jsx";
 import AnleitungTab from "../AnleitungTab.jsx";
 import AppEinstellungen from "../AppEinstellungen.jsx";
+import { ShowKnopf } from "../Shows.jsx";
 import GpSetupTab from "../gamepc/SetupTab.jsx";
 import BildTab from "../gamepc/BildTab.jsx";
 import { Gauge, ListChecks, Send, FlaskConical, BookOpen, Power, Radio, KeyRound, TriangleAlert, Settings, Gamepad2, MonitorPlay, ScanEye } from "lucide-react";
@@ -28,7 +29,7 @@ function logEinfuegen(l, e) {
   return neu.filter((x) => (x.verworfen ? ++verw : ++echt) <= LOG_MAX);
 }
 
-export default function RegieApp({ cfg: alles, mutate: mutateAlles, status: st, jetzt, notify, version, modusWechseln, standalone = false }) {
+export default function RegieApp({ cfg: alles, mutate: mutateAlles, ersetzen, status: st, jetzt, notify, version, modusWechseln, standalone = false }) {
   const TABS = standalone ? TABS_STANDALONE : TABS_REGIE;
   const cfg = alles.regie;
   const status = st.regie;
@@ -61,6 +62,7 @@ export default function RegieApp({ cfg: alles, mutate: mutateAlles, status: st, 
         {(!standalone || ses.offen) && <span> · <b style={{ color: verbunden.length ? OK : MUTED }}>{verbunden.length}</b> PCs</span>}
         {status.spielAufRegie && <span style={{ color: ERR }}> · <TriangleAlert size={12} /> Auf diesem PC läuft {status.spielAufRegie}</span>}
       </>}>
+        <ShowKnopf cfg={alles} ersetzen={ersetzen} notify={notify} />
         {statsAn && <button onClick={() => api.statsFenster(!statsOffen)} title={statsOffen ? "Stats-Fenster schließen" : "Game-Stats-Screen als eigenes Fenster öffnen"}
           style={{ ...S.ghostBtn, ...(statsOffen ? { borderColor: ACCENT, color: "#fff", boxShadow: GLOW_STARK } : {}) }}><MonitorPlay size={14} /> Stats{status.stats?.ndi?.laeuft ? " · NDI" : ""}</button>}
         {aktiv && <span title="Aktives Spiel (Tab „Control“)" style={{ borderRadius: 6, padding: "6px 12px", fontWeight: 800, fontSize: 12, letterSpacing: 0.5, background: aktiv.farbe, color: "#14121a", boxShadow: `0 0 12px ${aktiv.farbe}88` }}>{aktiv.kurz}</span>}

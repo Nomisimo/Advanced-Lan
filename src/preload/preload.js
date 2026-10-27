@@ -10,6 +10,14 @@ contextBridge.exposeInMainWorld('regieAPI', {
   setModus:        call('modus-setzen'),
   status:          call('status'),
   netzAdressen:    call('netz-adressen'),
+  // Shows
+  showsListe:      call('shows-liste'),
+  showSpeichern:   call('show-speichern'),
+  showLaden:       call('show-laden'),
+  showLoeschen:    call('show-loeschen'),
+  showLeer:        call('show-leer'),
+  showExport:      call('show-export'),
+  showImport:      call('show-import'),
   onStatus:        abo('status'),
   onMeldung:       abo('meldung'),
   openExternal:    call('open-external'),
@@ -57,6 +65,8 @@ contextBridge.exposeInMainWorld('regieAPI', {
   gamePcSimStart:  call('gamepc-sim-start'),
   gamePcSimStop:   call('gamepc-sim-stop'),
   gamePcSimNeu:    call('gamepc-sim-neu'),
+  spielerSetzen:   call('spieler-setzen'),
+  nameFragen:      call('name-fragen'),
   onGamePcEvent:   abo('gamepc-event'),
   // Bilderkennung (Valorant, The Finals)
   bildBildschirme: call('bild-bildschirme'),

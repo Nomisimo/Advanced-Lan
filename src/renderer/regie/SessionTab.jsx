@@ -15,13 +15,14 @@ function Uebersicht({ status, version }) {
     <Section title="Verbunden" right={<span style={{ fontSize: 12, color: SUB }}>{pcs.filter((p) => p.verbunden).length} von {pcs.length} PCs online</span>}>
       {!pcs.length ? <div style={S.empty}>Noch kein Game-PC beigetreten.</div> : (
         <table style={{ ...S.table, marginTop: 0 }}>
-          <thead><tr>{["", "PC-ID", "Hostname", "IP", "MAC", "Ping", "App-Version", "Netzwerkkarte", ""].map((h, i) => <th key={i} style={th()}>{h}</th>)}</tr></thead>
+          <thead><tr>{["", "PC-ID", "Spieler", "Hostname", "IP", "MAC", "Ping", "App-Version", "Netzwerkkarte", ""].map((h, i) => <th key={i} style={th()}>{h}</th>)}</tr></thead>
           <tbody>{pcs.map((p) => {
             const g = p.geraet || {};
             return (
               <tr key={p.pcId} style={{ opacity: p.verbunden ? 1 : 0.5 }}>
                 <td style={td({ width: 18 })}><Dot color={p.verbunden ? OK : MUTED} glow={p.verbunden} title={p.verbunden ? "verbunden" : "getrennt"} /></td>
                 <td style={td({ fontWeight: 800 })}>{p.pcId}</td>
+                <td style={td({ color: p.spieler ? "#ece9f2" : MUTED })} title="Name aus dem Namens-Popup des Game-PCs, steht auf dem Game-Stats-Screen">{p.spieler || "–"}</td>
                 <td style={td()}>{g.hostname || "–"}{g.plattform && <span style={{ color: MUTED, fontSize: 11 }}> · {PLATTFORM[g.plattform] || g.plattform}</span>}</td>
                 <td style={td(S.mono)}>{p.remote || "–"}</td>
                 <td style={td({ ...S.mono, color: SUB })}>{g.mac || "–"}</td>

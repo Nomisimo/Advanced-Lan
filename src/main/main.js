@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, ipcMain, dialog, screen, globalShortcut } = require('electron');
+const { app, BrowserWindow, shell, ipcMain, dialog, screen, globalShortcut, powerMonitor } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { execFile } = require('child_process');
@@ -21,6 +21,7 @@ const { rlIni, leseRlIni, RL_INI_DATEI } = require('../core/rl-ini');
 const { OVERDRIVE_PORT } = require('../core/overdrive');
 const { migrateKonfig, MODI } = require('../core/defaults');
 const { gsiCfg, CFG_DATEI } = require('../core/cfg');
+const { SHOW_ENDUNG, ART_NAME, arten: showArten, showDatei, leseShow, showAnwenden, leereShow, alsGespeichert, dateiName: showDateiName } = require('../core/show');
 const { testNachricht, zeigeNachricht } = require('../core/signal');
 const { overlayStatus } = require('../core/overlay-status');
 const { kartenListe, lokaleIp } = require('../core/netzwerk');
@@ -32,6 +33,9 @@ const { ValSimMatch } = require('../core/val-sim');
 const { einrichtenUpdates } = require('./updates');
 const { restoreFocus, mitFokus } = require('./fokus');
 const { StatsAusgabe } = require('./stats-ausgabe');
+const { NamensAbfrage } = require('./name-abfrage');
+const { NamensWaechter } = require('../core/namen');
+const { leseSpieler } = require('../core/protokoll');
 const { hotkeyText, feedbackUrl } = require('../core/app-info');
 const os = require('os');
 
@@ -142,6 +146,7 @@ const client = new SessionClient({
   onAntwort: statusMelden,
   geraet: () => ({ app: app.getVersion() }),
   karte: () => cfg.gamepc.netz,
+  spieler: () => cfg.gamepc.spieler,
 });
 const discovery = new Discovery({ onChange: () => discoveryGeaendert(), karte: () => cfg.gamepc.netz });
 const gsi = new GsiServer({ onPayload: (b) => gamePcPayload(b), onStatus: statusMelden });
@@ -152,7 +157,7 @@ const lokalId = () => cfg.gamepc.pcId.trim() || 'Dieser PC';
 function lokalAnmelden() {
   if (lokalPc && lokalPc !== lokalId()) regie.pcEntfernen(lokalPc);
   lokalPc = lokalId();
-  regie.pcVerbunden(lokalPc, { spiele: QUELLEN, remote: 'dieser PC', geraet: { hostname: os.hostname(), app: app.getVersion(), plattform: process.platform, karte: 'lokal' } });
+  regie.pcVerbunden(lokalPc, { spiele: QUELLEN, remote: 'dieser PC', spieler: cfg.gamepc.spieler, geraet: { hostname: os.hostname(), app: app.getVersion(), plattform: process.platform, karte: 'lokal' } });
 }
 function lokalAbmelden() { if (lokalPc) regie.pcEntfernen(lokalPc); lokalPc = null; }
 // Ereignis und Status eines Spiels: im Standalone direkt an die Regie, sonst über die Session
@@ -170,6 +175,7 @@ function gamePcPayload(body, sim = false) {
   if (body?.auth?.token !== cfg.gamepc.gsiToken) { gp.fremd++; return statusMelden(); }
   if (body?.provider?.appid === DOTA_APPID) return quelleMelden('dota2', quellen.dota2.ingest(body), sim); // Dota 2 schickt an denselben Empfang
   const r = quelle.ingest(body);
+  if (!sim) spielDaten();
   Object.assign(gp, { letzte: Date.now(), status: r.status, stand: r.stand });
   const spiel = 'cs2'; // Game-PC sendet immer alles, was er erkennt. Was davon genutzt wird, entscheidet die Regie.
   for (const ev of r.events) {
@@ -183,6 +189,7 @@ function gamePcPayload(body, sim = false) {
 // Ergebnis einer Quelle (Dota 2, Bild-Spiele) → Log, Regie, Status
 function quelleMelden(spiel, r, sim = false) {
   const d = daten[spiel] = daten[spiel] || { letzte: 0, statusGesendet: 0 };
+  if (!sim) spielDaten();
   Object.assign(d, { letzte: Date.now(), stand: r.stand, status: r.status });
   for (const ev of r.events) gamePcLog({ spiel, ev, gesendet: anRegie(spiel, ev), sim });
   if (r.events.length || Date.now() - d.statusGesendet > 500) { statusAnRegie(spiel, r.status, r.stand); d.statusGesendet = Date.now(); }
@@ -242,6 +249,7 @@ let autoWartet = false;
 function rlNachricht(m, sim = false) {
   if (!hatSpiele()) return;
   const r = rlQuelle.ingest(m);
+  if (!sim) spielDaten();
   rl.letzte = Date.now();
   rl.stand = r.stand;
   for (const ev of r.events) {
@@ -374,6 +382,46 @@ async function setupCheck() {
   };
 }
 
+/* ── Spielername (Namens-Popup) ───────────────────────────────────────── */
+// Fragt bei Spielstart und nach langem Leerlauf, wer an diesem PC spielt. Der Name geht an die Regie und steht auf dem
+// Game-Stats-Screen, ohne Namen die PC-ID. Nach dem Leerlauf gilt der alte Name nicht mehr, das Popup schlägt ihn nur vor.
+const waechter = new NamensWaechter();
+let namenVorschlag = '';
+const namenPopup = new NamensAbfrage({ root, onAntwort: (name) => spielerSetzen(name), onZu: () => {} });
+const anzeigePcId = () => (cfg.modus === 'standalone' ? lokalId() : cfg.gamepc.pcId.trim() || 'diesem PC');
+
+function spielerSetzen(name) {
+  cfg.gamepc.spieler = leseSpieler(name);
+  namenVorschlag = '';
+  speichereKonfig();
+  if (cfg.modus === 'standalone') regie.pcSpieler(lokalId(), cfg.gamepc.spieler);
+  else client.spieler(cfg.gamepc.spieler);
+  statusMelden();
+}
+
+// Popup zeigen. Auch von außen aufrufbar (Knopf im Tab „Session“, später ein Befehl der Regie).
+function namenFragen(grund = 'hand') {
+  if (!cfg || !hatSpiele()) return { fehler: 'Nur auf einem Game-PC' };
+  waechter.gefragt();
+  namenPopup.zeigen({ pcId: anzeigePcId(), vorschlag: cfg.gamepc.spieler || namenVorschlag, grund });
+  return { ok: true };
+}
+
+function spielDaten() {
+  if (cfg.modus !== 'gamepc' && cfg.modus !== 'standalone') return;
+  if (waechter.spielDaten(cfg.gamepc.namensAbfrage) && !namenPopup.offen) namenFragen('spielstart');
+}
+
+// Leerlauf: Sekunden ohne Maus und Tastatur (electron.d.ts von ow-electron: powerMonitor.getSystemIdleTime(): number)
+setInterval(() => {
+  if (!cfg || !hatSpiele()) return;
+  let idle = 0;
+  try { idle = powerMonitor.getSystemIdleTime(); } catch { return; }
+  const r = waechter.leerlauf(idle, cfg.gamepc.namensAbfrage);
+  if (r === 'weg' && cfg.gamepc.spieler) { const alt = cfg.gamepc.spieler; spielerSetzen(''); namenVorschlag = alt; }
+  if (r === 'zurueck' && !namenPopup.offen) namenFragen('zurueck');
+}, 5000).unref();
+
 /* ── Modus wechseln ───────────────────────────────────────────────────── */
 async function modusStarten() {
   regieSim.stop();
@@ -385,6 +433,7 @@ async function modusStarten() {
   rlClient.stop();
   await Promise.all([gsi.stop(), overdrive.stop()]);
   lokalAbmelden();
+  namenPopup.schliessen();
   spielAufRegie = '';
   if (istRegie()) {
     // Im Standalone darf die Session offen sein: dann kommen weitere Game-PCs dazu
@@ -415,7 +464,7 @@ async function modusStarten() {
 function gesamtStatus() {
   const s = { modus: cfg.modus, jetzt: Date.now(), app: { hotkeyFehler, plattform: process.platform } };
   if (istRegie()) s.regie = { ...regie.snapshot(), session: session.status(), sim: regieSim.status(), armed: cfg.regie.armed, spielAufRegie, stats: stats.status(), lokal: lokalPc };
-  if (hatSpiele()) s.gamepc = { client: client.info(), sessions: discovery.liste(), discoveryFehler: discovery.fehler, gsi: gsi.status(), letzte: gp.letzte, status: gp.status, stand: gp.stand, fremd: gp.fremd, sim: { ...gpSim.status(), spiel: gpSimSpiel }, rl: { ...rlClient.status(), letzte: rl.letzte, stand: rl.stand }, daten, bild: bild.status(), overdrive: overdrive.status() };
+  if (hatSpiele()) s.gamepc = { spieler: cfg.gamepc.spieler, spielerAnzeige: cfg.gamepc.spieler || anzeigePcId(), client: client.info(), sessions: discovery.liste(), discoveryFehler: discovery.fehler, gsi: gsi.status(), letzte: gp.letzte, status: gp.status, stand: gp.stand, fremd: gp.fremd, sim: { ...gpSim.status(), spiel: gpSimSpiel }, rl: { ...rlClient.status(), letzte: rl.letzte, stand: rl.stand }, daten, bild: bild.status(), overdrive: overdrive.status() };
   return s;
 }
 
@@ -455,7 +504,7 @@ function createWindow() {
   mainWin.once('ready-to-show', () => { appBereit = true; zeigen(); });
   setTimeout(() => { animationFertig = true; zeigen(); }, 1900);
   for (const ev of ['minimize', 'restore', 'hide', 'show']) mainWin.on(ev, () => setImmediate(overlayAktualisieren));
-  mainWin.on('closed', () => { if (overlayWin) overlayWin.destroy(); stats.beenden(); });
+  mainWin.on('closed', () => { if (overlayWin) overlayWin.destroy(); namenPopup.beenden(); stats.beenden(); });
   // Fokus im Fenster immer auch an die Seite geben, sonst nehmen Textfelder unter Windows teils keine Eingabe an
   mainWin.on('focus', () => mainWin.webContents.focus());
   // Per window.open erzeugte Kindfenster (derzeit verweigert, siehe unten): beim Schließen Fokus zurück
@@ -574,13 +623,16 @@ ipcMain.handle('feedback-oeffnen', () => {
 ipcMain.handle('app-version', () => app.getVersion());
 const updates = einrichtenUpdates({ app, ipcMain, shell, getWin: () => mainWin });
 ipcMain.handle('config-get', () => cfg);
-ipcMain.handle('config-set', async (_, neu) => {
+ipcMain.handle('config-set', (_, neu) => konfigUebernehmen(neu));
+// Neue Einstellungen übernehmen und anwenden (aus der Oberfläche oder beim Laden einer Show)
+async function konfigUebernehmen(neu) {
   const alt = cfg;
   cfg = { ...migrateKonfig(neu), modus: alt.modus };
   cfg.regie.armed = !!neu.regie?.armed;
   cfg.regie.session.offen = alt.regie.session.offen; // offen/zu steuern nur die Session-Knöpfe
   if (client.zustand !== 'getrennt' && client.zustand !== 'abgelehnt') cfg.gamepc.pcId = alt.gamepc.pcId; // PC-ID nur ohne aktive Session änderbar
   cfg.gamepc.overlay = { ...cfg.gamepc.overlay, x: alt.gamepc.overlay?.x ?? null, y: alt.gamepc.overlay?.y ?? null }; // Position setzt nur das Overlay selbst
+  cfg.gamepc.spieler = alt.gamepc.spieler; // Spielername setzen nur das Namens-Popup und „spieler-setzen“
   speichereKonfig();
   if (cfg.app.hotkey !== alt.app.hotkey) hotkeyAnwenden();
   overlayAktualisieren();
@@ -609,6 +661,79 @@ ipcMain.handle('config-set', async (_, neu) => {
   }
   statusMelden();
   return gesamtStatus();
+}
+
+/* ── Shows ────────────────────────────────────────────────────────────── */
+// Gespeicherte Shows liegen je Art in einem eigenen Ordner, exportiert und importiert wird eine einzelne Datei
+const SHOW_ORDNER = (art) => path.join(app.getPath('userData'), 'shows', art);
+const showErlaubt = (art) => showArten(cfg.modus).includes(art);
+function showsListe() {
+  const out = {};
+  for (const art of showArten(cfg.modus)) {
+    let dateien = [];
+    try { dateien = fs.readdirSync(SHOW_ORDNER(art)).filter((f) => f.endsWith(`.${SHOW_ENDUNG}`)); } catch {}
+    out[art] = dateien.map((datei) => {
+      try { const d = leseShow(fs.readFileSync(path.join(SHOW_ORDNER(art), datei), 'utf8'), [art]); return d.fehler ? null : { datei, name: d.name, gespeichert: d.gespeichert }; }
+      catch { return null; }
+    }).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name, 'de'));
+  }
+  return out;
+}
+// Nur Dateinamen aus der eigenen Liste, nie Pfade
+const showPfad = (art, datei) => (typeof datei === 'string' && datei === path.basename(datei) && datei.endsWith(`.${SHOW_ENDUNG}`) ? path.join(SHOW_ORDNER(art), datei) : null);
+async function showUebernehmen(neu, meldungText) {
+  const status = await konfigUebernehmen(neu);
+  meldung(meldungText);
+  return { ok: true, cfg, status, liste: showsListe() };
+}
+ipcMain.handle('shows-liste', () => showsListe());
+ipcMain.handle('show-speichern', (_, art, name) => {
+  if (!showErlaubt(art)) return { fehler: 'In diesem Modus nicht möglich.' };
+  const datei = showDatei(cfg, art, name, { appVersion: app.getVersion() });
+  try { fs.mkdirSync(SHOW_ORDNER(art), { recursive: true }); fs.writeFileSync(path.join(SHOW_ORDNER(art), showDateiName(datei.name, art)), JSON.stringify(datei, null, 1)); }
+  catch (e) { return { fehler: `Show nicht gespeichert: ${e.message}` }; }
+  cfg = alsGespeichert(cfg, art, datei.name);
+  speichereKonfig();
+  return { ok: true, cfg, name: datei.name, liste: showsListe() };
+});
+ipcMain.handle('show-laden', async (_, art, dateiName) => {
+  const p = showErlaubt(art) && showPfad(art, dateiName);
+  if (!p) return { fehler: 'Show nicht gefunden.' };
+  let d;
+  try { d = leseShow(fs.readFileSync(p, 'utf8'), [art]); } catch (e) { return { fehler: e.message }; }
+  if (d.fehler) return d;
+  return showUebernehmen(showAnwenden(cfg, art, d.daten, d.name), `Show „${d.name}“ geladen. Ausgabe ist aus.`);
+});
+ipcMain.handle('show-loeschen', (_, art, dateiName) => {
+  const p = showErlaubt(art) && showPfad(art, dateiName);
+  if (!p) return { fehler: 'Show nicht gefunden.' };
+  try { fs.unlinkSync(p); } catch (e) { return { fehler: e.message }; }
+  return { ok: true, liste: showsListe() };
+});
+ipcMain.handle('show-leer', (_, art) => {
+  if (!showErlaubt(art)) return { fehler: 'In diesem Modus nicht möglich.' };
+  return showUebernehmen(leereShow(cfg, art), `Leere ${ART_NAME[art]}-Show geladen.`);
+});
+ipcMain.handle('show-export', async (_, art, name) => {
+  if (!showErlaubt(art)) return { fehler: 'In diesem Modus nicht möglich.' };
+  const datei = showDatei(cfg, art, name, { appVersion: app.getVersion() });
+  const r = await dialogMitFokus('showSaveDialog', { defaultPath: showDateiName(datei.name, art), filters: [{ name: `Advanced LAN ${ART_NAME[art]}-Show`, extensions: [SHOW_ENDUNG] }] });
+  if (r.canceled || !r.filePath) return { abgebrochen: true };
+  try { fs.writeFileSync(r.filePath, JSON.stringify(datei, null, 1)); } catch (e) { return { fehler: e.message }; }
+  return { ok: true, pfad: r.filePath };
+});
+ipcMain.handle('show-import', async () => {
+  const erlaubt = showArten(cfg.modus);
+  if (!erlaubt.length) return { fehler: 'Zuerst einen Modus wählen.' };
+  const r = await dialogMitFokus('showOpenDialog', { properties: ['openFile'], filters: [{ name: 'Advanced LAN Show', extensions: [SHOW_ENDUNG, 'json'] }] });
+  if (r.canceled || !r.filePaths?.[0]) return { abgebrochen: true };
+  let inhalt;
+  try { inhalt = fs.readFileSync(r.filePaths[0], 'utf8'); } catch (e) { return { fehler: e.message }; }
+  const d = leseShow(inhalt, erlaubt);
+  if (d.fehler) return d;
+  // Importierte Show auch in die eigene Liste legen
+  try { fs.mkdirSync(SHOW_ORDNER(d.art), { recursive: true }); fs.writeFileSync(path.join(SHOW_ORDNER(d.art), showDateiName(d.name, d.art)), inhalt); } catch {}
+  return { ...(await showUebernehmen(showAnwenden(cfg, d.art, d.daten, d.name), `${ART_NAME[d.art]}-Show „${d.name}“ importiert. Ausgabe ist aus.`)), art: d.art };
 });
 ipcMain.handle('modus-setzen', async (_, modus) => {
   cfg.modus = MODI.includes(modus) ? modus : null;
@@ -696,6 +821,8 @@ ipcMain.handle('test-event', (_, type, spiel = 'cs2', team = '', kills = 1) => {
   return { ok };
 });
 ipcMain.handle('gamepc-sim-start', (_, modus) => gamePcSimStart(modus));
+ipcMain.handle('spieler-setzen', (_, name) => { spielerSetzen(name); return gesamtStatus(); });
+ipcMain.handle('name-fragen', () => namenFragen('hand'));
 // Bilderkennung: Bildschirme, Texterkennung für den Editor, Aufnahme im Hintergrund, Export und Import der Spiel-Konfiguration
 ipcMain.handle('bild-bildschirme', () => bild.bildschirme());
 // Alle offenen Fenster für die Auswahl der Bildquelle (auch wenn die Erkennung aus ist)

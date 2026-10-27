@@ -9,7 +9,7 @@
 // Allgemeine Befehle (cfg.signale.allgemein, core/aktionen.js) gelten zusätzlich für jedes passende Spiel-Event.
 
 const { zielTyp, befehlVon } = require("./ziel-typen");
-const { einsetzen, nutzt } = require("./platzhalter");
+const { einsetzen, nutzt, zaehlen } = require("./platzhalter");
 const { planVars, PLAN_VARS } = require("./plan");
 const { geerbt } = require("./aktionen");
 
@@ -69,7 +69,7 @@ function baue(ziel, befehl, eingaben = {}, ev = {}, plan = null) {
   const optionen = {};
   for (const o of typ.optionen || []) optionen[o.key] = ziel.optionen?.[o.key] ?? o.standard ?? "";
   const werte = {};
-  for (const p of befehl.params || []) werte[p.key] = einsetzen(eingaben?.[p.key] ?? p.standard ?? "", evVars);
+  for (const p of befehl.params || []) werte[p.key] = einsetzen(zaehlen(eingaben?.[p.key] ?? p.standard ?? ""), evVars);
   const vars = { ...evVars, ...optionen, ...werte };
   const vorab = (typ.vorab || []).filter((n) => String(optionen[n.nurWenn] ?? "").trim());
   return [...vorab, ...befehl.osc].map((n) => {

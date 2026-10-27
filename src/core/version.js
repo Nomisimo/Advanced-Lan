@@ -6,6 +6,10 @@ const REPO = "Nomisimo/Advanced-Lan";
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
+  "0.1.0-beta.11": [
+    "Plan: „10{nr}“ zählt jetzt 101, 102 … 110, 111 (wie {100+nr}) statt 109, 1010. „10{nr2}“ zählt 1001, 1002 …. Gilt auch für Werte in den Signalen",
+    "Plan: unter jeder Regel steht, was sie ergibt, z. B. „101, 102 … 110“",
+  ],
   "0.1.0-beta.10": [
     "Neuer Tab „Plan“ in der Regie: Game-PCs vorab als Plätze anlegen (PC 01 bis PC 10), auch ohne verbundenen Rechner. Geplante PCs stehen grau im Verbindungscheck",
     "Je Ziel eine Spalte im Plan: eine Regel für alle Plätze, z. B. {100+nr} für die MA3-Sequenz (PC 1 → 101, PC 2 → 102 …), einzelne Zellen überschreiben sie",

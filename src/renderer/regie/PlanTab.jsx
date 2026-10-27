@@ -19,6 +19,15 @@ function vorlageStatus(p, v) {
   return p.vorlage === v.stand ? { text: "Vorlage aktuell", farbe: OK } : { text: "Vorlage veraltet", farbe: WARN, title: "„An alle verteilen“ schickt die aktuelle Vorlage" };
 }
 
+// Kurz unter der Regel: was sie ergibt, z. B. „101, 102 … 110“
+function regelText(plan, zielId) {
+  const n = plan.pcs.length;
+  if (!n) return "";
+  const ohne = { ...plan, pcs: plan.pcs.map((x) => ({ ...x, werte: {} })) };
+  const w = (i) => planWert(ohne, i, zielId);
+  return n <= 3 ? Array.from({ length: n }, (_, i) => w(i + 1)).join(", ") : `${w(1)}, ${w(2)} … ${w(n)}`;
+}
+
 function Plaetze({ cfg, mutate, status }) {
   const plan = cfg.plan;
   const [anzahl, setAnzahl] = useState(plan.pcs.length || 10);
@@ -58,7 +67,8 @@ function Plaetze({ cfg, mutate, status }) {
                 {ziele.map((t) => (
                   <td key={t.id} style={td()}>
                     <input style={{ ...S.inputSm, ...S.mono, borderColor: ACCENT + "88" }} value={plan.regeln[t.id] ?? ""} placeholder={STANDARD_REGEL}
-                      title="Regel für alle Plätze, z. B. {100+nr} → 101, 102 …" onChange={(e) => set((p) => { p.regeln[t.id] = e.target.value; })} />
+                      title="Regel für alle Plätze, z. B. 10{nr} oder {100+nr} → 101, 102 …" onChange={(e) => set((p) => { p.regeln[t.id] = e.target.value; })} />
+                    <div style={{ fontSize: 10, color: MUTED, marginTop: 3, whiteSpace: "nowrap" }}>{regelText(plan, t.id)}</div>
                   </td>
                 ))}
                 <td style={td()} />
@@ -102,6 +112,7 @@ function Plaetze({ cfg, mutate, status }) {
       </div>
       <div style={{ ...S.hint, lineHeight: 1.8 }}>
         In den Signalen: <Kbd>{"{plan}"}</Kbd> Wert aus der Spalte des Ziels für den PC, der das Ereignis meldet · <Kbd>{"{nr}"}</Kbd> Platznummer · <Kbd>{"{nr2}"}</Kbd> mit führender Null (01) ·
+        Hochzählen: <Kbd>{"10{nr}"}</Kbd> ergibt 101, 102 … 110, 111 (wie <Kbd>{"{100+nr}"}</Kbd>), <Kbd>{"10{nr2}"}</Kbd> ergibt 1001, 1002 ….
         Rechnen: <Kbd>{"{100+nr}"}</Kbd> <Kbd>{"{nr*10}"}</Kbd> <Kbd>{"{(nr-1)*4+1}"}</Kbd>.<br />
         Beispiel: Spalte grandMA3 mit Regel <Kbd>{"{100+nr}"}</Kbd>, im Signal „Kill“ den Befehl „Sequenz: Go+“ mit Sequenz <Kbd>{"{plan}"}</Kbd>. Ein Kill von Platz 3 schickt <Kbd>Go+ Sequence 103</Kbd>.
         Steht ein PC nicht im Plan, sendet ein solcher Befehl nichts und das Event-Log zeigt den Grund. Simulierte PCs (SIM 03) spielen Platz 3.

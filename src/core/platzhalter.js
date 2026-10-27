@@ -47,10 +47,19 @@ const einsetzen = (s, vars = {}) => String(s ?? "").replace(/\{([^{}]+)\}/g, (ga
   return ganz;
 });
 
+// Startzahl vor der Platznummer: „10{nr}“ zählt 101, 102 … 110, 111 (wie {100+nr}), nicht 1010.
+// „10{nr2}“ zählt 1001 … 1010 (wie {1000+nr}). Gilt nur, wenn der ganze Wert so aussieht.
+function zaehlen(s) {
+  const m = /^\s*(\d+)\{\s*(nr2?)\s*\}\s*$/.exec(String(s ?? ""));
+  if (!m) return s;
+  const basis = Number(m[1]) * (m[2] === "nr2" ? 100 : 10);
+  return `{${basis}+nr}`;
+}
+
 // Kommt einer dieser Platzhalter im Text vor (auch in einer Rechnung)?
 const nutzt = (s, namen) => {
   const re = new RegExp(`\\b(${namen.join("|")})\\b`);
   return (String(s ?? "").match(/\{([^{}]+)\}/g) || []).some((p) => re.test(p));
 };
 
-module.exports = { einsetzen, rechne, nutzt, zahlText };
+module.exports = { einsetzen, rechne, nutzt, zahlText, zaehlen };

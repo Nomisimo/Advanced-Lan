@@ -9,6 +9,7 @@ const { Discovery, SessionClient } = require('./session-client');
 const { findeCs2CfgOrdner, findeRlConfigOrdner, findeDotaCfgOrdner, steamLocalConfigs } = require('./cs2-pfad');
 const { BildDienst } = require('./bild');
 const { RlClient } = require('./rl-client');
+const { OverdriveServer } = require('./overdrive-server');
 const { Regie } = require('../core/regie');
 const { RegieSim } = require('../core/regie-sim');
 const { CsQuelle } = require('../core/cs-quelle');
@@ -17,6 +18,7 @@ const { DotaQuelle, DOTA_APPID, dotaCfg, dotaStartoptionen, DOTA_CFG_DATEI, DOTA
 const { BildQuelle, BILD_SPIELE, BILD_BY_ID, exportDatei, importDatei, aktionBereit } = require('../core/bild-spiele');
 const { QUELLEN, SPIEL_BY_ID } = require('../core/spiele');
 const { rlIni, leseRlIni, RL_INI_DATEI } = require('../core/rl-ini');
+const { OVERDRIVE_PORT } = require('../core/overdrive');
 const { migrateKonfig, MODI } = require('../core/defaults');
 const { gsiCfg, CFG_DATEI } = require('../core/cfg');
 const { testNachricht, zeigeNachricht } = require('../core/signal');
@@ -133,6 +135,8 @@ const bild = new BildDienst({
   onChange: statusMelden,
 });
 const rlClient = new RlClient({ onNachricht: (m) => rlNachricht(m), onChange: statusMelden });
+// Valorant über die Overwolf-App „Automation Overdrive“: läuft durch dieselbe Quelle wie die Bilderkennung
+const overdrive = new OverdriveServer({ onEvent: (event) => bildNachricht('valorant', { bild: true, event, seite: 'eigen', aktion: 'Automation Overdrive' }), onChange: statusMelden });
 const client = new SessionClient({
   onChange: () => { if (client.zustand !== 'verbunden') gpSim.stop(); bild.anwenden(); statusMelden(); },
   onAntwort: statusMelden,
@@ -322,6 +326,16 @@ function bildCheck() {
   }).flat();
 }
 
+// Automation Overdrive (Valorant): Empfang auf Port 44206, App verbunden, Events kommen an. Optional, deshalb nur Hinweise.
+function overdriveCheck() {
+  const o = overdrive.status(), alter = alterVon(o.letzte);
+  return [
+    { id: 'od-empfang', label: 'Empfang bereit', ok: o.laeuft, detail: o.fehler ? `${o.fehler}: Touch Portal mit dem Overdrive-Plugin beenden` : `localhost:${o.port ?? OVERDRIVE_PORT}` },
+    { id: 'od-verbunden', label: 'Automation Overdrive verbunden', ok: o.verbunden > 0, warn: true, detail: o.verbunden ? 'Overwolf-App ist verbunden' : 'Overwolf und Automation Overdrive starten' },
+    { id: 'od-daten', label: 'Valorant-Events kommen an', ok: alter != null && alter < 600, warn: true, detail: alter == null ? 'noch keins, kommt beim ersten Kill' : `zuletzt vor ${alter} s` },
+  ];
+}
+
 // „Ist korrekt aufgesetzt“-Check des Game-PCs
 // CS2 und Rocket League gibt es nicht für macOS: dort nicht suchen, sondern das sagen
 const OHNE_MAC = (spiel) => [{ id: 'plattform', label: `${spiel} gibt es nicht für macOS`, ok: false, warn: true, nichtVerfuegbar: true, detail: 'Game-PC mit diesem Spiel nur unter Windows' }];
@@ -334,7 +348,7 @@ async function setupCheck() {
     { id: 'session', label: 'Mit einer Session verbunden', ok: c.zustand === 'verbunden', detail: c.zustand === 'verbunden' ? c.session : c.grund || 'nicht verbunden' },
   ];
   // Dota 2 läuft auch auf dem Mac; Valorant und The Finals gibt es nur für Windows, der Editor geht trotzdem
-  if (process.platform === 'darwin') return { allgemein, cs2: OHNE_MAC('Counter-Strike 2'), rl: OHNE_MAC('Rocket League'), dota2: await dotaCheck(), bild: bildCheck(), plattform: 'darwin' };
+  if (process.platform === 'darwin') return { allgemein, cs2: OHNE_MAC('Counter-Strike 2'), rl: OHNE_MAC('Rocket League'), dota2: await dotaCheck(), bild: bildCheck(), overdrive: overdriveCheck(), plattform: 'darwin' };
   const ordner = await findeCs2CfgOrdner();
   const datei = ordner ? path.join(ordner, CFG_DATEI) : '';
   let inhalt = null;
@@ -356,6 +370,7 @@ async function setupCheck() {
     rl: await rlCheck(),
     dota2: await dotaCheck(),
     bild: bildCheck(),
+    overdrive: overdriveCheck(),
   };
 }
 
@@ -368,7 +383,7 @@ async function modusStarten() {
   client.trennen();
   discovery.stop();
   rlClient.stop();
-  await gsi.stop();
+  await Promise.all([gsi.stop(), overdrive.stop()]);
   lokalAbmelden();
   spielAufRegie = '';
   if (istRegie()) {
@@ -385,6 +400,7 @@ async function modusStarten() {
     rlQuelle = new RlQuelle();
     neueQuellen();
     rlClient.start(Number(cfg.gamepc.rlPort));
+    await overdrive.start(OVERDRIVE_PORT);
   }
   bild.anwenden();
   if (cfg.modus === 'gamepc') {
@@ -399,7 +415,7 @@ async function modusStarten() {
 function gesamtStatus() {
   const s = { modus: cfg.modus, jetzt: Date.now(), app: { hotkeyFehler, plattform: process.platform } };
   if (istRegie()) s.regie = { ...regie.snapshot(), session: session.status(), sim: regieSim.status(), armed: cfg.regie.armed, spielAufRegie, stats: stats.status(), lokal: lokalPc };
-  if (hatSpiele()) s.gamepc = { client: client.info(), sessions: discovery.liste(), discoveryFehler: discovery.fehler, gsi: gsi.status(), letzte: gp.letzte, status: gp.status, stand: gp.stand, fremd: gp.fremd, sim: { ...gpSim.status(), spiel: gpSimSpiel }, rl: { ...rlClient.status(), letzte: rl.letzte, stand: rl.stand }, daten, bild: bild.status() };
+  if (hatSpiele()) s.gamepc = { client: client.info(), sessions: discovery.liste(), discoveryFehler: discovery.fehler, gsi: gsi.status(), letzte: gp.letzte, status: gp.status, stand: gp.stand, fremd: gp.fremd, sim: { ...gpSim.status(), spiel: gpSimSpiel }, rl: { ...rlClient.status(), letzte: rl.letzte, stand: rl.stand }, daten, bild: bild.status(), overdrive: overdrive.status() };
   return s;
 }
 
@@ -737,7 +753,7 @@ else {
     client.trennen();
     rlClient.stop();
     discovery.stop();
-    await Promise.allSettled([session.schliessen(), gsi.stop(), stats.beenden(), bild.beenden()]);
+    await Promise.allSettled([session.schliessen(), gsi.stop(), overdrive.stop(), stats.beenden(), bild.beenden()]);
     osc.close();
     app.quit();
   });

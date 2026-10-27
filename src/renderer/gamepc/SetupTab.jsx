@@ -8,7 +8,8 @@ import { SPIELE } from "../../core/spiele.js";
 import { CFG_ORDNER, CFG_DATEI } from "../../core/cfg.js";
 import { RL_INI_DATEI, RL_INI_ORDNER } from "../../core/rl-ini.js";
 import { DOTA_CFG_DATEI, DOTA_CFG_ORDNER, DOTA_STARTOPTION } from "../../core/dota.js";
-import { FileDown, Download, RefreshCw, LocateFixed, BookOpen, ScanEye } from "lucide-react";
+import { OVERDRIVE_PORT } from "../../core/overdrive.js";
+import { FileDown, Download, RefreshCw, LocateFixed, BookOpen, ScanEye, ExternalLink } from "lucide-react";
 
 // Offizielle Dokumentation der Datenquellen, öffnet im Browser
 const DOKU = {
@@ -22,6 +23,44 @@ const DOKU = {
     ["Valve: Dota 2 Game State Integration", "https://developer.valvesoftware.com/wiki/Dota_2_Workshop_Tools/Scripting/Game_State_Integration"],
   ],
 };
+// Valorant ohne Bilderkennung: zwei Apps von Overwolf, die die Live-Events von Overwolf an diese App weitergeben
+const OVERDRIVE_LINKS = [
+  ["Overwolf herunterladen", "https://www.overwolf.com/"],
+  ["Automation Overdrive im Overwolf-Store", "https://www.overwolf.com/app/raimen_ttv-automation_overdrive"],
+  ["Anleitung von Automation Overdrive", "https://github.com/raimen-ttv/Automation-Overdrive"],
+];
+
+function OverdriveAnleitung({ punkte, mac }) {
+  const schritt = { display: "flex", gap: 10, alignItems: "flex-start", fontSize: 13, lineHeight: 1.5, padding: "6px 0" };
+  const nr = { flexShrink: 0, width: 20, height: 20, borderRadius: "50%", background: "#ff465533", color: "#ff4655", fontSize: 11, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center", marginTop: 1 };
+  const schritte = [
+    <><b>Overwolf installieren</b> (kostenlos, von overwolf.com) und mit einem Overwolf-Konto anmelden.</>,
+    <><b>Automation Overdrive</b> aus dem Overwolf-Store installieren (kostenlos, von Raimen TTV).</>,
+    <><b>Touch Portal ist nicht nötig.</b> Diese App übernimmt die Rolle des Touch-Portal-Plugins und lauscht auf Port <Kbd>{OVERDRIVE_PORT}</Kbd>. Läuft Touch Portal mit dem Overdrive-Plugin, Touch Portal beenden: Beide brauchen denselben Port.</>,
+    <><b>Erst diese App, dann Overwolf starten.</b> Im Fenster von Automation Overdrive muss „Connected to TP“ stehen. Sonst dort „Retry Connection“ drücken.</>,
+    <><b>Valorant spielen.</b> Kill, Tod, Assist, Headshot, Match-Start und Match-Ende kommen automatisch als Valorant-Events dieses PCs an, mit dem Team aus dem Tab „Bilderkennung“.</>,
+  ];
+  return (
+    <Section title={<span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>Valorant über Automation Overdrive <SpielChip spiel="valorant" /></span>}
+      subtitle="Optional, zusätzlich zur Bilderkennung: Overwolf liest die Events und Automation Overdrive schickt sie an diese App. Runden und Spike kommen weiter nur aus der Bilderkennung.">
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.2fr) minmax(0,1fr)", gap: 20, alignItems: "start" }}>
+        <div>
+          {schritte.map((t, i) => <div key={i} style={schritt}><span style={nr}>{i + 1}</span><span>{t}</span></div>)}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
+            {OVERDRIVE_LINKS.map(([titel, url]) => (
+              <button key={url} style={{ ...S.smallBtn, padding: "5px 9px" }} title={url} onClick={() => api.openExternal(url)}><ExternalLink size={12} /> {titel}</button>
+            ))}
+          </div>
+        </div>
+        <div>
+          {punkte && <Liste punkte={punkte} />}
+          <p style={S.hint}>{mac ? "Overwolf und Valorant gibt es nur für Windows. " : ""}Automation Overdrive ist nicht von uns und wird seit 2022 nicht mehr aktualisiert. Liefert es keine Events mehr, bleibt die Bilderkennung.</p>
+        </div>
+      </div>
+    </Section>
+  );
+}
+
 const DokuLinks = ({ spiel }) => (
   <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
     {DOKU[spiel].map(([titel, url]) => (
@@ -172,6 +211,7 @@ export default function SetupTab({ cfg, mutate, g, jetzt, notify, goTab, standal
           <p style={S.hint}>Spiel im randlosen Fenstermodus starten, sonst kann die Aufnahme schwarz bleiben.</p>
         </Section>
       </div>
+      <OverdriveAnleitung punkte={check?.overdrive} mac={mac} />
     </>
   );
 }

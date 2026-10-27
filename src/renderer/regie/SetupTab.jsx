@@ -54,6 +54,8 @@ function RegieCheck({ cfg, status, standalone }) {
   );
 }
 
+const MAC = typeof navigator !== "undefined" && /Mac/.test(navigator.userAgent);
+
 // Game-Stats-Screen: Pop-out-Fenster und NDI-Stream (nur Regie und Standalone)
 function StatsScreenSetup({ cfg, mutate, status, log, goTab }) {
   const s = cfg.stats || {}, st = status.stats || {}, ndi = st.ndi || {};
@@ -82,7 +84,7 @@ function StatsScreenSetup({ cfg, mutate, status, log, goTab }) {
             <input style={S.input} value={name} disabled={!an} maxLength={60} onChange={(e) => setName(e.target.value)} onBlur={() => name.trim() && name.trim() !== s.ndiName ? set("ndiName", name.trim()) : setName(s.ndiName || "")} onKeyDown={(e) => e.key === "Enter" && e.target.blur()} />
           </Field>
           <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, marginTop: 10, color: ndiFarbe }}><Dot color={ndiFarbe} glow={ndi.laeuft} /> {ndiGeht ? ndiText : `nicht verfügbar: ${ndiCheck?.fehler || ""}`}</div>
-          {an && s.ndi && ndi.laeuft && !ndi.verbindungen && <div style={{ fontSize: 11, color: WARN, marginTop: 8, lineHeight: 1.5 }}>Kein Empfänger sieht die Quelle? Die Windows-Firewall muss Advanced LAN im privaten Netz erlauben (Windows-Sicherheit → Firewall → App zulassen), und Sender und Empfänger müssen im selben Netz sein.</div>}
+          {an && s.ndi && ndi.laeuft && !ndi.verbindungen && <div style={{ fontSize: 11, color: WARN, marginTop: 8, lineHeight: 1.5 }}>{MAC ? "Kein Empfänger sieht die Quelle? Unter Systemeinstellungen → Datenschutz & Sicherheit → Lokales Netzwerk muss Advanced LAN erlaubt sein. Ist der Schalter schon an, einmal aus- und wieder einschalten und die App neu starten. Sender und Empfänger müssen im selben Netz sein." : "Kein Empfänger sieht die Quelle? Die Windows-Firewall muss Advanced LAN im privaten Netz erlauben (Windows-Sicherheit → Firewall → App zulassen), und Sender und Empfänger müssen im selben Netz sein."}</div>}
           <div style={{ fontSize: 10, color: MUTED, marginTop: 8 }}>1920×1080, 30 fps, im selben Netz.{ndi.version ? ` ${ndi.version}.` : ""} NDI® ist eine eingetragene Marke von Vizrt NDI AB.</div>
         </div>
         <div>

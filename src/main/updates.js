@@ -1,6 +1,5 @@
 // Updates wie im Netzwerkplaner.
 // Windows: electron-updater lädt die neue Version im Hintergrund und installiert sie nach Bestätigung
-// (Overwolf empfiehlt für ow-electron den Electron-autoUpdater).
 // macOS: die App ist nicht mit Apple-Developer-ID signiert, deshalb lädt die App das passende DMG
 // wie im Browser (Gatekeeper-Schutz bleibt), öffnet es und der Nutzer zieht die App nach „Programme“.
 const path = require('path');

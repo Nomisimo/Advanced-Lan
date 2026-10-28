@@ -1,6 +1,6 @@
 # Code-Signing-Zertifikat: Schritt für Schritt
 
-Overwolf lädt GEP, Overlay und Recorder in einer verteilten Windows-Version nur, wenn die `.exe` mit **deinem eigenen** Code-Signing-Zertifikat signiert ist (zusätzlich zur Overwolf-Signatur mit `OW_BUILD_KEY`). Ohne Zertifikat läuft die App, aber ohne Overwolf-Spieldaten, und Windows zeigt „Unbekannter Herausgeber“.
+Mit einem eigenen Code-Signing-Zertifikat zeigt Windows deinen Namen als Herausgeber, und die SmartScreen-Warnung baut sich mit der Zeit ab. Ohne Zertifikat läuft die App genauso, Windows zeigt nur „Unbekannter Herausgeber“. Die App läuft auf normalem Electron, eine Overwolf-Signatur gibt es nicht mehr.
 
 Stand der Preise und Abläufe: 4. Oktober 2026.
 
@@ -12,7 +12,7 @@ Stand der Preise und Abläufe: 4. Oktober 2026.
 |---|---|---|
 | **Certum Open Source Code Signing in the Cloud** (SimplySign) | 49 € / Jahr | **Ja.** Für Einzelpersonen mit Open-Source-Projekt, kein Kartenleser nötig, Schlüssel liegt in der Cloud |
 | Certum Open Source Code Signing Set (Karte + Leser) | ca. 69 € + Versand, Verlängerung ca. 29 € | Ja, aber Hardware und Treiber-Gefummel |
-| SignPath Foundation | kostenlos | **Nein.** Verlangt ein Projekt ganz ohne proprietäre Teile (ow-electron und NDI sind proprietär), und Herausgeber wäre „SignPath Foundation“ statt du. Overwolf verlangt ein eigenes Zertifikat |
+| SignPath Foundation | kostenlos | **Nein.** Verlangt ein Projekt ganz ohne proprietäre Teile (NDI ist proprietär), und Herausgeber wäre „SignPath Foundation“ statt du |
 | Certum Standard / Sectigo / DigiCert | 139 bis 300 € / Jahr | Geht, aber unnötig teuer |
 
 Wichtig zu wissen:
@@ -70,15 +70,7 @@ certutil -user -store My
 
 Dort steht ein Eintrag „Open Source Developer, Vorname Nachname“. Die Zeile **Zertifikathash (SHA1)** ist der **Fingerabdruck**, den brauchst du gleich. Schreib ihn auf (40 Zeichen, ohne Leerzeichen).
 
-## 5. Overwolf-Schlüssel holen (geht erst nach der Freigabe der App)
-
-Im Overwolf Developers Console (https://console.overwolf.com):
-1. **Release management → App Keys** → `OW_BUILD_KEY` kopieren.
-2. **Profil → API Keys** → einen API-Key anlegen → das ist `OW_CLI_API_KEY`. `OW_CLI_EMAIL` ist die E-Mail deines Overwolf-Kontos.
-
-Diese Werte sind geheim: nie ins Repo schreiben, nicht in Chats posten.
-
-## 6. Signiert bauen (bei jedem Release, auf deinem Windows-PC)
+## 5. Signiert bauen (bei jedem Release, auf deinem Windows-PC)
 
 Signiert wird auf deinem PC, nicht in GitHub Actions: SimplySign will bei jeder Anmeldung einen frischen Code aus der Handy-App.
 
@@ -87,7 +79,6 @@ Einmalig: Windows SDK installieren (enthält `signtool.exe`): https://developer.
 Wenn das Zertifikat da ist, stelle ich `package.json` auf Signieren um (das brauchst du nicht selbst zu machen). Es kommt dann etwa so hinein:
 
 ```json
-"overwolf": { "requireSigning": true },
 "win": {
   "signAndEditExecutable": true,
   "signtoolOptions": {
@@ -98,23 +89,18 @@ Wenn das Zertifikat da ist, stelle ich `package.json` auf Signieren um (das brau
 }
 ```
 
-`requireSigning` steht bis dahin auf `false`, damit die unsignierten Betas in GitHub Actions bauen. Mit `true` bricht der Build ab, wenn die Overwolf-Schlüssel fehlen, so rutscht keine unsignierte Version in den Store.
-
 Dann bei jedem Release:
 
 ```powershell
 # 1. SimplySign Desktop verbinden (Token-Code aus der App)
 # 2. Im Projektordner:
-$env:OW_CLI_EMAIL = "deine@overwolf-mail"
-$env:OW_CLI_API_KEY = "…"
-$env:OW_BUILD_KEY = "…"
 npm ci
 npm run dist:win
 ```
 
-Ergebnis: `dist\Advanced-LAN-<Version>-win-x64.exe`, signiert von dir und von Overwolf.
+Ergebnis: `dist\Advanced-LAN-<Version>-win-x64.exe`, signiert von dir.
 
-## 7. Prüfen und hochladen
+## 6. Prüfen
 
 ```powershell
 & "C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\signtool.exe" verify /pa /v "dist\Advanced-LAN-0.1.0-win-x64.exe"
@@ -122,7 +108,7 @@ Ergebnis: `dist\Advanced-LAN-<Version>-win-x64.exe`, signiert von dir und von Ov
 
 Oder: Rechtsklick auf die `.exe` → **Eigenschaften** → Reiter **Digitale Signaturen** → dein Name steht dort.
 
-Danach die `.exe` im Overwolf Developers Console unter **Release management** hochladen.
+Danach die `.exe` wie gewohnt ins GitHub-Release legen.
 
 ## Jedes Jahr
 
@@ -135,4 +121,4 @@ Certum schickt vor Ablauf eine E-Mail. Verlängern im Shop (Open Source, wieder 
 - Certum, Aktivierung (PDF): https://www.files.certum.eu/documents/manual_en/CS-Open_Source_Code_Signing_in_the_cloud_Certificate_activation.pdf
 - Erfahrungsbericht mit Ablauf und signtool: https://piers.rocks/2025/10/30/certum-open-source-code-sign.html
 - SignPath Foundation, Bedingungen: https://signpath.org/terms
-- Overwolf, App Signing: https://dev.overwolf.com/ow-electron/guides/dev-tools/app-signing/
+- electron-builder, Windows-Signatur: https://www.electron.build/code-signing-win

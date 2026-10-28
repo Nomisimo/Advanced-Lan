@@ -1,23 +1,20 @@
 {
   "name": "advanced-lan",
-  "version": "0.1.0-beta.11",
+  "version": "0.1.0-beta.12",
   "private": true,
   "description": "Advanced LAN: Game-PCs melden Spielereignisse (offizielle Schnittstellen oder Bilderkennung), die Regie sendet OSC-Befehle an Licht, Audio und Video",
   "author": "Momo",
   "license": "MIT",
   "main": "src/main/main.js",
-  "overwolf": {
-    "packages": []
-  },
   "scripts": {
     "build": "node scripts/build.js --minify",
     "build:dev": "node scripts/build.js",
-    "start": "npm run build:dev && ow-electron .",
+    "start": "npm run build:dev && electron .",
     "test": "node --test --test-timeout=30000 test/*.test.js",
-    "pack": "npm run build && ow-electron-builder --dir",
-    "dist": "npm run build && ow-electron-builder",
-    "dist:win": "npm run build && ow-electron-builder --win",
-    "dist:mac": "npm run build && ow-electron-builder --mac --x64"
+    "pack": "npm run build && electron-builder --dir",
+    "dist": "npm run build && electron-builder",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:mac": "npm run build && electron-builder --mac --x64"
   },
   "build": {
     "appId": "dev.advancedlan",
@@ -42,9 +39,6 @@
       "dist-ocr/**"
     ],
     "npmRebuild": false,
-    "overwolf": {
-      "requireSigning": false
-    },
     "win": {
       "target": [
         {
@@ -98,8 +92,8 @@
     }
   },
   "devDependencies": {
-    "@overwolf/ow-electron": "^42.11.4",
-    "@overwolf/ow-electron-builder": "^26.9.3",
+    "electron": "^42.11.18",
+    "electron-builder": "^26.18.0",
     "esbuild": "^0.28.2",
     "lucide-react": "^1.49.0",
     "react": "^18.3.1",

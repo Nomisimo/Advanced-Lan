@@ -447,7 +447,7 @@ function spielDaten() {
   if (waechter.spielDaten(cfg.gamepc.namensAbfrage) && !namenPopup.offen) namenFragen('spielstart');
 }
 
-// Leerlauf: Sekunden ohne Maus und Tastatur (electron.d.ts von ow-electron: powerMonitor.getSystemIdleTime(): number)
+// Leerlauf: Sekunden ohne Maus und Tastatur (powerMonitor.getSystemIdleTime())
 setInterval(() => {
   if (!cfg || !hatSpiele()) return;
   let idle = 0;
@@ -510,15 +510,14 @@ const dialogMitFokus = (art, optionen) => mitFokus(mainWin, () => dialog[art](ma
 function createWindow() {
   // Startanimation wie im Netzwerkplaner: Controller, dessen Tasten nacheinander gedrückt werden
   const splash = new BrowserWindow({
-    name: 'splash', width: 380, height: 240, frame: false, resizable: false, center: true,
+    width: 380, height: 240, frame: false, resizable: false, center: true,
     alwaysOnTop: true, skipTaskbar: true, backgroundColor: '#131118',
     webPreferences: { contextIsolation: true, nodeIntegration: false },
   });
   splash.loadFile(path.join(root, 'src', 'main', 'splash.html'));
   const iconPath = path.join(root, 'assets', 'app-icon', 'icon.png');
-  // name: Fenstername für die Statistik im Overwolf Developers Console (electron.d.ts von ow-electron, „name?: string“)
   mainWin = new BrowserWindow({
-    name: 'desktop', width: 1480, height: 940, minWidth: 1100, minHeight: 680,
+    width: 1480, height: 940, minWidth: 1100, minHeight: 680,
     title: 'Advanced LAN', show: false, backgroundColor: '#131118',
     icon: fs.existsSync(iconPath) ? iconPath : undefined,
     webPreferences: { contextIsolation: true, nodeIntegration: false, preload: path.join(root, 'src', 'preload', 'preload.js') },
@@ -563,7 +562,7 @@ function overlayErzeugen() {
   const x = Number.isFinite(o.x) ? o.x : wa.x + wa.width - OVERLAY_GROESSE - 24;
   const y = Number.isFinite(o.y) ? o.y : wa.y + 24;
   overlayWin = new BrowserWindow({
-    name: 'overlay', width: OVERLAY_GROESSE, height: OVERLAY_GROESSE, x, y,
+    width: OVERLAY_GROESSE, height: OVERLAY_GROESSE, x, y,
     frame: false, transparent: true, resizable: false, movable: true, minimizable: false, maximizable: false, fullscreenable: false,
     skipTaskbar: true, hasShadow: false, focusable: false, show: false, alwaysOnTop: true, title: 'Advanced LAN Overlay',
     webPreferences: { contextIsolation: true, nodeIntegration: false, preload: path.join(root, 'src', 'preload', 'overlay-preload.js') },
@@ -618,7 +617,7 @@ ipcMain.on('overlay-oeffnen', () => {
 setInterval(overlayMelden, 2000).unref(); // Daten veralten auch ohne neue Meldung
 
 /* ── Tastenkürzel ─────────────────────────────────────────────────────── */
-// Blendet die App ein und aus, auch mitten im Spiel (Overwolf: Hotkey und Hotkey-Erinnerung in den Einstellungen)
+// Blendet die App ein und aus, auch mitten im Spiel
 function fensterUmschalten() {
   if (!mainWin || mainWin.isDestroyed()) return;
   if (mainWin.isVisible() && !mainWin.isMinimized() && mainWin.isFocused()) mainWin.minimize();
@@ -637,19 +636,7 @@ function hotkeyAnwenden() {
   else hotkeyFehler = 'belegt: eine andere App nutzt dieses Tastenkürzel schon';
 }
 
-/* ── Datenschutz (Overwolf CMP) ───────────────────────────────────────── */
-// ow-electron-types.d.ts: app.overwolf.isCMPRequired() und app.overwolf.openAdPrivacySettingsWindow()
-ipcMain.handle('cmp-pruefen', async () => {
-  const ow = app.overwolf;
-  if (!ow?.isCMPRequired) return { verfuegbar: false, erforderlich: false };
-  return { verfuegbar: true, erforderlich: await ow.isCMPRequired() };
-});
-ipcMain.handle('privacy-oeffnen', async () => {
-  const ow = app.overwolf;
-  if (!ow?.openAdPrivacySettingsWindow) return { fehler: 'Nur in der Overwolf-Version der App verfügbar.' };
-  try { await ow.openAdPrivacySettingsWindow({ parent: mainWin, modal: true, backgroundColor: '#131118' }); return { ok: true }; }
-  catch (e) { return { fehler: `Datenschutz-Einstellungen nicht geöffnet: ${e?.message || e}` }; }
-});
+/* ── Feedback ─────────────────────────────────────────────────────────── */
 ipcMain.handle('feedback-oeffnen', () => {
   shell.openExternal(feedbackUrl({ version: app.getVersion(), plattform: process.platform, system: `${os.type()} ${os.release()} (${process.arch})`, modus: cfg.modus }));
 });

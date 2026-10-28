@@ -16,7 +16,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      # Kein Linux-Binary von ow-electron nötig: Tests und Oberflächen-Build laufen ohne Electron
+      # Kein Linux-Binary von Electron nötig: Tests und Oberflächen-Build laufen ohne Electron
       - run: npm ci --ignore-scripts
       - run: npm test
       - run: npm run build
@@ -34,7 +34,7 @@ jobs:
       - run: npm test
         timeout-minutes: 5
       - run: npm run build
-      - run: npx ow-electron-builder --win --x64 --publish never
+      - run: npx electron-builder --win --x64 --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       - name: Installer prüfen
@@ -59,7 +59,7 @@ jobs:
       - run: npm test
         timeout-minutes: 5
       - run: npm run build
-      - run: npx ow-electron-builder --mac --x64 --publish never
+      - run: npx electron-builder --mac --x64 --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           # In Pull Requests überspringt der Builder sonst jede Signatur, auch die ad-hoc-Signatur ohne Zertifikat

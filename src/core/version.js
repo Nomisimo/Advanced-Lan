@@ -6,6 +6,12 @@ const REPO = "Nomisimo/Advanced-Lan";
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
+  "0.1.0-beta.12": [
+    "Ohne Overwolf: die App läuft jetzt auf normalem Electron und wird mit electron-builder gebaut. Keine Overwolf-Laufzeit, keine Nutzungsdaten an Overwolf",
+    "Alle Spiele und Events bleiben: CS2 und Dota 2 über Valve GSI, Rocket League über die Stats API, Valorant und The Finals über Bilderkennung, Mini-Overlay, Namens-Popup, Simulator und Netzwerk wie bisher",
+    "Setup → App: der Knopf „Datenschutz-Einstellungen“ (Overwolf) entfällt",
+    "Valorant über Automation Overdrive geht weiter, braucht aber wie bisher den Overwolf-Client auf dem Game-PC",
+  ],
   "0.1.0-beta.11": [
     "Plan: „10{nr}“ zählt jetzt 101, 102 … 110, 111 (wie {100+nr}) statt 109, 1010. „10{nr2}“ zählt 1001, 1002 …. Gilt auch für Werte in den Signalen",
     "Plan: unter jeder Regel steht, was sie ergibt, z. B. „101, 102 … 110“",

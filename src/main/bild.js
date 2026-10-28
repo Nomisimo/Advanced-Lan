@@ -3,7 +3,7 @@
 // Hier werden sie mit den Frames verglichen (core/bild-erkennung.js), Texte gelesen (Tesseract.js, Englisch und Deutsch,
 // läuft lokal ohne Internet) und Treffer gemeldet. Sind mehrere Spiele offen, läuft für jedes eine eigene Erkennung.
 // Welche Spiele laufen, entscheidet core/bild-spiele.js (erkennungsPlan) anhand der offenen Fenster.
-// Bildschirmaufnahme über session.setDisplayMediaRequestHandler und desktopCapturer (electron.d.ts von ow-electron).
+// Bildschirmaufnahme über session.setDisplayMediaRequestHandler und desktopCapturer.
 const { BrowserWindow, desktopCapturer, screen, session, webContents } = require('electron');
 const path = require('path');
 const fs = require('fs');

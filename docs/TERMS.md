@@ -15,12 +15,12 @@ You may use, copy, modify and distribute the app under the terms of the MIT Lice
 ## 3. Your responsibility
 
 - You are responsible for the devices you connect and the commands you configure. Test your setup before a live event; stage lighting, audio and video can affect people on and around a stage (for example strobe effects or loud sound).
-- Use the app only in ways that respect the rules of the games you play, of the events you run and of the platforms you use (Overwolf, Valve, Psyonix, Epic Games and others).
+- Use the app only in ways that respect the rules of the games you play, of the events you run and of the platforms you use (Valve, Psyonix, Riot Games, Embark Studios and others).
 - Do not use the app to gain an unfair advantage in competitive play.
 
 ## 4. Third-party services and games
 
-The app relies on the Overwolf runtime and on official interfaces provided by game publishers. These services may change or stop at any time, which can limit what the app can do. Game names and trademarks belong to their owners; the app is not endorsed by them.
+The app is built on Electron and relies on official interfaces provided by game publishers. These services may change or stop at any time, which can limit what the app can do. Game names and trademarks belong to their owners; the app is not endorsed by them.
 
 ## 5. No warranty
 

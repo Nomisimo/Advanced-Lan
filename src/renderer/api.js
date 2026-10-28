@@ -175,9 +175,6 @@ function browserApi() {
     onConfig: abo("config"),
     onMeldung: abo("meldung"),
     openExternal: async (url) => window.open(url, "_blank"),
-    // Datenschutz (Overwolf CMP) gibt es nur in der App
-    cmpPruefen: async () => ({ verfuegbar: false, erforderlich: false }),
-    privacyOeffnen: async () => ({ fehler: "Nur in der Overwolf-Version der App verfügbar." }),
     feedbackOeffnen: async () => window.open(feedbackUrl({ version: __APP_VERSION__, system: navigator.userAgent, modus: cfg.modus }), "_blank"),
     // Updates: im Browser nur Hinweis und Download-Seite
     fetchReleases: async () => { try { const r = await fetch("https://api.github.com/repos/Nomisimo/Advanced-Lan/releases?per_page=20"); return r.ok ? r.json() : null; } catch { return null; } },

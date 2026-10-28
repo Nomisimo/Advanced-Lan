@@ -11,7 +11,7 @@
 
 Eine App für die LAN-Party: Die Game-PCs melden Spielereignisse aus CS2, Rocket League und Dota 2 über ihre offiziellen Schnittstellen, Valorant und The Finals über eine Bilderkennung, die Regie sendet daraus OSC-Befehle an Lichtpulte, Audio- und Videosoftware (z. B. grandMA3, QLab, Reaper, Resolume). Design und Aufbau wie [Netzwerkplaner](https://github.com/Nomisimo/Netzwerkplaner) und Stromplaner, Akzentfarbe Lila.
 
-Gebaut mit **Overwolf Electron** (`@overwolf/ow-electron`), React 18 und esbuild. Die Oberfläche wird zu einer einzelnen Datei `dist-app/index.html` gebündelt.
+Gebaut mit **Electron** und electron-builder, React 18 und esbuild. Ohne Overwolf. Die Oberfläche wird zu einer einzelnen Datei `dist-app/index.html` gebündelt.
 
 ## Drei Modi, eine App
 
@@ -52,7 +52,7 @@ Der Modus wird beim ersten Start gewählt (Standalone: Textknopf unten in der Mi
 | Valorant | Bilderkennung | TEAM A, TEAM B (stellt jeder PC ein) | 10 PCs, Runde |
 | The Finals | Bilderkennung | TEAM A bis TEAM D | – |
 
-Overwolf ist raus: Die App nutzt keine Overwolf-Spielereignisse (GEP) und wird nur über GitHub verteilt.
+Overwolf ist raus: Die App läuft auf normalem Electron, nutzt keine Overwolf-Spielereignisse (GEP) und wird nur über GitHub verteilt. Optional kann ein Valorant-PC zusätzlich die Overwolf-App „Automation Overdrive“ nutzen (eigene Installation, siehe Setup).
 
 ## Screenshots
 
@@ -114,8 +114,8 @@ Einstellungen aus Version 0.1.0-beta.1 (neutrale Signale) werden übernommen: Zi
 ```bash
 npm install
 npm test           # Erkennung, Regie, Netzwerk (WebSocket, UDP, OSC)
-npm start          # baut die Oberfläche und startet ow-electron
-npm run dist:win   # Windows-Installer mit ow-electron-builder
+npm start          # baut die Oberfläche und startet Electron
+npm run dist:win   # Windows-Installer mit electron-builder
 npm run dist:mac   # macOS Intel (dmg), nur auf einem Mac
 ```
 

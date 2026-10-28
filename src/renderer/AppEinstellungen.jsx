@@ -5,7 +5,7 @@ import { api } from "./api.js";
 import { LINKS, STANDARD_HOTKEY, hotkeyAusTaste, hotkeyText } from "../core/app-info.js";
 import { Keyboard, RotateCcw, GraduationCap, ShieldCheck, FileText, MessageSquareWarning, ExternalLink } from "lucide-react";
 
-// Setup → App: für alle Modi gleich. Tastenkürzel (mit Erinnerung, Overwolf-Pflicht), Einführung, Datenschutz, Feedback.
+// Setup → App: für alle Modi gleich. Tastenkürzel (mit Erinnerung), Einführung, Datenschutz, Feedback.
 const Zeile = ({ icon: Ic, titel, children, hinweis }) => (
   <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 12px", borderBottom: `1px solid ${LINE}` }}>
     <Ic size={16} color={SUB} />
@@ -50,7 +50,6 @@ function Hotkey({ cfg, status, mutate }) {
 }
 
 export default function AppEinstellungen({ cfg, status, mutate, notify }) {
-  const privacy = async () => { const r = await api.privacyOeffnen(); if (r?.fehler) notify(r.fehler, "warn"); };
   const link = (url) => () => api.openExternal(url);
   return (
     <Section title="App">
@@ -60,7 +59,6 @@ export default function AppEinstellungen({ cfg, status, mutate, notify }) {
           <button style={S.smallBtn} onClick={() => mutate((d) => { d.app = { ...d.app, einfuehrung: false }; })}>Noch einmal zeigen</button>
         </Zeile>
         <Zeile icon={ShieldCheck} titel="Datenschutz" hinweis={cfg.app?.bedingungen ? `zugestimmt am ${new Date(cfg.app.bedingungen).toLocaleDateString("de-DE")}` : ""}>
-          <button style={S.smallBtn} onClick={privacy}>Datenschutz-Einstellungen</button>
           <button style={S.smallBtn} onClick={link(LINKS.privacy)}><ExternalLink size={12} /> Datenschutzerklärung</button>
         </Zeile>
         <Zeile icon={FileText} titel="Nutzungsbedingungen">

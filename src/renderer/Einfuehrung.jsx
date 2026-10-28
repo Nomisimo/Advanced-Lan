@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { S, ACCENT, ACCENT_HI, LINE, SUB, MUTED, GLOW } from "./theme.js";
 import { APP_ICON } from "./Kopf.jsx";
 import { Kbd } from "./ui.jsx";
@@ -6,7 +6,7 @@ import { api } from "./api.js";
 import { LINKS, hotkeyText } from "../core/app-info.js";
 import { Gamepad2, Clapperboard, MonitorPlay, Lightbulb, Volume2, Video, Keyboard, ShieldCheck, ExternalLink } from "lucide-react";
 
-// Einführung beim ersten Start (Overwolf: First Time User Experience). Danach nie wieder, außer über Setup → App.
+// Einführung beim ersten Start. Danach nie wieder, außer über Setup → App.
 const Zeile = ({ icon: Ic, titel, text }) => (
   <div style={{ display: "flex", gap: 14, alignItems: "flex-start", padding: "10px 0" }}>
     <div style={{ width: 38, height: 38, borderRadius: 10, flexShrink: 0, background: ACCENT + "22", border: `1px solid ${ACCENT}`, display: "flex", alignItems: "center", justifyContent: "center", color: ACCENT_HI }}><Ic size={19} /></div>
@@ -21,13 +21,10 @@ const LinkKnopf = ({ url, children }) => (
 export default function Einfuehrung({ cfg, status, mutate, notify }) {
   const [schritt, setSchritt] = useState(0);
   const [zugestimmt, setZugestimmt] = useState(!!cfg.app?.bedingungen);
-  const [cmp, setCmp] = useState(null);
-  useEffect(() => { api.cmpPruefen().then(setCmp).catch(() => setCmp({ verfuegbar: false })); }, []);
   const plattform = status.app?.plattform;
   const hotkey = cfg.app?.hotkey;
 
   const fertig = () => mutate((d) => { d.app = { ...d.app, einfuehrung: true, bedingungen: d.app?.bedingungen || new Date().toISOString() }; });
-  const privacy = async () => { const r = await api.privacyOeffnen(); if (r?.fehler) notify(r.fehler, "warn"); };
 
   const SCHRITTE = [
     {
@@ -61,11 +58,10 @@ export default function Einfuehrung({ cfg, status, mutate, notify }) {
     {
       titel: "Datenschutz",
       inhalt: <>
-        <Zeile icon={ShieldCheck} titel="Deine Daten bleiben im LAN" text="Advanced LAN zeigt keine Werbung und sammelt keine persönlichen Daten. Spielereignisse gehen nur an die Regie und die Geräte, die du einträgst. Die Overwolf-Laufzeit sendet anonyme Nutzungsdaten an Overwolf." />
+        <Zeile icon={ShieldCheck} titel="Deine Daten bleiben im LAN" text="Advanced LAN zeigt keine Werbung und sammelt keine persönlichen Daten. Spielereignisse gehen nur an die Regie und die Geräte, die du einträgst." />
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "8px 0 16px 52px" }}>
           <LinkKnopf url={LINKS.terms}>Nutzungsbedingungen</LinkKnopf>
           <LinkKnopf url={LINKS.privacy}>Datenschutzerklärung</LinkKnopf>
-          {cmp?.verfuegbar && <button style={S.smallBtn} onClick={privacy}>Datenschutz-Einstellungen</button>}
         </div>
         <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, cursor: "pointer", marginLeft: 52 }}>
           <input type="checkbox" checked={zugestimmt} onChange={(e) => setZugestimmt(e.target.checked)} style={{ accentColor: ACCENT, width: 16, height: 16 }} />

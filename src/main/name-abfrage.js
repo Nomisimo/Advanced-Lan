@@ -32,7 +32,7 @@ class NamensAbfrage {
   erzeugen() {
     const wa = screen.getPrimaryDisplay().workArea;
     this.win = new BrowserWindow({
-      name: 'name-abfrage', width: BREITE, height: HOEHE, x: Math.round(wa.x + (wa.width - BREITE) / 2), y: wa.y + 32,
+      width: BREITE, height: HOEHE, x: Math.round(wa.x + (wa.width - BREITE) / 2), y: wa.y + 32,
       frame: false, transparent: true, resizable: false, minimizable: false, maximizable: false, fullscreenable: false,
       skipTaskbar: true, hasShadow: false, show: false, alwaysOnTop: true, title: 'Advanced LAN: Wer spielt?',
       webPreferences: { contextIsolation: true, nodeIntegration: false, preload: path.join(this.root, 'src', 'preload', 'name-preload.js') },

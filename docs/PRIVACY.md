@@ -1,6 +1,6 @@
 # Advanced LAN – Privacy Policy
 
-_Last updated: 11 October 2026_
+_Last updated: 28 October 2026_
 
 Advanced LAN ("the app") is a free, open-source desktop app published by Momo (GitHub: [Nomisimo](https://github.com/Nomisimo)). It turns in-game events into OSC commands for stage lighting, audio and video. This policy explains which data the app processes.
 
@@ -10,7 +10,7 @@ Advanced LAN ("the app") is a free, open-source desktop app published by Momo (G
 - The publisher **does not collect, store or sell personal data**. There is no server operated by the publisher.
 - Game events stay in your local network and go only to the devices you configure.
 - For Valorant and The Finals the app captures the screen of the game PC. The image is analysed on that PC only and never leaves it.
-- The Overwolf runtime that the app is built on sends anonymous usage data to Overwolf (see below).
+- The app runs on plain Electron and sends no analytics or usage data.
 
 ## Data processed on your computer and in your local network
 
@@ -26,7 +26,7 @@ Game data is read only from official interfaces: Valve Game State Integration (C
 
 ## Data sent to third parties
 
-- **Overwolf**: The app runs on Overwolf's ow-electron runtime. Overwolf collects anonymous analytics (for example a machine identifier, app version, crash and performance data). The app uses no Overwolf game-event packages. This processing is covered by the privacy policies Overwolf publishes at [legal.overwolf.com](https://legal.overwolf.com/). You can review your choices in the app under **Setup → App → Privacy settings**.
+- **Automation Overdrive (optional)**: If you install the third-party Overwolf app Automation Overdrive for Valorant, it sends game events to Advanced LAN on the same PC (`localhost`). That app and the Overwolf client are not part of Advanced LAN; their own privacy policies apply ([legal.overwolf.com](https://legal.overwolf.com/)).
 - **GitHub**: To check for updates, the app requests the public release list from `api.github.com` and downloads updates from `github.com`. GitHub receives your IP address as part of these requests ([GitHub Privacy Statement](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement)).
 - **Feedback**: If you click **Report** in the app, your browser opens a new GitHub issue that already contains the app version, your operating system and the selected mode. Nothing is sent unless you submit the issue yourself.
 
@@ -36,7 +36,7 @@ The app is not directed at children under 16 and does not knowingly process thei
 
 ## Your rights
 
-Because the publisher stores no personal data, there is nothing to access, correct or delete on the publisher's side. You can delete all local data by uninstalling the app and removing the `advanced-lan` folder in your application data (Windows: `%APPDATA%\advanced-lan`, macOS: `~/Library/Application Support/advanced-lan`). For data processed by Overwolf or GitHub, please contact them directly.
+Because the publisher stores no personal data, there is nothing to access, correct or delete on the publisher's side. You can delete all local data by uninstalling the app and removing the `advanced-lan` folder in your application data (Windows: `%APPDATA%\advanced-lan`, macOS: `~/Library/Application Support/advanced-lan`). For data processed by GitHub (or by Overwolf, if you installed it yourself), please contact them directly.
 
 ## Contact
 

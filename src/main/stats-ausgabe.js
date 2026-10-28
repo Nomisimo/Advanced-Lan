@@ -57,7 +57,7 @@ class StatsAusgabe {
     if (!this.aktiv() || !this.getStats().an) return false;
     if (this.fenster && !this.fenster.isDestroyed()) { if (this.fenster.isMinimized()) this.fenster.restore(); this.fenster.show(); this.fenster.focus(); return true; }
     this.fenster = new BrowserWindow({
-      name: 'stats-screen', width: 1280, height: 720, minWidth: 480, minHeight: 270, title: 'Advanced LAN · Game Stats', backgroundColor: '#131118', icon: this.icon,
+      width: 1280, height: 720, minWidth: 480, minHeight: 270, title: 'Advanced LAN · Game Stats', backgroundColor: '#131118', icon: this.icon,
       webPreferences: { contextIsolation: true, nodeIntegration: false, preload: this.preload },
     });
     this.fenster.setMenuBarVisibility(false);

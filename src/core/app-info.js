@@ -8,7 +8,7 @@ const LINKS = {
   issues: `${REPO_URL}/issues`,
 };
 
-// Overwolf verlangt ein Tastenkürzel, das die App ein- und ausblendet, und eine Erinnerung daran in den Einstellungen
+// Tastenkürzel, das die App ein- und ausblendet, auch mitten im Spiel. Die Einstellungen erinnern daran
 const STANDARD_HOTKEY = "CommandOrControl+Shift+A";
 
 const MODIFIER = ["CommandOrControl", "Control", "Command", "Alt", "Shift"];

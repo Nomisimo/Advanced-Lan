@@ -1,4 +1,4 @@
-# Baut die Installer für Windows (x64) und macOS Intel mit ow-electron-builder
+# Baut die Installer für Windows (x64) und macOS Intel mit electron-builder
 # und veröffentlicht sie als GitHub-Release. Ablauf wie im Netzwerkplaner.
 #
 # Auslöser:
@@ -61,10 +61,10 @@ jobs:
       - name: App bauen
         run: npm run build
 
-      # Ohne Zertifikat und ohne Overwolf-Schlüssel: der Build läuft durch, ow-electron-builder warnt nur.
+      # Ohne Zertifikat: der Build läuft durch, electron-builder warnt nur.
       # Mac wie im Netzwerkplaner ad-hoc signiert (identity "-"), kein Apple-Zertifikat.
       - name: Installer bauen
-        run: npx ow-electron-builder ${{ matrix.args }} --publish never
+        run: npx electron-builder ${{ matrix.args }} --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 

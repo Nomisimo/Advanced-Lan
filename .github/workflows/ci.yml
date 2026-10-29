@@ -45,6 +45,21 @@ jobs:
           if [ "$n" != "1" ]; then echo "::error::$n Installer gebaut, erwartet 1"; exit 1; fi
           test -f dist/latest.yml || { echo "::error::latest.yml fehlt (Update-Suche unter Windows)"; exit 1; }
           test -f dist/win-unpacked/resources/app.asar || { echo "::error::app.asar fehlt"; exit 1; }
+      # Ohne Bearbeiten der .exe trägt sie Name und Icon von Electron, dann zeigen Taskleiste und Verknüpfungen das Electron-Logo
+      - name: Icon und Name in der .exe prüfen
+        shell: pwsh
+        run: |
+          $exe = Get-Item "dist/win-unpacked/Advanced LAN.exe"
+          $name = $exe.VersionInfo.ProductName
+          Write-Host "ProductName: $name"
+          if ($name -ne "Advanced LAN") { Write-Error "Die .exe heißt '$name' statt 'Advanced LAN': Icon und Name wurden nicht eingetragen"; exit 1 }
+          Add-Type -AssemblyName System.Drawing
+          $soll = [System.Drawing.Icon]::new("assets/app-icon/icon.ico", 32, 32).ToBitmap()
+          $ist = [System.Drawing.Icon]::ExtractAssociatedIcon($exe.FullName).ToBitmap()
+          $abw = 0
+          for ($x = 0; $x -lt 32; $x += 4) { for ($y = 0; $y -lt 32; $y += 4) { $a = $soll.GetPixel($x, $y); $b = $ist.GetPixel($x, $y); $abw += [math]::Abs($a.R - $b.R) + [math]::Abs($a.G - $b.G) + [math]::Abs($a.B - $b.B) } }
+          Write-Host "Abweichung zum App-Icon: $abw"
+          if ($abw -gt 3000) { Write-Error "Die .exe trägt nicht das App-Icon"; exit 1 }
 
   # Mac-Installer wie im Release bauen und prüfen, ohne etwas zu veröffentlichen
   mac-intel:

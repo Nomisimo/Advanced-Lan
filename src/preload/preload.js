@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld('regieAPI', {
   onConfig:        abo('config'),
   onMeldung:       abo('meldung'),
   openExternal:    call('open-external'),
+  overdriveOeffnen: call('overdrive-oeffnen'),
   feedbackOeffnen: call('feedback-oeffnen'),
   // Updates (wie im Netzwerkplaner)
   fetchReleases:   call('fetch-releases'),

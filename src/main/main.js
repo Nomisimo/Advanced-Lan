@@ -10,6 +10,8 @@ const { findeCs2CfgOrdner, findeRlConfigOrdner, findeDotaCfgOrdner, steamLocalCo
 const { BildDienst } = require('./bild');
 const { RlClient } = require('./rl-client');
 const { OverdriveServer } = require('./overdrive-server');
+const { overdriveInstalliert, overdriveOeffnen } = require('./overdrive-start');
+const { RiotClient } = require('./riot-client');
 const { Regie } = require('../core/regie');
 const { RegieSim } = require('../core/regie-sim');
 const { CsQuelle } = require('../core/cs-quelle');
@@ -42,6 +44,8 @@ const os = require('os');
 const karten = () => kartenListe(os.networkInterfaces());
 
 const root = app.getAppPath();
+// App-Icon für Fenster und Taskleiste: unter Windows die .ico (enthält 16 bis 256 px, bleibt klein scharf)
+const APP_ICON = path.join(root, 'assets', 'app-icon', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
 const KONFIG_DATEI = () => path.join(app.getPath('userData'), 'advanced-lan.json');
 let mainWin = null;
 let hotkeyAktiv = '', hotkeyFehler = ''; // Tastenkürzel zum Ein- und Ausblenden (siehe unten)
@@ -112,7 +116,7 @@ function planAendern(fn) {
 }
 const regieSim = new RegieSim({ regie, onChange: statusMelden });
 const stats = new StatsAusgabe({
-  root, preload: path.join(root, 'src', 'preload', 'preload.js'), icon: path.join(root, 'assets', 'app-icon', 'icon.png'),
+  root, preload: path.join(root, 'src', 'preload', 'preload.js'), icon: APP_ICON,
   getStats: () => cfg.regie.stats, aktiv: () => istRegie(), onChange: statusMelden,
   onFensterZu: () => restoreFocus(mainWin),
 });
@@ -139,7 +143,18 @@ let rlQuelle = new RlQuelle();
 const rl = { letzte: 0, stand: null, statusGesendet: 0 };
 // Dota 2 (Valve GSI) und Bild-Spiele (Valorant, The Finals): je Spiel eine Quelle und der letzte Stand
 let quellen = {};
-const bildQuelle = (id) => new BildQuelle(id, { team: cfg?.gamepc.bild.spiele[id]?.team, name: cfg?.gamepc.pcId || '' });
+// Valorant-Team über den Riot Client: ein neues Team gilt sofort für die Quelle und die nächsten Events
+// Neue MatchID: sofort an die Regie, damit sie diesen PC dem richtigen Match zuordnet (auch vor dem ersten Event)
+const riot = new RiotClient({
+  onTeam: () => { if (quellen.valorant) quellen.valorant.team = teamVon('valorant'); statusMelden(); },
+  onMatch: () => { if (quellen.valorant) statusAnRegie('valorant', quellen.valorant.status(), quellen.valorant.stand()); },
+  onChange: statusMelden,
+});
+// Der Riot Client wird nur gefragt, wenn „Automatisch (Riot Client)“ an ist
+const riotAnwenden = () => { if (hatSpiele() && cfg.gamepc.bild.spiele.valorant?.teamAuto) riot.start(); else riot.stop(); };
+// Team eines Bild-Spiels: vom Riot Client erkannt (Valorant, wenn „automatisch“ an ist), sonst aus dem Setup
+const teamVon = (id) => { const sc = cfg?.gamepc.bild.spiele[id]; return (sc?.teamAuto && id === 'valorant' && riot.status().team) || sc?.team; };
+const bildQuelle = (id) => new BildQuelle(id, { team: teamVon(id), name: cfg?.gamepc.pcId || '' });
 const neueQuellen = () => { quellen = { dota2: new DotaQuelle(), ...Object.fromEntries(BILD_SPIELE.map((d) => [d.id, bildQuelle(d.id)])) }; };
 neueQuellen();
 const daten = {}; // spiel → { letzte, stand, status, statusGesendet }
@@ -201,6 +216,9 @@ function anRegie(spiel, ev) {
   return client.event(spiel, ev);
 }
 function statusAnRegie(spiel, status, stand) {
+  // Valorant: MatchID vom Riot Client, damit die Regie die PCs nach Match trennt (core/match-check.js)
+  const match = spiel === 'valorant' ? riot.status().match : '';
+  if (match) stand = { ...(stand || {}), match };
   if (cfg.modus === 'standalone') regie.pcStatus(lokalId(), { spiel, status, stand });
   else client.status(spiel, status, stand);
 }
@@ -234,7 +252,7 @@ function quelleMelden(spiel, r, sim = false) {
 // Bild-Spiele: erkannte Aktionen auf diesem PC. Team und Name kommen aus dem Setup dieses PCs, auch im Simulator.
 function bildNachricht(spiel, m, sim = false) {
   if (!hatSpiele() || !quellen[spiel]) return;
-  quelleMelden(spiel, quellen[spiel].ingest({ ...m, team: cfg.gamepc.bild.spiele[spiel]?.team, name: cfg.gamepc.pcId || '' }), sim);
+  quelleMelden(spiel, quellen[spiel].ingest({ ...m, team: teamVon(spiel), name: cfg.gamepc.pcId || '' }), sim);
 }
 
 function gamePcLog(x) {
@@ -362,7 +380,7 @@ function bildCheck() {
     const q = c.spiele[d.id].quelle;
     const wo = q === 'bildschirm' ? 'Bildschirm' : q.startsWith('fenster:') ? `Fenster „${q.slice(8)}“` : 'Spielfenster';
     return [
-      { id: `${d.id}-aktionen`, spiel: d.id, label: `${d.name}: Aktionen eingerichtet`, ok: n > 0, warn: true, detail: n ? `${n} Aktionen, Team ${c.spiele[d.id].team}` : 'noch keine: im Tab „Bilderkennung“ anlegen oder importieren' },
+      { id: `${d.id}-aktionen`, spiel: d.id, label: `${d.name}: Aktionen eingerichtet`, ok: n > 0, warn: true, detail: n ? `${n} Aktionen, Team ${teamVon(d.id)}` : 'noch keine: im Tab „Bilderkennung“ anlegen oder importieren' },
       ...(n && c.an ? [{ id: `${d.id}-bild`, spiel: d.id, label: `${d.name}: Bild kommt an`, ok: !!l?.laeuft && !l.leer, warn: !l,
         detail: !l ? `wartet: ${d.name} ist nicht offen (Quelle: ${wo})` : l.fehler || (l.leer ? 'Bild ist schwarz: Spiel im randlosen Fenstermodus starten' : l.laeuft ? `${l.quelle.name}, ${l.b}×${l.h}, ${c.fps} Bilder/s` : 'startet …') }] : []),
     ];
@@ -371,8 +389,10 @@ function bildCheck() {
 
 // Automation Overdrive (Valorant): Empfang auf Port 44206, App verbunden, Events kommen an. Optional, deshalb nur Hinweise.
 function overdriveCheck() {
-  const o = overdrive.status(), alter = alterVon(o.letzte);
+  const o = overdrive.status(), alter = alterVon(o.letzte), inst = overdriveInstalliert();
   return [
+    ...(inst ? [{ id: 'od-installiert', label: 'Automation Overdrive installiert', ok: !!inst.app, warn: true,
+      detail: inst.app ? `Version ${inst.app.version}` : inst.overwolf ? 'fehlt: Knopf oben führt zum Store' : 'Overwolf fehlt: Knopf oben führt zum Download' }] : []),
     { id: 'od-empfang', label: 'Empfang bereit', ok: o.laeuft, detail: o.fehler ? `${o.fehler}: Touch Portal mit dem Overdrive-Plugin beenden` : `localhost:${o.port ?? OVERDRIVE_PORT}` },
     { id: 'od-verbunden', label: 'Automation Overdrive verbunden', ok: o.verbunden > 0, warn: true, detail: o.verbunden ? 'Overwolf-App ist verbunden' : 'Overwolf und Automation Overdrive starten' },
     { id: 'od-daten', label: 'Valorant-Events kommen an', ok: alter != null && alter < 600, warn: true, detail: alter == null ? 'noch keins, kommt beim ersten Kill' : `zuletzt vor ${alter} s` },
@@ -467,6 +487,7 @@ async function modusStarten() {
   discovery.stop();
   rlClient.stop();
   await Promise.all([gsi.stop(), overdrive.stop()]);
+  riot.stop();
   lokalAbmelden();
   namenPopup.schliessen();
   spielAufRegie = '';
@@ -485,6 +506,7 @@ async function modusStarten() {
     neueQuellen();
     rlClient.start(Number(cfg.gamepc.rlPort));
     await overdrive.start(OVERDRIVE_PORT);
+    riotAnwenden();
   }
   bild.anwenden();
   if (cfg.modus === 'gamepc') {
@@ -499,7 +521,7 @@ async function modusStarten() {
 function gesamtStatus() {
   const s = { modus: cfg.modus, jetzt: Date.now(), app: { hotkeyFehler, plattform: process.platform } };
   if (istRegie()) s.regie = { ...regie.snapshot(), session: session.status(), sim: regieSim.status(), armed: cfg.regie.armed, spielAufRegie, stats: stats.status(), lokal: lokalPc };
-  if (hatSpiele()) s.gamepc = { spieler: cfg.gamepc.spieler, spielerAnzeige: cfg.gamepc.spieler || anzeigePcId(), client: client.info(), sessions: discovery.liste(), discoveryFehler: discovery.fehler, gsi: gsi.status(), letzte: gp.letzte, status: gp.status, stand: gp.stand, fremd: gp.fremd, sim: { ...gpSim.status(), spiel: gpSimSpiel }, rl: { ...rlClient.status(), letzte: rl.letzte, stand: rl.stand }, daten, bild: bild.status(), overdrive: overdrive.status() };
+  if (hatSpiele()) s.gamepc = { spieler: cfg.gamepc.spieler, spielerAnzeige: cfg.gamepc.spieler || anzeigePcId(), client: client.info(), sessions: discovery.liste(), discoveryFehler: discovery.fehler, gsi: gsi.status(), letzte: gp.letzte, status: gp.status, stand: gp.stand, fremd: gp.fremd, sim: { ...gpSim.status(), spiel: gpSimSpiel }, rl: { ...rlClient.status(), letzte: rl.letzte, stand: rl.stand }, daten, bild: bild.status(), overdrive: overdrive.status(), riot: riot.status() };
   return s;
 }
 
@@ -515,11 +537,10 @@ function createWindow() {
     webPreferences: { contextIsolation: true, nodeIntegration: false },
   });
   splash.loadFile(path.join(root, 'src', 'main', 'splash.html'));
-  const iconPath = path.join(root, 'assets', 'app-icon', 'icon.png');
   mainWin = new BrowserWindow({
     width: 1480, height: 940, minWidth: 1100, minHeight: 680,
     title: 'Advanced LAN', show: false, backgroundColor: '#131118',
-    icon: fs.existsSync(iconPath) ? iconPath : undefined,
+    icon: APP_ICON,
     webPreferences: { contextIsolation: true, nodeIntegration: false, preload: path.join(root, 'src', 'preload', 'preload.js') },
   });
   mainWin.setMenuBarVisibility(false);
@@ -659,6 +680,7 @@ async function konfigUebernehmen(neu) {
   if (cfg.app.hotkey !== alt.app.hotkey) hotkeyAnwenden();
   overlayAktualisieren();
   if (istRegie()) {
+    regie.matchAktualisieren(); // anderes Spiel oder andere Match-Wahl im Tab „Control“
     if (session.offen && (cfg.regie.netz.empfang !== alt.regie.netz?.empfang)) await session.oeffnen();
     if (cfg.regie.aktivesSpiel !== alt.regie.aktivesSpiel) session.spielGewechselt();
     else if (session.offen && cfg.regie.session.name !== alt.regie.session.name) session.ausrufen();
@@ -668,7 +690,8 @@ async function konfigUebernehmen(neu) {
   if (hatSpiele() && cfg.gamepc.rlPort !== alt.gamepc.rlPort) rlClient.start(Number(cfg.gamepc.rlPort));
   if (cfg.modus === 'standalone' && lokalPc !== lokalId()) lokalAnmelden();
   if (hatSpiele()) {
-    for (const d of BILD_SPIELE) if (quellen[d.id]) { quellen[d.id].team = cfg.gamepc.bild.spiele[d.id].team; quellen[d.id].name = cfg.gamepc.pcId || ''; }
+    riotAnwenden();
+    for (const d of BILD_SPIELE) if (quellen[d.id]) { quellen[d.id].team = teamVon(d.id); quellen[d.id].name = cfg.gamepc.pcId || ''; }
     bild.anwenden();
   }
   if (istRegie() && JSON.stringify(cfg.regie.stats) !== JSON.stringify(alt.regie.stats)) {
@@ -913,14 +936,20 @@ ipcMain.on('erkennung-text', (e, id, png) => bild.text(e.sender, id, png));
 ipcMain.on('erkennung-status', (e, s) => bild.meldung(e.sender, s));
 ipcMain.handle('gamepc-sim-stop', () => { gpSim.stop(); });
 ipcMain.handle('gamepc-sim-neu', () => { gpSim.neu(); });
+ipcMain.handle('overdrive-oeffnen', () => overdriveOeffnen(shell));
 ipcMain.handle('open-external', (_, url) => { if (/^https?:\/\//i.test(url)) shell.openExternal(url); });
 
 /* ── Start ────────────────────────────────────────────────────────────── */
+// Windows ordnet Fenster, Taskleisten-Icon und Verknüpfungen über diese ID zu. Sie muss der appId in
+// package.json entsprechen, sonst zeigt die Taskleiste ein zweites Icon neben der angehefteten Verknüpfung
+if (process.platform === 'win32') app.setAppUserModelId('dev.advancedlan');
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) app.quit();
 else {
   app.on('second-instance', () => { if (mainWin) { if (mainWin.isMinimized()) mainWin.restore(); mainWin.focus(); } });
   app.whenReady().then(async () => {
+    // Ungepackt (npm start) zeigt das Dock sonst das Electron-Logo, gepackt kommt das Icon aus der .icns
+    if (process.platform === 'darwin' && !app.isPackaged) app.dock.setIcon(APP_ICON);
     ladeKonfig();
     createWindow();
     bild.einrichten();
@@ -935,6 +964,7 @@ else {
     client.trennen();
     rlClient.stop();
     discovery.stop();
+    riot.stop();
     await Promise.allSettled([session.schliessen(), gsi.stop(), overdrive.stop(), stats.beenden(), bild.beenden()]);
     osc.close();
     app.quit();

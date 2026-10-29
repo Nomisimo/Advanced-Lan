@@ -22,6 +22,9 @@ function standardRegie() {
   return {
     armed: false,
     aktivesSpiel: "cs2",
+    // Tab „Control“: welches Match zählt, wenn die Game-PCs in mehreren Matches sind (core/match-check.js).
+    // auto: immer das mit den meisten PCs, sonst wahl (ID des Matches, folgt dessen PCs ins nächste Match)
+    match: { auto: true, wahl: "" },
     spiele: { cs2: true, rl: true, dota2: false, valorant: false, finals: false }, // Tab „Setup“: nur genutzte Spiele erscheinen in Control und Signale
     session: { name: "LAN-Party", passwort: "", port: PORTS.session, offen: false },
     netz: { empfang: "", senden: "" }, // Netzwerkkarten (Name, leer = automatisch): Empfang der Game-PCs, Senden der OSC-Befehle
@@ -129,6 +132,7 @@ function migrateKonfig(k) {
       ...d.regie,
       ...r,
       armed: false, // nach dem Start nie scharf: erst bewusst einschalten
+      match: { auto: r.match?.auto !== false, wahl: typeof r.match?.wahl === "string" ? r.match.wahl : "" },
       session: { ...d.regie.session, ...(r.session || {}) },
       netz: { ...d.regie.netz, ...(r.netz && typeof r.netz === "object" ? r.netz : {}) },
       targets: Array.isArray(r.targets) ? r.targets.map(migrateZiel) : d.regie.targets,

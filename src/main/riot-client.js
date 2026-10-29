@@ -33,8 +33,9 @@ function holen(url, headers, agent) {
 }
 
 class RiotClient {
-  constructor({ onTeam, onChange }) {
+  constructor({ onTeam, onMatch, onChange }) {
     this.onTeam = onTeam || (() => {});
+    this.onMatch = onMatch || (() => {});
     this.onChange = onChange || (() => {});
     this.timer = null;
     this.lauf = 0; // jede Abfrageschleife hat eine Nummer: nach stop() endet die alte, auch mitten in einer Anfrage
@@ -43,9 +44,8 @@ class RiotClient {
 
   reset() {
     // zustand: aus | kein-client | kein-match | erkannt | fehler
-    this.s = { zustand: 'aus', team: '', teamId: '', phase: '', detail: '', letzte: 0 };
+    this.s = { zustand: 'aus', team: '', teamId: '', match: '', phase: '', detail: '', letzte: 0 }; // match: MatchID von Riot
     this.glz = null;
-    this.matchId = '';
   }
 
   status() { return { ...this.s }; }
@@ -69,9 +69,10 @@ class RiotClient {
     try { neu = await this.abfragen(); } catch (e) { neu = { zustand: 'fehler', detail: e.message }; }
     if (lauf !== this.lauf) return; // inzwischen gestoppt
     const vorher = this.s;
-    this.s = { ...vorher, team: '', teamId: '', phase: '', detail: '', ...neu };
+    this.s = { ...vorher, team: '', teamId: '', match: '', phase: '', detail: '', ...neu };
     if (this.s.team) this.s.letzte = Date.now();
     if (this.s.team && this.s.team !== vorher.team) this.onTeam(this.s.team);
+    if (this.s.match !== vorher.match) this.onMatch(this.s.match);
     if (JSON.stringify({ ...this.s, letzte: 0 }) !== JSON.stringify({ ...vorher, letzte: 0 })) this.onChange();
     // Im Match ändert sich das Team nicht: dann seltener fragen
     this.timer = setTimeout(() => this.runde(lauf), this.s.team ? 15000 : 5000);
@@ -106,8 +107,10 @@ class RiotClient {
       const m = await holen(`${glz}/${art}/v1/matches/${p.json.MatchID}`, h);
       if (m.status !== 200) continue;
       const teamId = eigeneTeamId(m.json, puuid), team = appTeam(teamId);
-      if (!team) return { zustand: 'kein-match', phase, detail: teamId ? `unbekanntes Team ${teamId}` : 'Zuschauer oder Coach' };
-      return { zustand: 'erkannt', team, teamId, phase };
+      // Agentenwahl und Match haben verschiedene IDs: als Match zählt erst das laufende Spiel
+      const match = art === 'core-game' ? String(p.json.MatchID) : '';
+      if (!team) return { zustand: 'kein-match', match, phase, detail: teamId ? `unbekanntes Team ${teamId}` : 'Zuschauer oder Coach' };
+      return { zustand: 'erkannt', team, teamId, match, phase };
     }
     return { zustand: 'kein-match', detail: 'Valorant läuft, gerade kein Match' };
   }

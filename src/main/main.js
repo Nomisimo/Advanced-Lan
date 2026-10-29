@@ -141,7 +141,14 @@ const rl = { letzte: 0, stand: null, statusGesendet: 0 };
 // Dota 2 (Valve GSI) und Bild-Spiele (Valorant, The Finals): je Spiel eine Quelle und der letzte Stand
 let quellen = {};
 // Valorant-Team über den Riot Client: ein neues Team gilt sofort für die Quelle und die nächsten Events
-const riot = new RiotClient({ onTeam: () => { if (quellen.valorant) quellen.valorant.team = teamVon('valorant'); statusMelden(); }, onChange: statusMelden });
+// Neue MatchID: sofort an die Regie, damit sie diesen PC dem richtigen Match zuordnet (auch vor dem ersten Event)
+const riot = new RiotClient({
+  onTeam: () => { if (quellen.valorant) quellen.valorant.team = teamVon('valorant'); statusMelden(); },
+  onMatch: () => { if (quellen.valorant) statusAnRegie('valorant', quellen.valorant.status(), quellen.valorant.stand()); },
+  onChange: statusMelden,
+});
+// Der Riot Client wird nur gefragt, wenn „Automatisch (Riot Client)“ an ist
+const riotAnwenden = () => { if (hatSpiele() && cfg.gamepc.bild.spiele.valorant?.teamAuto) riot.start(); else riot.stop(); };
 // Team eines Bild-Spiels: vom Riot Client erkannt (Valorant, wenn „automatisch“ an ist), sonst aus dem Setup
 const teamVon = (id) => { const sc = cfg?.gamepc.bild.spiele[id]; return (sc?.teamAuto && id === 'valorant' && riot.status().team) || sc?.team; };
 const bildQuelle = (id) => new BildQuelle(id, { team: teamVon(id), name: cfg?.gamepc.pcId || '' });
@@ -206,6 +213,9 @@ function anRegie(spiel, ev) {
   return client.event(spiel, ev);
 }
 function statusAnRegie(spiel, status, stand) {
+  // Valorant: MatchID vom Riot Client, damit die Regie die PCs nach Match trennt (core/match-check.js)
+  const match = spiel === 'valorant' ? riot.status().match : '';
+  if (match) stand = { ...(stand || {}), match };
   if (cfg.modus === 'standalone') regie.pcStatus(lokalId(), { spiel, status, stand });
   else client.status(spiel, status, stand);
 }
@@ -491,7 +501,7 @@ async function modusStarten() {
     neueQuellen();
     rlClient.start(Number(cfg.gamepc.rlPort));
     await overdrive.start(OVERDRIVE_PORT);
-    riot.start();
+    riotAnwenden();
   }
   bild.anwenden();
   if (cfg.modus === 'gamepc') {
@@ -666,6 +676,7 @@ async function konfigUebernehmen(neu) {
   if (cfg.app.hotkey !== alt.app.hotkey) hotkeyAnwenden();
   overlayAktualisieren();
   if (istRegie()) {
+    regie.matchAktualisieren(); // anderes Spiel oder andere Match-Wahl im Tab „Control“
     if (session.offen && (cfg.regie.netz.empfang !== alt.regie.netz?.empfang)) await session.oeffnen();
     if (cfg.regie.aktivesSpiel !== alt.regie.aktivesSpiel) session.spielGewechselt();
     else if (session.offen && cfg.regie.session.name !== alt.regie.session.name) session.ausrufen();
@@ -675,6 +686,7 @@ async function konfigUebernehmen(neu) {
   if (hatSpiele() && cfg.gamepc.rlPort !== alt.gamepc.rlPort) rlClient.start(Number(cfg.gamepc.rlPort));
   if (cfg.modus === 'standalone' && lokalPc !== lokalId()) lokalAnmelden();
   if (hatSpiele()) {
+    riotAnwenden();
     for (const d of BILD_SPIELE) if (quellen[d.id]) { quellen[d.id].team = teamVon(d.id); quellen[d.id].name = cfg.gamepc.pcId || ''; }
     bild.anwenden();
   }

@@ -6,6 +6,10 @@ const REPO = "Nomisimo/Advanced-Lan";
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
+  "0.1.0-beta.13": [
+    "Valorant: das Team jedes Game-PCs kommt automatisch vom Riot Client, schon in der Agentenwahl. Rot = TEAM A (beginnt im Angriff), Blau = TEAM B. Das Team bleibt das ganze Match gleich, auch nach dem Seitenwechsel",
+    "Bilderkennung → Valorant → „Team dieses PCs“: neu „Automatisch (Riot Client)“, Standard. Darunter steht, welches Team erkannt ist. Ohne Riot Client oder außerhalb eines Matches gilt das zuletzt gewählte Team",
+  ],
   "0.1.0-beta.12": [
     "Ohne Overwolf: die App läuft jetzt auf normalem Electron und wird mit electron-builder gebaut. Keine Overwolf-Laufzeit, keine Nutzungsdaten an Overwolf",
     "Alle Spiele und Events bleiben: CS2 und Dota 2 über Valve GSI, Rocket League über die Stats API, Valorant und The Finals über Bilderkennung, Mini-Overlay, Namens-Popup, Simulator und Netzwerk wie bisher",

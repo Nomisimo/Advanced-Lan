@@ -6,6 +6,7 @@ import { Section, Field, Toggle, SpielChip, Kbd } from "../ui.jsx";
 import { BILD_SPIELE, BILD_BY_ID, FPS, migrateAktion, migrateBereich, erkennungsAuftrag, aktionBereit, bereichBereit, MAX_BEREICHE, MAX_FRAMES, uid } from "../../core/bild-spiele.js";
 import { BildErkennung, kodieren, ankerVon, region as regionBegrenzen, ANKER_H, ANKER_V } from "../../core/bild-erkennung.js";
 import { sigAus, bildAus, pngAus, istLeer } from "../bild.js";
+import { RIOT_FARBE } from "../../core/riot-team.js";
 import { Circle, Square, Upload, Download, Play, Pause, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Plus, Trash2, Film, FlaskConical, Type, Crop, ImagePlus, FolderOpen } from "lucide-react";
 
 // Aufnahme bis zu 2 Stunden (Sicherheitsgrenze). 30 Bilder/s, höchstens 1080p und 4 Mbit/s: etwa 1,8 GB pro Stunde.
@@ -94,21 +95,38 @@ export default function BildTab({ cfg, mutate, g, notify }) {
         ))}
       </span>} right={<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
         <Field label="Team dieses PCs">
-          <select style={{ ...S.selectSm, width: 130, color: teamFarbe(sc.team) }} value={sc.team} onChange={(e) => setzeSpiel((s) => { s.team = e.target.value; })}>
+          <select style={{ ...S.selectSm, width: def.riot ? 170 : 130, color: def.riot && sc.teamAuto ? ACCENT_HI : teamFarbe(sc.team) }} value={def.riot && sc.teamAuto ? "auto" : sc.team}
+            onChange={(e) => setzeSpiel((s) => { if (e.target.value === "auto") s.teamAuto = true; else { s.teamAuto = false; s.team = e.target.value; } })}>
+            {def.riot && <option value="auto">Automatisch (Riot Client)</option>}
             {def.teams.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
         </Field>
         <button style={{ ...S.secondaryBtn, alignSelf: "flex-end" }} onClick={importieren}><FolderOpen size={14} /> Importieren</button>
         <button style={{ ...S.secondaryBtn, alignSelf: "flex-end" }} onClick={exportieren}><Download size={14} /> Exportieren</button>
       </div>}>
+        {def.riot && sc.teamAuto && <RiotTeam r={g.riot} ersatz={sc.team} />}
         <p style={{ ...S.subtitle, marginTop: -4 }}>
-          Einmal auf einem PC einrichten, exportieren und auf den anderen Game-PCs importieren. Das Team stellt jeder PC selbst ein.
+          Einmal auf einem PC einrichten, exportieren und auf den anderen Game-PCs importieren. Das Team stellt jeder PC selbst ein{def.riot ? " oder holt es automatisch vom Riot Client" : ""}.
           Hat ein PC ein anderes Seitenverhältnis, verschiebt der Import die Bereiche passend zu ihrem Anker.
         </p>
         <Editor key={spielId} def={def} sc={sc} setzeSpiel={setzeSpiel} notify={notify} werteLive={st.spiele?.[spielId]?.werte || null} teilWerteLive={st.spiele?.[spielId]?.teilWerte || null} letzteLive={st.spiele?.[spielId]?.letzte} />
       </Section>
     </>
   );
+}
+
+// Valorant: Team vom Riot Client (main/riot-client.js). Solange keins erkannt ist, gilt das zuletzt gewählte Team.
+function RiotTeam({ r, ersatz }) {
+  const zeile = { fontSize: 13, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", margin: "-4px 0 10px" };
+  if (!r || r.zustand === "aus") return <div style={{ ...zeile, color: MUTED }}>● Riot Client wird nur unter Windows abgefragt. Team bis dahin: {ersatz}</div>;
+  if (r.zustand === "erkannt") return (
+    <div style={zeile}>
+      <span style={{ color: OK }}>● Riot Client:</span>
+      <b style={{ color: teamFarbe(r.team) }}>{r.team}</b>
+      <span style={{ color: SUB }}>({RIOT_FARBE[r.team]}) · {r.phase}</span>
+    </div>
+  );
+  return <div style={{ ...zeile, color: r.zustand === "fehler" ? WARN : MUTED }}>● {r.detail || "Riot Client wird gesucht"}. Team bis dahin: <b style={{ color: teamFarbe(ersatz) }}>{ersatz}</b></div>;
 }
 
 // Live-Quelle eines Spiels: Spielfenster automatisch erkennen, ein beliebiges offenes Fenster/Programm, ein eigener Titel oder der Bildschirm

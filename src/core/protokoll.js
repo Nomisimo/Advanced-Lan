@@ -21,6 +21,10 @@
 //   PC → Regie   { t: "einrichtung-ok", stand }          übernommen (stand) oder "eigene", wenn der PC keine Vorlage annimmt
 //   Regie → PC   { t: "vorlage-holen" }                 Einstellungen dieses PCs als Vorlage schicken
 //   PC → Regie   { t: "vorlage", name, daten }          Game-PC-Show-Daten dieses PCs
+//   PC → Regie   { t: "hinweis", vollbild, nameOffen }  vollbild = "exklusiv" (Overlay und Popup unsichtbar), "vollbild" oder ""
+//                                                       nameOffen = Namens-Popup wartet aufs Ende des exklusiven Vollbilds
+//   Regie → PC   { t: "spieler-setzen", name }          Spielernamen von der Regie eintragen (PC antwortet mit „spieler“)
+//   Regie → PC   { t: "name-fragen" }                   Namens-Popup zeigen (im exklusiven Vollbild: sobald es endet)
 // Ältere Game-PCs ignorieren die neuen Nachrichten. Code 4004 beim Schließen: neu zugeordnet, sofort neu anmelden.
 
 const MDNS_TYP = "advancedlan"; // → _advancedlan._tcp.local

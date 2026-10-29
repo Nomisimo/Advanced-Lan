@@ -124,7 +124,13 @@ const GamePc = ({ goTab }) => (
     <P>
       <b>Mini-Overlay:</b> Ist die App minimiert, zeigt ein kleines App-Icon über allen Fenstern, ob alles läuft. Grün: Session verbunden und ein Spiel liefert Daten.
       Orange: verbindet gerade oder kein Spiel liefert Daten. Rot: keine Session, abgelehnt oder CS2-Empfang gestört. Das Icon lässt sich verschieben, ein Klick öffnet die App.
-      Ein- und ausschalten im Tab <b>Setup</b> unter „Einstellungen“. Über Spielen im exklusiven Vollbild erscheint es nicht; in CS2 dafür „Vollbild (Fenster)“ wählen.
+      Ein- und ausschalten im Tab <b>Setup</b> unter „Einstellungen“.
+    </P>
+    <P>
+      <b>Exklusives Vollbild:</b> Läuft ein Spiel im exklusiven Vollbild, schreibt es direkt auf den Monitor und Windows zeichnet keine anderen Fenster darüber.
+      Mini-Overlay und Namens-Popup sind dann nicht zu sehen. Die App merkt das: Das Popup wartet, bis das Spiel das Vollbild verlässt (Alt+Tab oder Spiel beendet),
+      und die Regie sieht beim PC „Name offen“ und kann den Namen im Tab <b>Session</b> selbst eintragen. Dauerhaft lösen: im Spiel randloses Vollbild einstellen,
+      in Valorant „Vollbild im Fenster“ (Windowed Fullscreen), in CS2 „Vollbild (Fenster)“, in Rocket League „Randlos“ (Borderless). Das hilft auch der Bilderkennung.
     </P>
     <P><span style={{ color: SUB }}>
       CS2, Rocket League, Valorant und The Finals gibt es als Game-PC nur unter Windows, Dota 2 auch auf dem Mac. Auf dem Mac läuft vor allem die Regie; der Game-PC-Modus zeigt dort, welche Spiele fehlen.

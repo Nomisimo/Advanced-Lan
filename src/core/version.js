@@ -6,6 +6,13 @@ const REPO = "Nomisimo/Advanced-Lan";
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
+  "0.1.0-beta.18": [
+    "Exklusives Vollbild: der Game-PC erkennt, wenn ein Spiel im exklusiven Vollbild läuft. Dort zeichnet Windows keine Fenster darüber, Mini-Overlay und Namens-Popup sind unsichtbar",
+    "Das Namens-Popup wartet dann, bis das Spiel das Vollbild verlässt (Alt+Tab oder Spiel beendet), statt ungesehen abzulaufen",
+    "Regie → Session: Spielernamen der Game-PCs direkt eintragen und das Namens-Popup am PC zeigen lassen. Hinweise „Exklusives Vollbild“ und „Name offen“, auch im Tab „Control“",
+    "Mini-Overlay und Namens-Popup holen sich jede Sekunde die oberste Ebene zurück, wenn sich ein randloses Spiel darüber legt",
+    "Game-PC → Session: Warnung mit den richtigen Spieleinstellungen (Valorant „Vollbild im Fenster“, CS2 „Vollbild (Fenster)“, Rocket League „Randlos“)",
+  ],
   "0.1.0-beta.17": [
     "Regie: Tabs in der Reihenfolge der Einrichtung: Control, Session, Ziele, Plan, Signale, Stats-Screen, Setup, Simulator, Anleitung",
     "Regie: Tab „Screen“ heißt jetzt „Stats-Screen“ und enthält alles zum Game-Stats-Screen: Editor und darunter Einschalten, Pop-out-Fenster und NDI (vorher im Setup)",

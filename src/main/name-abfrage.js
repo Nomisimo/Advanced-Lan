@@ -1,5 +1,6 @@
 // Namens-Popup des Game-PCs: kleines Fenster oben in der Mitte, über allen Fenstern, ohne dem Spiel den Fokus zu nehmen.
 // Wie das Mini-Overlay ein normales Fenster: sichtbar über Spielen im Fenster- oder randlosen Vollbild, nicht über exklusivem Vollbild.
+// Läuft ein Spiel im exklusiven Vollbild, wartet main.js mit dem Zeigen, bis das Spiel es verlässt (src/main/vollbild.js).
 const path = require('path');
 const { BrowserWindow, ipcMain, screen } = require('electron');
 
@@ -13,6 +14,7 @@ class NamensAbfrage {
     this.onAntwort = onAntwort || (() => {});
     this.onZu = onZu || (() => {});
     this.win = null;
+    this.oben = null;
     ipcMain.on('name-antwort', (e, name) => { if (this.von(e)) { this.schliessen(); this.onAntwort(String(name || '')); } });
     ipcMain.on('name-schliessen', (e) => { if (this.von(e)) { this.schliessen(); this.onZu(); } });
   }
@@ -44,8 +46,23 @@ class NamensAbfrage {
     this.win.on('closed', () => { this.win = null; });
   }
 
-  schliessen() { if (this.win && !this.win.isDestroyed()) this.win.hide(); }
-  beenden() { if (this.win && !this.win.isDestroyed()) this.win.destroy(); this.win = null; }
+  schliessen() { clearInterval(this.oben); this.oben = null; if (this.win && !this.win.isDestroyed()) this.win.hide(); }
+  beenden() { clearInterval(this.oben); this.oben = null; if (this.win && !this.win.isDestroyed()) this.win.destroy(); this.win = null; }
 }
 
-module.exports = { NamensAbfrage };
+// Spiele im randlosen Vollbild setzen sich beim Fokus gern selbst ganz nach oben. Solange das Fenster sichtbar ist,
+// holt es sich alle OBEN_MS die oberste Ebene zurück, ohne dem Spiel den Fokus zu nehmen. Für Popup und Mini-Overlay.
+const OBEN_MS = 1000;
+function nachOben(win) {
+  if (!win || win.isDestroyed() || !win.isVisible()) return false;
+  win.setAlwaysOnTop(true, 'screen-saver');
+  win.moveTop();
+  return true;
+}
+function obenHalten(halter, win = halter.win) {
+  clearInterval(halter.oben);
+  halter.oben = setInterval(() => { if (!nachOben(win)) { clearInterval(halter.oben); halter.oben = null; } }, OBEN_MS);
+  halter.oben.unref?.();
+}
+
+module.exports = { NamensAbfrage, obenHalten };

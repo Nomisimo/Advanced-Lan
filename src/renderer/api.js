@@ -193,10 +193,14 @@ function browserApi() {
         regie.pcVerbunden(id, { spiele: QUELLEN, remote: ip, geraet: { hostname: host, app: __APP_VERSION__, mac, karte: `Ethernet (${ip})`, plattform: "win32" } });
         regie.pcPing(id, ping);
       }
+      if (sessionOffen) regie.pcHinweis(VORSCHAU_PCS[1][0], { vollbild: "exklusiv", nameOffen: true }); // so sieht die Regie ein Spiel im exklusiven Vollbild
       return status();
     },
     sessionSchliessen: async () => { sessionOffen = false; for (const [id] of VORSCHAU_PCS) regie.pcGetrennt(id); return status(); },
     pcTrennen: async () => {},
+    // Vorschau: der PC übernimmt den Namen sofort, die offene Namensfrage ist damit erledigt
+    regieSpielerSetzen: async (pcId, name) => { regie.pcSpieler(pcId, name); regie.pcHinweis(pcId, { ...regie.pcs.get(pcId)?.hinweis, nameOffen: false }); statusMelden(); return { ok: true }; },
+    regieNameFragen: async () => ({ fehler: "Das Namens-Popup gibt es nur in der App." }),
     planVerteilen: async (pcId) => {
       const v = cfg.regie.plan.vorlage;
       if (!v || !sessionOffen) return { n: 0 };

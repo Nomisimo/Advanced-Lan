@@ -6,6 +6,15 @@ const REPO = "Nomisimo/Advanced-Lan";
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
+  "0.1.0-beta.17": [
+    "Regie: Tabs in der Reihenfolge der Einrichtung: Control, Session, Ziele, Plan, Signale, Stats-Screen, Setup, Simulator, Anleitung",
+    "Regie: Tab „Screen“ heißt jetzt „Stats-Screen“ und enthält alles zum Game-Stats-Screen: Editor und darunter Einschalten, Pop-out-Fenster und NDI (vorher im Setup)",
+    "Netzwerkkarten: die Regie wählt die Empfangskarte im Tab „Session“ und die OSC-Karte im Tab „Ziele“, der Game-PC seine Karte im Tab „Session“",
+    "Game-PC → Setup: oben die Prüfliste, dann die Spiele, unten unter „Einstellungen“ Mini-Overlay und App",
+    "Aufgeräumt: ungenutzter Code und Reste der entfernten Battle-Royale-Spiele (Spieler übrig, Squad gewinnt, Niedergeschlagen) sind raus, die Anleitung nennt beim Simulator nur noch die aktuellen Spiele",
+    "Doppelter Code zusammengelegt: Simulator-Knöpfe in Regie und Game-PC, Tab-Leiste, Bestenlisten im Control-Tab, cfg-Dateien von CS2 und Dota 2 und das Installieren und Speichern der Spiel-Dateien",
+    "„Speichern unter …“ für cfg und ini meldet Schreibfehler jetzt als Meldung statt still abzubrechen",
+  ],
   "0.1.0-beta.16": [
     "Windows: das Advanced-LAN-Icon erscheint jetzt überall, in der Taskleiste, im Startmenü, auf der Desktop-Verknüpfung, an der .exe und im Installer statt des Electron-Logos",
     "Windows: angeheftete Taskleisten-Verknüpfung und laufende App teilen sich ein Icon statt zwei nebeneinander",

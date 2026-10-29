@@ -1,11 +1,9 @@
 import React, { useState } from "react";
-import { S, ACCENT, ACCENT_HI, LINE, SUB, MUTED, OK, ERR, teamFarbe } from "../theme.js";
-import { Section, EventIcon, SpielChip, SimStand, eventLabel, zeit } from "../ui.jsx";
+import { S, ACCENT_HI, LINE, SUB, MUTED, OK, ERR, teamFarbe } from "../theme.js";
+import { Section, EventIcon, SpielChip, SimKnoepfe, TeamWahl, EventKnoepfe, SIM_KILLS, eventLabel, zeit } from "../ui.jsx";
 import { api } from "../api.js";
 import { SPIEL_BY_ID } from "../../core/spiele.js";
-import { Play, Square, RotateCcw, FastForward, Plug, CircleCheck, CircleX } from "lucide-react";
-
-const KILLS = { multikill_3: 3, multikill_4: 4, ace: 5 };
+import { Plug, CircleCheck, CircleX } from "lucide-react";
 
 // Simulator des Game-PCs: spielt das aktive Spiel der Session, als liefe es auf diesem PC.
 // So lässt sich vom Platz aus prüfen, ob Events bei der Regie ankommen und dort Befehle auslösen.
@@ -20,7 +18,7 @@ export default function SimTab({ cfg, g, log, goTab, notify }) {
   const sim = g.sim?.spiel === spielId ? g.sim : { ...g.sim, anzeige: null, runde: 0 };
   const kannMatch = !!spiel?.sim;
   const ergebnis = (r) => r?.fehler && notify(r.fehler, "err");
-  const ausloesen = (e) => api.testEvent(e.id, spielId, e.fest || (e.team ? team : ""), KILLS[e.id] || 1);
+  const ausloesen = (e) => api.testEvent(e.id, spielId, e.fest || (e.team ? team : ""), SIM_KILLS[e.id] || 1);
   // Wer dieser PC in der Simulation ist
   const rolle = spielId === "cs2" ? " (Spieler 1, CT)" : spielId === "dota2" ? " (Spieler 1, Radiant)" : spiel?.bild ? ` (${cfg.bild?.spiele?.[spielId]?.team || "TEAM A"})` : "";
   const simLog = log.filter((e) => e.sim).slice(0, 12);
@@ -34,42 +32,17 @@ export default function SimTab({ cfg, g, log, goTab, notify }) {
     </Section>
   );
 
-  const gruppen = [...new Set((spiel?.events || []).map((e) => e.gruppe))];
   return (
     <>
       <Section title={<span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>{spiel?.name || spielId}-Match simulieren <SpielChip spiel={spielId} aktiv /></span>}
         subtitle={`Spielt das aktive Spiel der Session „${c.session}“ als ${cfg.pcId || "dieser PC"}${rolle}. Die Daten laufen durch dieselbe Erkennung wie echte Spieldaten und gehen an die Regie. Ist dort die Ausgabe an, lösen sie echte Befehle aus.`}>
-        {!kannMatch ? <div style={S.empty}>Für dieses Spiel gibt es keinen Simulator.</div> : (
-          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-            <button style={S.primaryBtn} disabled={sim.laeuft} onClick={async () => ergebnis(await api.gamePcSimStart("runde"))}><Play size={15} /> {spiel.sim}</button>
-            <button style={S.secondaryBtn} disabled={sim.laeuft} onClick={async () => ergebnis(await api.gamePcSimStart("match"))}><FastForward size={15} /> Ganzes Match</button>
-            <button style={S.secondaryBtn} disabled={!sim.laeuft} onClick={() => api.gamePcSimStop()}><Square size={14} /> Stopp</button>
-            <button style={S.ghostBtn} onClick={() => api.gamePcSimNeu()}><RotateCcw size={14} /> Zurücksetzen</button>
-            <span style={{ fontSize: 13, color: SUB, marginLeft: 8 }}>
-              {sim.laeuft ? <b style={{ color: ACCENT_HI }}>läuft ({sim.modus === "match" ? "Match" : spiel.sim}) · </b> : null}
-              <SimStand sim={sim} />
-            </span>
-          </div>
-        )}
+        {!kannMatch ? <div style={S.empty}>Für dieses Spiel gibt es keinen Simulator.</div>
+          : <SimKnoepfe spiel={spiel} sim={sim} start={async (m) => ergebnis(await api.gamePcSimStart(m))} stop={() => api.gamePcSimStop()} neu={() => api.gamePcSimNeu()} />}
       </Section>
 
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.3fr) minmax(0,1fr)", gap: 20, alignItems: "start" }}>
-        <Section title="Event auslösen"
-          right={TEAMS.length > 0 && <div style={{ display: "flex", gap: 4 }}>{TEAMS.map((t, i) => (
-            <button key={t} onClick={() => setTeam(i)} style={{ ...S.smallBtn, padding: "5px 12px", background: team === t ? teamFarbe(t) : "transparent", color: team === t ? "#111" : SUB, fontWeight: 700 }}>{t}</button>
-          ))}</div>}>
-          {gruppen.map((gr) => (
-            <div key={gr} style={{ marginBottom: 14 }}>
-              <div className="sp-section-label">{gr}</div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {spiel.events.filter((e) => e.gruppe === gr).map((e) => (
-                  <button key={e.id} className="glow-hover" onClick={() => ausloesen(e)} style={{ ...S.secondaryBtn, background: "#1e1c26", padding: "9px 12px", fontSize: 13 }}>
-                    <span style={{ color: ACCENT, display: "inline-flex" }}><EventIcon type={e.id} spiel={spielId} /></span>{e.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
+        <Section title="Event auslösen" right={<TeamWahl teams={TEAMS} team={team} setTeam={setTeam} />}>
+          <EventKnoepfe spiel={spiel} team={team} ausloesen={ausloesen} />
         </Section>
         <Section title="Zuletzt simuliert" right={<button style={S.smallBtn} onClick={() => goTab("events")}>Alle Events</button>}>
           <div style={{ border: `1px solid ${LINE}`, borderRadius: 8, background: "#1a1820", minHeight: 120 }}>

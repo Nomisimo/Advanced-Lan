@@ -859,47 +859,37 @@ ipcMain.handle('ndi-pruefen', () => stats.ndiVerfuegbar());
 ipcMain.handle('gamepc-log', () => gp.log);
 ipcMain.handle('verbinden', () => gamePcVerbinden());
 ipcMain.handle('trennen', () => { autoWartet = false; client.trennen(); });
-ipcMain.handle('cs2-ordner', () => findeCs2CfgOrdner());
 ipcMain.handle('setup-check', () => setupCheck());
-ipcMain.handle('rl-ini-installieren', async () => {
-  const ordner = await findeRlConfigOrdner();
-  if (!ordner) return { fehler: 'Rocket-League-Ordner nicht gefunden. Bitte „Speichern unter …“ nehmen.' };
-  try { fs.writeFileSync(path.join(ordner, RL_INI_DATEI), rlIni({ webPort: Number(cfg.gamepc.rlPort) })); }
+// Konfigurationsdateien der Spiele: direkt in den Spielordner oder per „Speichern unter …“
+const gsiWerte = () => ({ port: cfg.gamepc.gsiPort, token: cfg.gamepc.gsiToken });
+const SPIEL_DATEIEN = {
+  cs2: { datei: CFG_DATEI, ordner: findeCs2CfgOrdner, inhalt: () => gsiCfg(gsiWerte()), fehlt: 'CS2-Ordner nicht gefunden. Bitte „cfg speichern unter …“ nehmen.', filter: { name: 'CS2-Konfiguration', extensions: ['cfg'] } },
+  rl: { datei: RL_INI_DATEI, ordner: findeRlConfigOrdner, inhalt: () => rlIni({ webPort: Number(cfg.gamepc.rlPort) }), fehlt: 'Rocket-League-Ordner nicht gefunden. Bitte „Speichern unter …“ nehmen.', filter: { name: 'Rocket League Stats API', extensions: ['ini'] } },
+  dota2: { datei: DOTA_CFG_DATEI, ordner: findeDotaCfgOrdner, inhalt: () => dotaCfg(gsiWerte()), fehlt: 'Dota-2-Ordner nicht gefunden. Bitte „Speichern unter …“ nehmen.', filter: { name: 'Dota-2-Konfiguration', extensions: ['cfg'] } },
+};
+async function dateiInstallieren(spiel) {
+  const d = SPIEL_DATEIEN[spiel];
+  const ordner = await d.ordner();
+  if (!ordner) return { fehler: d.fehlt };
+  const pfad = path.join(ordner, d.datei);
+  try { fs.mkdirSync(ordner, { recursive: true }); fs.writeFileSync(pfad, d.inhalt()); }
   catch (e) { return { fehler: e.message }; }
-  return { ok: true, pfad: path.join(ordner, RL_INI_DATEI) };
-});
-ipcMain.handle('rl-ini-speichern', async () => {
-  const r = await dialogMitFokus('showSaveDialog', { defaultPath: RL_INI_DATEI, filters: [{ name: 'Rocket League Stats API', extensions: ['ini'] }] });
+  return { ok: true, pfad };
+}
+async function dateiSpeichern(spiel) {
+  const d = SPIEL_DATEIEN[spiel];
+  const r = await dialogMitFokus('showSaveDialog', { defaultPath: d.datei, filters: [d.filter] });
   if (r.canceled || !r.filePath) return { abgebrochen: true };
-  fs.writeFileSync(r.filePath, rlIni({ webPort: Number(cfg.gamepc.rlPort) }));
-  return { ok: true, pfad: r.filePath };
-});
-ipcMain.handle('cfg-installieren', async () => {
-  const ordner = await findeCs2CfgOrdner();
-  if (!ordner) return { fehler: 'CS2-Ordner nicht gefunden. Bitte „cfg speichern unter …“ nehmen.' };
-  try { fs.writeFileSync(path.join(ordner, CFG_DATEI), gsiCfg({ port: cfg.gamepc.gsiPort, token: cfg.gamepc.gsiToken })); }
+  try { fs.writeFileSync(r.filePath, d.inhalt()); }
   catch (e) { return { fehler: e.message }; }
-  return { ok: true, pfad: path.join(ordner, CFG_DATEI) };
-});
-ipcMain.handle('cfg-speichern', async () => {
-  const r = await dialogMitFokus('showSaveDialog', { defaultPath: CFG_DATEI, filters: [{ name: 'CS2-Konfiguration', extensions: ['cfg'] }] });
-  if (r.canceled || !r.filePath) return { abgebrochen: true };
-  fs.writeFileSync(r.filePath, gsiCfg({ port: cfg.gamepc.gsiPort, token: cfg.gamepc.gsiToken }));
   return { ok: true, pfad: r.filePath };
-});
-ipcMain.handle('dota-cfg-installieren', async () => {
-  const ordner = await findeDotaCfgOrdner();
-  if (!ordner) return { fehler: 'Dota-2-Ordner nicht gefunden. Bitte „Speichern unter …“ nehmen.' };
-  try { fs.mkdirSync(ordner, { recursive: true }); fs.writeFileSync(path.join(ordner, DOTA_CFG_DATEI), dotaCfg({ port: cfg.gamepc.gsiPort, token: cfg.gamepc.gsiToken })); }
-  catch (e) { return { fehler: e.message }; }
-  return { ok: true, pfad: path.join(ordner, DOTA_CFG_DATEI) };
-});
-ipcMain.handle('dota-cfg-speichern', async () => {
-  const r = await dialogMitFokus('showSaveDialog', { defaultPath: DOTA_CFG_DATEI, filters: [{ name: 'Dota-2-Konfiguration', extensions: ['cfg'] }] });
-  if (r.canceled || !r.filePath) return { abgebrochen: true };
-  fs.writeFileSync(r.filePath, dotaCfg({ port: cfg.gamepc.gsiPort, token: cfg.gamepc.gsiToken }));
-  return { ok: true, pfad: r.filePath };
-});
+}
+ipcMain.handle('cfg-installieren', () => dateiInstallieren('cs2'));
+ipcMain.handle('cfg-speichern', () => dateiSpeichern('cs2'));
+ipcMain.handle('rl-ini-installieren', () => dateiInstallieren('rl'));
+ipcMain.handle('rl-ini-speichern', () => dateiSpeichern('rl'));
+ipcMain.handle('dota-cfg-installieren', () => dateiInstallieren('dota2'));
+ipcMain.handle('dota-cfg-speichern', () => dateiSpeichern('dota2'));
 // Einzelnes Event von diesem PC an die Regie (Tab „Simulator“)
 ipcMain.handle('test-event', (_, type, spiel = 'cs2', team = '', kills = 1) => {
   const stand = spiel === 'rl' ? rl.stand : spiel === 'cs2' ? gp.stand : daten[spiel]?.stand;

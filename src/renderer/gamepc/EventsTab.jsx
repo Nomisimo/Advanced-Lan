@@ -1,8 +1,7 @@
 import React from "react";
 import { S, ACCENT_HI, LINE, MUTED, OK, ERR, SUB, teamFarbe } from "../theme.js";
-import { api } from "../api.js";
 import { Section, TeamChip, EventIcon, eventLabel, zeit, SpielChip } from "../ui.jsx";
-import { Send, CircleCheck, CircleX } from "lucide-react";
+import { CircleCheck, CircleX } from "lucide-react";
 
 export default function EventsTab({ g, log }) {
   const c = g.client;

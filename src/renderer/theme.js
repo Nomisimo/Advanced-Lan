@@ -27,7 +27,6 @@ export const S = {
   inputSm:      { background: FELD, border: `1px solid ${LINE}`, borderRadius: 5, padding: "5px 8px", color: "#fff", fontSize: 13, width: "100%", boxSizing: "border-box" },
   select:       { background: FELD, border: `1px solid ${LINE}`, borderRadius: 6, padding: "8px 10px", color: "#fff", fontSize: 14, minWidth: 160 },
   selectSm:     { background: FELD, border: `1px solid ${LINE}`, borderRadius: 5, padding: "5px 8px", color: "#fff", fontSize: 13, width: "100%", boxSizing: "border-box" },
-  row:          { display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 16 },
   primaryBtn:   { background: ACCENT, color: "#fff", border: "none", borderRadius: 6, padding: "9px 14px", fontWeight: 700, cursor: "pointer", fontSize: 13, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, boxShadow: GLOW },
   secondaryBtn: { background: "#2f2c3a", color: "#fff", border: `1px solid ${LINE}`, borderRadius: 6, padding: "8px 12px", cursor: "pointer", fontSize: 12, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 5 },
   smallBtn:     { background: "#2f2c3a", color: "#fff", border: `1px solid ${LINE}`, borderRadius: 5, padding: "4px 8px", cursor: "pointer", fontSize: 11, whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 4 },

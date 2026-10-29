@@ -14,8 +14,6 @@ function oeffnen(art, text) {
   });
 }
 
-// Hinweis mit OK. Promise ist erfüllt, sobald der Dialog zu ist.
-export const uiAlert = (text) => oeffnen("alert", String(text ?? ""));
 // Frage mit OK/Abbrechen. Promise liefert true oder false.
 export const uiConfirm = (text) => oeffnen("confirm", String(text ?? ""));
 

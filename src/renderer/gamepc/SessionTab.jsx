@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { S, ACCENT, LINE, SUB, MUTED, ERR, OK } from "../theme.js";
 import { api } from "../api.js";
-import { Section, Field, Toggle, Dot, SpielChip } from "../ui.jsx";
+import { Section, Field, Toggle, Dot, SpielChip, KartenWahl, useKarten } from "../ui.jsx";
+import { karteFuer } from "../../core/netzwerk.js";
 import { ZUSTAND } from "./GamePcApp.jsx";
 import SpielerName from "./SpielerName.jsx";
 import { Plug, Unplug, Radar, Eye, EyeOff, Lock, Server } from "lucide-react";
@@ -19,23 +20,26 @@ export default function SessionTab({ cfg, mutate, g, notify }) {
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr", gap: 20, alignItems: "start" }}>
-      <Section title="Dieser PC">
-        <Field label="PC-ID">
-          <div style={{ position: "relative" }}>
-            <input style={{ ...S.input, width: "100%", fontSize: 20, fontWeight: 800, paddingRight: 34 }} value={cfg.pcId} disabled={aktiv} placeholder="vergibt die Regie"
-              title={aktiv ? "Nur ohne aktive Session änderbar" : undefined} onChange={(e) => mutate((d) => { d.pcId = e.target.value; })} />
-            {aktiv && <Lock size={15} color={MUTED} style={{ position: "absolute", right: 11, top: 13 }} />}
+      <div>
+        <Section title="Dieser PC">
+          <Field label="PC-ID">
+            <div style={{ position: "relative" }}>
+              <input style={{ ...S.input, width: "100%", fontSize: 20, fontWeight: 800, paddingRight: 34 }} value={cfg.pcId} disabled={aktiv} placeholder="vergibt die Regie"
+                title={aktiv ? "Nur ohne aktive Session änderbar" : undefined} onChange={(e) => mutate((d) => { d.pcId = e.target.value; })} />
+              {aktiv && <Lock size={15} color={MUTED} style={{ position: "absolute", right: 11, top: 13 }} />}
+            </div>
+          </Field>
+          {!cfg.pcId.trim() && !aktiv && <div style={{ ...S.hint, marginTop: 4 }}>Leer lassen, wenn dieser Rechner im Plan der Regie steht: die Regie trägt die PC-ID beim Beitreten ein.</div>}
+          <SpielerName cfg={cfg} mutate={mutate} g={g} notify={notify} pcId={cfg.pcId.trim()} />
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 16, fontSize: 14, fontWeight: 700, color: zFarbe }}>
+            <Dot color={zFarbe} glow={c.zustand === "verbunden"} size={10} /> {zText}{c.grund ? <span style={{ fontWeight: 400, fontSize: 12 }}>: {c.grund}</span> : null}
           </div>
-        </Field>
-        {!cfg.pcId.trim() && !aktiv && <div style={{ ...S.hint, marginTop: 4 }}>Leer lassen, wenn dieser Rechner im Plan der Regie steht: die Regie trägt die PC-ID beim Beitreten ein.</div>}
-        <SpielerName cfg={cfg} mutate={mutate} g={g} notify={notify} pcId={cfg.pcId.trim()} />
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 16, fontSize: 14, fontWeight: 700, color: zFarbe }}>
-          <Dot color={zFarbe} glow={c.zustand === "verbunden"} size={10} /> {zText}{c.grund ? <span style={{ fontWeight: 400, fontSize: 12 }}>: {c.grund}</span> : null}
-        </div>
-        {c.zustand === "verbunden" && c.aktivesSpiel && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, fontSize: 13, color: SUB }}>Regie nutzt <SpielChip spiel={c.aktivesSpiel} /></div>
-        )}
-      </Section>
+          {c.zustand === "verbunden" && c.aktivesSpiel && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, fontSize: 13, color: SUB }}>Regie nutzt <SpielChip spiel={c.aktivesSpiel} /></div>
+          )}
+        </Section>
+        <Netzwerkkarte cfg={cfg} mutate={mutate} />
+      </div>
 
       <Section title="Sessions im Netz" right={<span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, color: SUB }}><Radar size={13} className="suche" /> {g.sessions.length} gefunden</span>}>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -82,5 +86,19 @@ export default function SessionTab({ cfg, mutate, g, notify }) {
         </div>
       </Section>
     </div>
+  );
+}
+
+// Über welche Karte der PC Sessions sucht und mit der Regie spricht
+function Netzwerkkarte({ cfg, mutate }) {
+  const karten = useKarten();
+  const k = karteFuer(karten, cfg.netz) || (!cfg.netz && karten.length === 1 ? karten[0] : null);
+  return (
+    <Section title="Netzwerkkarte" subtitle="Über diese Karte sucht der PC Sessions und spricht mit der Regie. Nach einem Wechsel verbindet er sich neu.">
+      <KartenWahl karten={karten} wert={cfg.netz} onChange={(v) => mutate((d) => { d.netz = v; })} style={{ fontSize: 14, padding: "8px 10px" }} />
+      <div style={{ ...S.mono, fontSize: 11, color: SUB, marginTop: 8 }}>
+        {k ? `${k.ip} / ${k.maske} · MAC ${k.mac}` : cfg.netz ? <span style={{ color: "#ff5d5d" }}>Karte nicht verbunden</span> : `${karten.length} Karten, das Betriebssystem wählt`}
+      </div>
+    </Section>
   );
 }

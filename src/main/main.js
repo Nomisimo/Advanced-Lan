@@ -44,6 +44,8 @@ const os = require('os');
 const karten = () => kartenListe(os.networkInterfaces());
 
 const root = app.getAppPath();
+// App-Icon für Fenster und Taskleiste: unter Windows die .ico (enthält 16 bis 256 px, bleibt klein scharf)
+const APP_ICON = path.join(root, 'assets', 'app-icon', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
 const KONFIG_DATEI = () => path.join(app.getPath('userData'), 'advanced-lan.json');
 let mainWin = null;
 let hotkeyAktiv = '', hotkeyFehler = ''; // Tastenkürzel zum Ein- und Ausblenden (siehe unten)
@@ -114,7 +116,7 @@ function planAendern(fn) {
 }
 const regieSim = new RegieSim({ regie, onChange: statusMelden });
 const stats = new StatsAusgabe({
-  root, preload: path.join(root, 'src', 'preload', 'preload.js'), icon: path.join(root, 'assets', 'app-icon', 'icon.png'),
+  root, preload: path.join(root, 'src', 'preload', 'preload.js'), icon: APP_ICON,
   getStats: () => cfg.regie.stats, aktiv: () => istRegie(), onChange: statusMelden,
   onFensterZu: () => restoreFocus(mainWin),
 });
@@ -535,11 +537,10 @@ function createWindow() {
     webPreferences: { contextIsolation: true, nodeIntegration: false },
   });
   splash.loadFile(path.join(root, 'src', 'main', 'splash.html'));
-  const iconPath = path.join(root, 'assets', 'app-icon', 'icon.png');
   mainWin = new BrowserWindow({
     width: 1480, height: 940, minWidth: 1100, minHeight: 680,
     title: 'Advanced LAN', show: false, backgroundColor: '#131118',
-    icon: fs.existsSync(iconPath) ? iconPath : undefined,
+    icon: APP_ICON,
     webPreferences: { contextIsolation: true, nodeIntegration: false, preload: path.join(root, 'src', 'preload', 'preload.js') },
   });
   mainWin.setMenuBarVisibility(false);
@@ -949,11 +950,16 @@ ipcMain.handle('overdrive-oeffnen', () => overdriveOeffnen(shell));
 ipcMain.handle('open-external', (_, url) => { if (/^https?:\/\//i.test(url)) shell.openExternal(url); });
 
 /* ── Start ────────────────────────────────────────────────────────────── */
+// Windows ordnet Fenster, Taskleisten-Icon und Verknüpfungen über diese ID zu. Sie muss der appId in
+// package.json entsprechen, sonst zeigt die Taskleiste ein zweites Icon neben der angehefteten Verknüpfung
+if (process.platform === 'win32') app.setAppUserModelId('dev.advancedlan');
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) app.quit();
 else {
   app.on('second-instance', () => { if (mainWin) { if (mainWin.isMinimized()) mainWin.restore(); mainWin.focus(); } });
   app.whenReady().then(async () => {
+    // Ungepackt (npm start) zeigt das Dock sonst das Electron-Logo, gepackt kommt das Icon aus der .icns
+    if (process.platform === 'darwin' && !app.isPackaged) app.dock.setIcon(APP_ICON);
     ladeKonfig();
     createWindow();
     bild.einrichten();

@@ -1,6 +1,6 @@
 {
   "name": "advanced-lan",
-  "version": "0.1.0-beta.15",
+  "version": "0.1.0-beta.16",
   "private": true,
   "description": "Advanced LAN: Game-PCs melden Spielereignisse (offizielle Schnittstellen oder Bilderkennung), die Regie sendet OSC-Befehle an Licht, Audio und Video",
   "author": "Momo",
@@ -48,13 +48,19 @@
           ]
         }
       ],
-      "signAndEditExecutable": false
+      "icon": "assets/app-icon/icon.ico",
+      "signAndEditExecutable": true
     },
     "nsis": {
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": false,
       "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Advanced LAN",
+      "installerIcon": "assets/app-icon/icon.ico",
+      "uninstallerIcon": "assets/app-icon/icon.ico",
+      "installerHeaderIcon": "assets/app-icon/icon.ico",
       "license": "assets/installer/terms.txt"
     },
     "directories": {
@@ -76,6 +82,7 @@
         }
       ],
       "category": "public.app-category.utilities",
+      "icon": "assets/app-icon/icon.png",
       "identity": "-",
       "hardenedRuntime": false,
       "gatekeeperAssess": false,

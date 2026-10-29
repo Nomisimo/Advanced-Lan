@@ -6,6 +6,11 @@ const REPO = "Nomisimo/Advanced-Lan";
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
+  "0.1.0-beta.16": [
+    "Windows: das Advanced-LAN-Icon erscheint jetzt überall, in der Taskleiste, im Startmenü, auf der Desktop-Verknüpfung, an der .exe und im Installer statt des Electron-Logos",
+    "Windows: angeheftete Taskleisten-Verknüpfung und laufende App teilen sich ein Icon statt zwei nebeneinander",
+    "Mac: schärferes Dock-Icon (1024 px)",
+  ],
   "0.1.0-beta.15": [
     "Game-PC → Setup: Knopf „Automation Overdrive öffnen“. Startet die installierte Overwolf-App direkt über Overwolf. Fehlt sie, öffnet sich die Seite im Overwolf-Store, fehlt Overwolf, die Download-Seite",
     "Setup-Check zeigt, ob Automation Overdrive installiert ist und in welcher Version",

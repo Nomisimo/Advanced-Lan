@@ -36,6 +36,8 @@ contextBridge.exposeInMainWorld('regieAPI', {
   sessionOeffnen:  call('session-oeffnen'),
   sessionSchliessen: call('session-schliessen'),
   pcTrennen:       call('pc-trennen'),
+  regieSpielerSetzen: call('regie-spieler-setzen'),
+  regieNameFragen: call('regie-name-fragen'),
   // Plan
   planVerteilen:   call('plan-verteilen'),
   planVorlageHolen: call('plan-vorlage-holen'),

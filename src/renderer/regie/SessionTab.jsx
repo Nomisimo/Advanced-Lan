@@ -1,14 +1,40 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { S, SUB, MUTED, OK, ERR, WARN } from "../theme.js";
 import { Section, Field, Dot, th, td } from "../ui.jsx";
 import { api } from "../api.js";
-import { Lock, LockOpen, Eye, EyeOff, Unplug } from "lucide-react";
+import { SPIELER_MAX } from "../../core/protokoll.js";
+import { Lock, LockOpen, Eye, EyeOff, Unplug, MessageSquareText, Maximize } from "lucide-react";
 
 const PLATTFORM = { win32: "Windows", darwin: "macOS", linux: "Linux" };
 const pingFarbe = (ms) => (ms == null ? MUTED : ms > 50 ? ERR : ms > 10 ? WARN : OK);
 
+// Spielername eines PCs: hier eintragen (der PC übernimmt ihn) oder das Namens-Popup am PC zeigen lassen.
+// Läuft dort ein Spiel im exklusiven Vollbild, ist das Popup unsichtbar und wartet: dann hilft nur Eintragen hier.
+function SpielerZelle({ p, notify }) {
+  const [name, setName] = useState(p.spieler || "");
+  useEffect(() => setName(p.spieler || ""), [p.spieler]);
+  const h = p.hinweis || {};
+  const melden = (r) => r?.fehler && notify(r.fehler, "err");
+  const uebernehmen = async () => { if (name.trim() !== (p.spieler || "")) melden(await api.regieSpielerSetzen(p.pcId, name)); };
+  if (!p.verbunden) return <span style={{ color: p.spieler ? "#ece9f2" : MUTED }}>{p.spieler || "–"}</span>;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 170 }}>
+      <div style={{ display: "flex", gap: 4 }}>
+        <input style={{ ...S.input, padding: "4px 7px", fontSize: 13, flex: 1, minWidth: 0 }} value={name} placeholder={p.pcId} maxLength={SPIELER_MAX}
+          title="Steht auf dem Game-Stats-Screen. Enter: an den PC schicken"
+          onChange={(e) => setName(e.target.value)} onBlur={uebernehmen} onKeyDown={(e) => e.key === "Enter" && e.target.blur()} />
+        <button style={S.smallBtn} onClick={async () => melden(await api.regieNameFragen(p.pcId))} title="Namens-Popup am Game-PC zeigen"><MessageSquareText size={12} /></button>
+      </div>
+      {(h.vollbild === "exklusiv" || h.nameOffen) && <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+        {h.vollbild === "exklusiv" && <span style={{ ...S.badge, background: "#3a2f14", color: WARN, display: "inline-flex", alignItems: "center", gap: 3 }} title="Spiel läuft im exklusiven Vollbild: Overlay und Namens-Popup sind am PC nicht zu sehen. Im Spiel randloses Vollbild einstellen."><Maximize size={10} /> Exklusives Vollbild</span>}
+        {h.nameOffen && <span style={{ ...S.badge, background: "#3a1f24", color: ERR }} title="Das Namens-Popup wartet, bis das Spiel das Vollbild verlässt. Name hier eintragen.">Name offen</span>}
+      </div>}
+    </div>
+  );
+}
+
 // Wer in der Session ist: echte Game-PCs (simulierte stehen im Tab „Control“)
-function Uebersicht({ status, version }) {
+function Uebersicht({ status, version, notify }) {
   const pcs = status.pcs.filter((p) => !p.sim).sort((a, b) => (b.verbunden - a.verbunden) || a.pcId.localeCompare(b.pcId, "de", { numeric: true }));
   const andereVersion = (v) => v && version && v !== version;
   return (
@@ -22,7 +48,7 @@ function Uebersicht({ status, version }) {
               <tr key={p.pcId} style={{ opacity: p.verbunden ? 1 : 0.5 }}>
                 <td style={td({ width: 18 })}><Dot color={p.verbunden ? OK : MUTED} glow={p.verbunden} title={p.verbunden ? "verbunden" : "getrennt"} /></td>
                 <td style={td({ fontWeight: 800 })}>{p.pcId}</td>
-                <td style={td({ color: p.spieler ? "#ece9f2" : MUTED })} title="Name aus dem Namens-Popup des Game-PCs, steht auf dem Game-Stats-Screen">{p.spieler || "–"}</td>
+                <td style={td()}><SpielerZelle p={p} notify={notify} /></td>
                 <td style={td()}>{g.hostname || "–"}{g.plattform && <span style={{ color: MUTED, fontSize: 11 }}> · {PLATTFORM[g.plattform] || g.plattform}</span>}</td>
                 <td style={td(S.mono)}>{p.remote || "–"}</td>
                 <td style={td({ ...S.mono, color: SUB })}>{g.mac || "–"}</td>
@@ -35,7 +61,7 @@ function Uebersicht({ status, version }) {
           })}</tbody>
         </table>
       )}
-      <div style={S.hint}>Ping: Antwortzeit der Verbindung, alle 3 s gemessen. Grün bis 10 ms, orange bis 50 ms, darüber rot. Eine andere App-Version als die der Regie ist orange markiert.</div>
+      <div style={S.hint}>Ping: Antwortzeit der Verbindung, alle 3 s gemessen. Grün bis 10 ms, orange bis 50 ms, darüber rot. Eine andere App-Version als die der Regie ist orange markiert. Spieler: Name eintragen und Enter, der Game-PC übernimmt ihn; die Sprechblase zeigt das Namens-Popup am PC. Über einem Spiel im <b>exklusiven Vollbild</b> ist das Popup nicht zu sehen und wartet, bis der Spieler das Spiel verlässt: dann den Namen hier eintragen.</div>
     </Section>
   );
 }

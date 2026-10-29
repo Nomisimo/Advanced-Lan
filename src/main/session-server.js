@@ -149,6 +149,8 @@ class SessionServer {
         this.regie.pcStatus(pcId, { spiel: String(m.spiel || ''), status: m.status, stand: m.stand });
       } else if (m.t === 'spieler') {
         this.regie.pcSpieler(pcId, leseSpieler(m.name));
+      } else if (m.t === 'hinweis') {
+        this.regie.pcHinweis(pcId, m);
       } else if (m.t === 'einrichtung-ok') {
         this.regie.pcVorlage(pcId, typeof m.stand === 'string' ? m.stand.slice(0, 40) : '');
       } else if (m.t === 'vorlage' && m.daten && typeof m.daten === 'object') {
@@ -183,6 +185,16 @@ class SessionServer {
     let n = 0;
     for (const [id, ws] of this.verbindungen) if ((!pcId || id === pcId) && ws.readyState === 1) { ws.send(m); n++; }
     return n;
+  }
+
+  // Spielernamen eines PCs eintragen (der PC meldet ihn mit „spieler“ zurück) oder sein Namens-Popup zeigen lassen
+  spielerSetzen(pcId, name) { return this.anPc(pcId, { t: 'spieler-setzen', name }); }
+  nameFragen(pcId) { return this.anPc(pcId, { t: 'name-fragen' }); }
+  anPc(pcId, m) {
+    const ws = this.verbindungen.get(pcId);
+    if (!ws || ws.readyState !== 1) return false;
+    ws.send(JSON.stringify(m));
+    return true;
   }
 
   // Einstellungen eines verbundenen PCs als Vorlage anfordern (Antwort kommt über onVorlage)

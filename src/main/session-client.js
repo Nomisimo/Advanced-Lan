@@ -3,7 +3,7 @@ const os = require('os');
 const { Bonjour } = require('bonjour-service');
 const WebSocket = require('ws');
 const { kartenListe, waehleAdresse, lokaleIp } = require('../core/netzwerk');
-const { leseNachricht, MDNS_TYP, PROTOKOLL_VERSION } = require('../core/protokoll');
+const { leseNachricht, leseSpieler, MDNS_TYP, PROTOKOLL_VERSION } = require('../core/protokoll');
 const { beweis } = require('./session-server');
 
 // Sucht Sessions per mDNS (_advancedlan._tcp). Abgemeldete oder abgelaufene Dienste fallen aus der Liste.
@@ -47,7 +47,11 @@ class SessionClient {
   // geraet(): Angaben für die Übersicht der Regie. karte(): Name der gewählten Netzwerkkarte. spieler(): Name aus dem Namens-Popup.
   // vorlage(): Stand der Game-PC-Vorlage oder "eigene". onPcId(id): PC-ID aus dem Plan der Regie.
   // onEinrichtung(m) → Stand nach dem Übernehmen (oder "eigene"). onVorlageHolen() → { name, daten } dieses PCs.
-  constructor({ onChange, onAntwort, geraet, karte, spieler, vorlage, onPcId, onEinrichtung, onVorlageHolen }) {
+  // onSpielerSetzen(name), onNameFragen(): die Regie trägt den Spielernamen ein oder lässt das Namens-Popup zeigen.
+  constructor({ onChange, onAntwort, geraet, karte, spieler, vorlage, onPcId, onEinrichtung, onVorlageHolen, onSpielerSetzen, onNameFragen }) {
+    this.onSpielerSetzen = onSpielerSetzen || (() => {});
+    this.onNameFragen = onNameFragen || (() => {});
+    this.letzterHinweis = null;
     this.vorlageStand = vorlage || (() => '');
     this.onPcId = onPcId || (() => {});
     this.onEinrichtung = onEinrichtung || (async () => 'eigene');
@@ -96,6 +100,11 @@ class SessionClient {
         this.aktivesSpiel = m.aktivesSpiel || this.aktivesSpiel;
         if (typeof m.pcId === 'string' && m.pcId && m.pcId !== this.ziel?.pcId) { this.ziel.pcId = m.pcId; this.onPcId(m.pcId); }
         this.setze('verbunden', '');
+        if (this.letzterHinweis) this.sende({ t: 'hinweis', ...this.letzterHinweis });
+      } else if (m.t === 'spieler-setzen') {
+        this.onSpielerSetzen(leseSpieler(m.name));
+      } else if (m.t === 'name-fragen') {
+        this.onNameFragen();
       } else if (m.t === 'einrichtung' && m.daten && typeof m.daten === 'object') {
         Promise.resolve(this.onEinrichtung(m)).then((stand) => this.sende({ t: 'einrichtung-ok', stand: String(stand || '') })).catch(() => {});
       } else if (m.t === 'vorlage-holen') {
@@ -159,6 +168,8 @@ class SessionClient {
   }
   status(spiel, status, stand) { return this.sende({ t: 'status', spiel, status, stand }); }
   spieler(name) { return this.sende({ t: 'spieler', name }); }
+  // Exklusives Vollbild und offene Namensfrage. Gemerkt, damit die Regie es auch nach dem Neuverbinden erfährt.
+  hinweis(h) { this.letzterHinweis = { vollbild: String(h.vollbild || ''), nameOffen: !!h.nameOffen }; return this.sende({ t: 'hinweis', ...this.letzterHinweis }); }
 
   info() {
     return { zustand: this.zustand, grund: this.grund, session: this.session, aktivesSpiel: this.aktivesSpiel, ziel: this.ziel && { host: this.ziel.host, port: this.ziel.port }, gesendet: this.gesendet, verworfen: this.verworfen };

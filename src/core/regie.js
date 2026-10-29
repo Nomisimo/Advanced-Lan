@@ -34,7 +34,7 @@ class Regie {
   // vorlage: Stand der Game-PC-Vorlage auf diesem PC (Fingerabdruck), "eigene" = PC nimmt keine Vorlage an, "" = unbekannt
   pcVerbunden(pcId, { spiele = [], remote = "", sim = false, geraet = {}, spieler = "", vorlage = "" } = {}) {
     const alt = this.pcs.get(pcId) || {};
-    this.pcs.set(pcId, { ...alt, pcId, spiele, remote, sim, geraet, spieler: leseSpieler(spieler), vorlage: String(vorlage || ""), verbunden: true, t: this.now() });
+    this.pcs.set(pcId, { ...alt, pcId, spiele, remote, sim, geraet, spieler: leseSpieler(spieler), vorlage: String(vorlage || ""), hinweis: null, verbunden: true, t: this.now() });
     this.emit("status");
   }
 
@@ -42,6 +42,16 @@ class Regie {
   pcVorlage(pcId, stand) {
     const p = this.pcs.get(pcId);
     if (p) { p.vorlage = String(stand || ""); this.emit("status"); }
+  }
+
+  // Hinweis des Game-PCs: vollbild = "exklusiv" (Overlay und Namens-Popup dort unsichtbar), "vollbild" oder ""
+  // nameOffen = das Namens-Popup wartet, bis das Spiel das exklusive Vollbild verlässt
+  pcHinweis(pcId, h) {
+    const p = this.pcs.get(pcId);
+    if (!p) return;
+    const v = String(h?.vollbild || "");
+    p.hinweis = { vollbild: ["exklusiv", "vollbild"].includes(v) ? v : "", nameOffen: !!h?.nameOffen };
+    this.emit("status");
   }
 
   // Spielername aus dem Namens-Popup des Game-PCs, leer = PC-ID zeigen

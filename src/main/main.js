@@ -33,7 +33,8 @@ const { ValSimMatch } = require('../core/val-sim');
 const { einrichtenUpdates } = require('./updates');
 const { restoreFocus, mitFokus } = require('./fokus');
 const { StatsAusgabe } = require('./stats-ausgabe');
-const { NamensAbfrage } = require('./name-abfrage');
+const { NamensAbfrage, obenHalten } = require('./name-abfrage');
+const { VollbildWaechter } = require('./vollbild');
 const { NamensWaechter } = require('../core/namen');
 const { leseSpieler } = require('../core/protokoll');
 const { hotkeyText, feedbackUrl } = require('../core/app-info');
@@ -182,6 +183,9 @@ const client = new SessionClient({
     return vorlageStand(cfg);
   },
   onVorlageHolen: () => ({ name: cfg.shows.gamepc.name || cfg.gamepc.pcId.trim() || 'Game-PC', daten: showDaten(cfg, 'gamepc') }),
+  // Die Regie trägt den Namen ein oder lässt das Popup zeigen (z. B. weil es im exklusiven Vollbild nicht zu sehen ist)
+  onSpielerSetzen: (name) => { meldung(name ? `Spielername von der Regie: ${name}` : 'Spielername von der Regie gelöscht'); spielerSetzen(name); },
+  onNameFragen: () => namenFragen('regie'),
 });
 const discovery = new Discovery({ onChange: () => discoveryGeaendert(), karte: () => cfg.gamepc.netz });
 const gsi = new GsiServer({ onPayload: (b) => gamePcPayload(b), onStatus: statusMelden });
@@ -423,21 +427,46 @@ async function setupCheck() {
 const waechter = new NamensWaechter();
 let namenVorschlag = '';
 const namenPopup = new NamensAbfrage({ root, onAntwort: (name) => spielerSetzen(name), onZu: () => {} });
+// Exklusives Vollbild: Windows zeichnet kein Fenster über das Spiel. Das Popup wartet dann, bis das Spiel das Vollbild
+// verlässt (Alt+Tab, Spiel beendet), und die Regie sieht „Name offen“ und kann den Namen selbst eintragen.
+let nameWartet = '';
+const vollbild = new VollbildWaechter({ onChange: () => { vollbildGeaendert(); } });
+function vollbildGeaendert() {
+  if (!vollbild.exklusiv && nameWartet && cfg && hatSpiele()) { const g = nameWartet; nameWartet = ''; namenFragen(g); }
+  hinweisMelden();
+  statusMelden();
+}
+// Vollbild und offene Namensfrage an die Regie (Tab „Session“ und „Control“ zeigen sie an)
+function hinweisMelden() {
+  const h = { vollbild: vollbild.art, nameOffen: !!nameWartet };
+  if (cfg?.modus === 'standalone') regie.pcHinweis(lokalId(), h);
+  else client.hinweis(h);
+}
 const anzeigePcId = () => (cfg.modus === 'standalone' ? lokalId() : cfg.gamepc.pcId.trim() || 'diesem PC');
 
 function spielerSetzen(name) {
   cfg.gamepc.spieler = leseSpieler(name);
   namenVorschlag = '';
+  if (nameWartet) { nameWartet = ''; hinweisMelden(); }
   speichereKonfig();
   if (cfg.modus === 'standalone') regie.pcSpieler(lokalId(), cfg.gamepc.spieler);
   else client.spieler(cfg.gamepc.spieler);
   statusMelden();
 }
 
-// Popup zeigen. Auch von außen aufrufbar (Knopf im Tab „Session“, später ein Befehl der Regie).
+// Popup zeigen. Auch von außen aufrufbar (Knopf im Tab „Session“, Befehl der Regie).
+// Im exklusiven Vollbild wäre es unsichtbar und liefe ungesehen ab: dann merken und zeigen, sobald das Spiel es verlässt.
+// Der Knopf in der App („hand“) zeigt immer, dann ist die App gerade vorne.
 function namenFragen(grund = 'hand') {
   if (!cfg || !hatSpiele()) return { fehler: 'Nur auf einem Game-PC' };
   waechter.gefragt();
+  if (grund !== 'hand' && vollbild.exklusiv) {
+    nameWartet = grund;
+    hinweisMelden();
+    statusMelden();
+    return { ok: true, wartet: true };
+  }
+  if (nameWartet) { nameWartet = ''; hinweisMelden(); }
   namenPopup.zeigen({ pcId: anzeigePcId(), vorschlag: cfg.gamepc.spieler || namenVorschlag, grund });
   return { ok: true };
 }
@@ -469,6 +498,8 @@ async function modusStarten() {
   await Promise.all([gsi.stop(), overdrive.stop()]);
   lokalAbmelden();
   namenPopup.schliessen();
+  nameWartet = '';
+  if (hatSpiele()) vollbild.start(); else vollbild.stop();
   spielAufRegie = '';
   if (istRegie()) {
     // Im Standalone darf die Session offen sein: dann kommen weitere Game-PCs dazu
@@ -491,7 +522,7 @@ async function modusStarten() {
     discovery.start();
     autoWartet = !!(cfg.gamepc.autoVerbinden && cfg.gamepc.regie.id && cfg.gamepc.passwort);
   }
-  if (cfg.modus === 'standalone') lokalAnmelden();
+  if (cfg.modus === 'standalone') { lokalAnmelden(); hinweisMelden(); }
   await stats.anwenden();
   statusMelden();
 }
@@ -499,7 +530,7 @@ async function modusStarten() {
 function gesamtStatus() {
   const s = { modus: cfg.modus, jetzt: Date.now(), app: { hotkeyFehler, plattform: process.platform } };
   if (istRegie()) s.regie = { ...regie.snapshot(), session: session.status(), sim: regieSim.status(), armed: cfg.regie.armed, spielAufRegie, stats: stats.status(), lokal: lokalPc };
-  if (hatSpiele()) s.gamepc = { spieler: cfg.gamepc.spieler, spielerAnzeige: cfg.gamepc.spieler || anzeigePcId(), client: client.info(), sessions: discovery.liste(), discoveryFehler: discovery.fehler, gsi: gsi.status(), letzte: gp.letzte, status: gp.status, stand: gp.stand, fremd: gp.fremd, sim: { ...gpSim.status(), spiel: gpSimSpiel }, rl: { ...rlClient.status(), letzte: rl.letzte, stand: rl.stand }, daten, bild: bild.status(), overdrive: overdrive.status() };
+  if (hatSpiele()) s.gamepc = { spieler: cfg.gamepc.spieler, vollbild: vollbild.art, nameWartet: !!nameWartet, spielerAnzeige: cfg.gamepc.spieler || anzeigePcId(), client: client.info(), sessions: discovery.liste(), discoveryFehler: discovery.fehler, gsi: gsi.status(), letzte: gp.letzte, status: gp.status, stand: gp.stand, fremd: gp.fremd, sim: { ...gpSim.status(), spiel: gpSimSpiel }, rl: { ...rlClient.status(), letzte: rl.letzte, stand: rl.stand }, daten, bild: bild.status(), overdrive: overdrive.status() };
   return s;
 }
 
@@ -553,6 +584,7 @@ function createWindow() {
 // Kleines App-Icon mit Status-Punkt über allen Fenstern, nur solange die App minimiert ist.
 // Normales Fenster ganz oben: sichtbar über Spielen im Fenster- oder randlosen Vollbild.
 let overlayWin = null;
+const overlayHalter = { oben: null };
 let hauptGezeigt = false; // vor dem ersten Zeigen (Startanimation) nie ein Overlay
 const OVERLAY_GROESSE = 64;
 
@@ -579,6 +611,7 @@ function overlayAktualisieren() {
   if (soll) {
     if (!overlayWin) overlayErzeugen();
     overlayWin.showInactive();
+    obenHalten(overlayHalter, overlayWin);
     overlayMelden();
   } else if (overlayWin) overlayWin.hide();
 }
@@ -773,6 +806,15 @@ ipcMain.handle('zaehler-zuruecksetzen', () => { regie.zuruecksetzen(); return tr
 ipcMain.handle('session-oeffnen', async () => { const ok = await session.oeffnen(); cfg.regie.session.offen = ok; speichereKonfig(); return gesamtStatus(); });
 ipcMain.handle('session-schliessen', async () => { await session.schliessen(); cfg.regie.session.offen = false; speichereKonfig(); return gesamtStatus(); });
 ipcMain.handle('pc-trennen', (_, pcId) => { session.trennen(pcId); });
+// Spielername eines Game-PCs von der Regie aus (im Standalone der eigene PC direkt)
+ipcMain.handle('regie-spieler-setzen', (_, pcId, name) => {
+  if (cfg.modus === 'standalone' && pcId === lokalPc) { spielerSetzen(name); return { ok: true }; }
+  return session.spielerSetzen(String(pcId || ''), leseSpieler(name)) ? { ok: true } : { fehler: `${pcId} ist nicht verbunden` };
+});
+ipcMain.handle('regie-name-fragen', (_, pcId) => {
+  if (cfg.modus === 'standalone' && pcId === lokalPc) return namenFragen('regie');
+  return session.nameFragen(String(pcId || '')) ? { ok: true } : { fehler: `${pcId} ist nicht verbunden` };
+});
 // Tab „Plan“
 ipcMain.handle('plan-verteilen', (_, pcId) => ({ n: session.einrichten(pcId || '') }));
 ipcMain.handle('plan-vorlage-holen', (_, pcId) => ({ ok: session.vorlageHolen(pcId) }));
@@ -945,6 +987,7 @@ else {
     client.trennen();
     rlClient.stop();
     discovery.stop();
+    vollbild.stop();
     await Promise.allSettled([session.schliessen(), gsi.stop(), overdrive.stop(), stats.beenden(), bild.beenden()]);
     osc.close();
     app.quit();

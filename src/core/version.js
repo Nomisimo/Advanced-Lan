@@ -6,6 +6,10 @@ const REPO = "Nomisimo/Advanced-Lan";
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
+  "0.1.0-beta.15": [
+    "Game-PC → Setup: Knopf „Automation Overdrive öffnen“. Startet die installierte Overwolf-App direkt über Overwolf. Fehlt sie, öffnet sich die Seite im Overwolf-Store, fehlt Overwolf, die Download-Seite",
+    "Setup-Check zeigt, ob Automation Overdrive installiert ist und in welcher Version",
+  ],
   "0.1.0-beta.12": [
     "Ohne Overwolf: die App läuft jetzt auf normalem Electron und wird mit electron-builder gebaut. Keine Overwolf-Laufzeit, keine Nutzungsdaten an Overwolf",
     "Alle Spiele und Events bleiben: CS2 und Dota 2 über Valve GSI, Rocket League über die Stats API, Valorant und The Finals über Bilderkennung, Mini-Overlay, Namens-Popup, Simulator und Netzwerk wie bisher",

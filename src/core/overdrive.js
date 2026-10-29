@@ -24,4 +24,16 @@ function overdriveEvent(text) {
   return OVERDRIVE_EVENTS[wert.toLowerCase()] || null;
 }
 
-module.exports = { OVERDRIVE_PORT, OVERDRIVE_STATE, OVERDRIVE_EVENTS, overdriveEvent };
+const OVERDRIVE_STORE_URL = "https://www.overwolf.com/app/raimen_ttv-automation_overdrive";
+const OVERWOLF_URL = "https://www.overwolf.com/";
+
+// manifest.json einer installierten Overwolf-App → { name, version }, wenn es Automation Overdrive ist, sonst null
+function overdriveAusManifest(text) {
+  let m;
+  try { m = JSON.parse(String(text ?? "").replace(/^\uFEFF/, "")); } catch { return null; }
+  const name = m?.meta?.name;
+  if (typeof name !== "string" || !/automation\s*overdrive/i.test(name)) return null;
+  return { name, version: String(m.meta.version || "") };
+}
+
+module.exports = { OVERDRIVE_PORT, OVERDRIVE_STATE, OVERDRIVE_EVENTS, OVERDRIVE_STORE_URL, OVERWOLF_URL, overdriveEvent, overdriveAusManifest };

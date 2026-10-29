@@ -55,3 +55,24 @@ test("Automation Overdrive: Empfang per WebSocket wie das Touch-Portal-Plugin", 
   await s.stop();
   await b.stop();
 });
+
+test("Automation Overdrive: installierte App im Overwolf-Ordner finden", () => {
+  const fs = require("fs"), os = require("os"), path = require("path");
+  const { overdriveAusManifest } = require("../src/core/overdrive");
+  const { findeOverdrive } = require("../src/main/overdrive-start");
+  assert.deepEqual(overdriveAusManifest(JSON.stringify({ meta: { name: "Automation Overdrive", version: "1.0.15" } })), { name: "Automation Overdrive", version: "1.0.15" });
+  assert.equal(overdriveAusManifest(JSON.stringify({ meta: { name: "Outplayed" } })), null);
+  assert.equal(overdriveAusManifest("kaputt"), null);
+  assert.ok(overdriveAusManifest("﻿" + JSON.stringify({ meta: { name: "automation overdrive" } })), "mit BOM und kleingeschrieben");
+
+  const ext = fs.mkdtempSync(path.join(os.tmpdir(), "ow-ext-"));
+  try {
+    assert.equal(findeOverdrive(ext), null);
+    const schreibe = (uid, ver, name) => { fs.mkdirSync(path.join(ext, uid, ver), { recursive: true }); fs.writeFileSync(path.join(ext, uid, ver, "manifest.json"), JSON.stringify({ meta: { name, version: ver } })); };
+    schreibe("aaaa", "2.1.0", "Outplayed");
+    schreibe("bbbb", "1.0.14", "Automation Overdrive");
+    schreibe("bbbb", "1.0.15", "Automation Overdrive");
+    assert.deepEqual(findeOverdrive(ext), { uid: "bbbb", name: "Automation Overdrive", version: "1.0.15" });
+    assert.equal(findeOverdrive(path.join(ext, "fehlt")), null);
+  } finally { fs.rmSync(ext, { recursive: true, force: true }); }
+});

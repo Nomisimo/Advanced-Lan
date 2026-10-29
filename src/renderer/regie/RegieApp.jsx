@@ -19,7 +19,8 @@ import GpSetupTab from "../gamepc/SetupTab.jsx";
 import BildTab from "../gamepc/BildTab.jsx";
 import { Gauge, ListChecks, Send, FlaskConical, BookOpen, Power, Radio, KeyRound, TriangleAlert, Settings, Gamepad2, MonitorPlay, ScanEye, LayoutGrid } from "lucide-react";
 
-const TABS_REGIE = [["control", "Control", Gauge], ["signale", "Signale", ListChecks], ["ziele", "Ziele", Send], ["plan", "Plan", LayoutGrid], ["session", "Session", KeyRound], ["setup", "Setup", Settings], ["screen", "Screen", MonitorPlay], ["sim", "Simulator", FlaskConical], ["hilfe", "Anleitung", BookOpen]];
+// Control ist der Live-Tab, danach die Einrichtung in der Reihenfolge, in der man sie braucht
+const TABS_REGIE = [["control", "Control", Gauge], ["session", "Session", KeyRound], ["ziele", "Ziele", Send], ["plan", "Plan", LayoutGrid], ["signale", "Signale", ListChecks], ["screen", "Stats-Screen", MonitorPlay], ["setup", "Setup", Settings], ["sim", "Simulator", FlaskConical], ["hilfe", "Anleitung", BookOpen]];
 // Standalone: dazu der Tab „Spiele“ mit dem Setup der Spiele auf diesem PC (wie auf einem Game-PC)
 const TABS_STANDALONE = [...TABS_REGIE.slice(0, 7), ["spiele", "Spiele", Gamepad2], ["bild", "Bilderkennung", ScanEye], ...TABS_REGIE.slice(7)];
 const LOG_MAX = 300;

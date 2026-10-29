@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { S, SUB, MUTED, LINE, FELD, ACCENT, GLOW, WARN } from "../theme.js";
 import { uiConfirm } from "../dialog.jsx";
-import { Section, th, td, ZielBadge, KAT_FARBE, KartenWahl, useKarten } from "../ui.jsx";
+import { Section, Field, th, td, ZielBadge, KAT_FARBE, KartenWahl, useKarten } from "../ui.jsx";
 import { karteFuer, zielHinweis } from "../../core/netzwerk.js";
 import { api } from "../api.js";
 import { uid } from "../../core/defaults.js";
@@ -138,7 +138,7 @@ export default function ZieleTab({ cfg, mutate, notify, goTab }) {
                     <td style={td({ width: 170 })}><input style={{ ...S.inputSm, ...S.mono }} value={t.host} placeholder="192.168.1.50" onChange={(e) => setZiel(t.id, (z) => { z.host = e.target.value.trim(); })} /></td>
                     <td style={td({ width: 100 })}><input style={S.inputSm} type="number" min="1" max="65535" value={t.port} onChange={(e) => setZiel(t.id, (z) => { z.port = +e.target.value || 0; })} /></td>
                     <td style={td({ width: 200 })}>
-                      <KartenWahl karten={karten} wert={t.netz} leer={`Wie „Senden“ (${cfg.netz?.senden || "automatisch"})`} onChange={(v) => setZiel(t.id, (z) => { z.netz = v; })} />
+                      <KartenWahl karten={karten} wert={t.netz} leer={`Standard (${cfg.netz?.senden || "automatisch"})`} onChange={(v) => setZiel(t.id, (z) => { z.netz = v; })} />
                       {(() => { const h = zielHinweis(t.host, karteFuer(karten, t.netz || cfg.netz?.senden)); return h && <div title={h} style={{ fontSize: 10, color: WARN, marginTop: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 200 }}>nicht im Netz dieser Karte</div>; })()}
                     </td>
                     <td style={td({ width: 160 })}>
@@ -160,6 +160,9 @@ export default function ZieleTab({ cfg, mutate, notify, goTab }) {
             </tbody>
           </table>
         )}
+        <Field label="Standard-Netzwerkkarte für OSC" hint="Gilt für alle Ziele ohne eigene Karte. Automatisch: das Betriebssystem wählt." style={{ maxWidth: 420, marginTop: 14 }}>
+          <KartenWahl karten={karten} wert={cfg.netz?.senden} onChange={(v) => mutate((d) => { d.netz = { ...d.netz, senden: v }; })} />
+        </Field>
       </Section>
       <Datenbank cfg={cfg} mutate={mutate} notify={notify} setInfo={setInfo} />
       {info && <ZielInfo typ={info} onClose={() => setInfo(null)} />}

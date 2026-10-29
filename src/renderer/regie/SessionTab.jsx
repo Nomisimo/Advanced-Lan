@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { S, SUB, MUTED, OK, ERR, WARN } from "../theme.js";
-import { Section, Field, Dot, th, td } from "../ui.jsx";
+import { Section, Field, Dot, KartenWahl, useKarten, th, td } from "../ui.jsx";
 import { api } from "../api.js";
 import { Lock, LockOpen, Eye, EyeOff, Unplug } from "lucide-react";
 
@@ -45,6 +45,7 @@ export default function SessionTab(props) {
     <>
       <SessionEinstellungen {...props} />
       <Uebersicht {...props} />
+      <Empfangskarte {...props} />
     </>
   );
 }
@@ -74,6 +75,30 @@ function SessionEinstellungen({ cfg, mutate, status, notify }) {
         <span style={{ width: 9, height: 9, borderRadius: "50%", background: ses.offen ? OK : ses.fehler ? ERR : WARN, boxShadow: ses.offen ? `0 0 8px ${OK}` : "none" }} />
         {ses.offen ? <span>Offen · {ses.verbunden} PCs · Port {ses.port}{ses.ip ? ` auf ${ses.ip}` : ""}</span> : <span style={{ color: ses.fehler ? ERR : SUB }}>{ses.fehler || "Geschlossen"}</span>}
       </div>
+    </Section>
+  );
+}
+
+// Über welche Netzwerkkarte die Session die Game-PCs empfängt, dazu alle Karten dieses PCs
+function Empfangskarte({ cfg, mutate, status }) {
+  const karten = useKarten();
+  return (
+    <Section title="Netzwerkkarte" subtitle="Automatisch: das Betriebssystem wählt. Mit fester Karte bleibt jeder Verkehr in seinem Netz, z. B. Game-PCs im LAN und Licht im eigenen Netz (OSC-Karte im Tab „Ziele“).">
+      <Field label="Empfangen: Session für die Game-PCs" hint={status.session.offen ? `lauscht auf ${status.session.ip || "allen Karten"}, Port ${status.session.port}` : "Session ist geschlossen"} style={{ maxWidth: 520 }}>
+        <KartenWahl karten={karten} wert={cfg.netz?.empfang} onChange={(v) => mutate((d) => { d.netz = { ...d.netz, empfang: v }; })} leer="Alle Karten" />
+      </Field>
+      <table style={S.table}>
+        <thead><tr>{["Karte", "IP", "Maske", "MAC"].map((h) => <th key={h} style={S.th}>{h}</th>)}</tr></thead>
+        <tbody>{karten.map((k) => (
+          <tr key={k.name + k.ip}>
+            <td style={{ ...S.td, fontWeight: 600 }}>{k.name}</td>
+            <td style={{ ...S.td, ...S.mono }}>{k.ip}</td>
+            <td style={{ ...S.td, ...S.mono, color: SUB }}>{k.maske}</td>
+            <td style={{ ...S.td, ...S.mono, color: SUB }}>{k.mac}</td>
+          </tr>
+        ))}</tbody>
+      </table>
+      {!karten.length && <div style={S.empty}>Keine aktive Netzwerkkarte gefunden.</div>}
     </Section>
   );
 }

@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { S, LINE, SUB, OK, WARN, teamFarbe } from "../theme.js";
 import { api } from "../api.js";
-import { Section, Check, Field, TeamChip, SpielChip, Kbd, Toggle, KartenWahl, useKarten } from "../ui.jsx";
-import { karteFuer } from "../../core/netzwerk.js";
+import { Section, Check, Field, TeamChip, SpielChip, Kbd, Toggle } from "../ui.jsx";
 import { overlayStatus } from "../../core/overlay-status.js";
 import { SPIELE } from "../../core/spiele.js";
 import { CFG_ORDNER, CFG_DATEI } from "../../core/cfg.js";
@@ -89,20 +88,6 @@ function OverlayVorschau({ farbe }) {
   );
 }
 
-// Über welche Karte der PC Sessions sucht und mit der Regie spricht
-function Netzwerkkarte({ cfg, mutate }) {
-  const karten = useKarten();
-  const k = karteFuer(karten, cfg.netz) || (!cfg.netz && karten.length === 1 ? karten[0] : null);
-  return (
-    <Section title="Netzwerkkarte" subtitle="Über diese Karte sucht der PC Sessions und spricht mit der Regie. Nach einem Wechsel verbindet er sich neu.">
-      <KartenWahl karten={karten} wert={cfg.netz} onChange={(v) => mutate((d) => { d.netz = v; })} style={{ fontSize: 14, padding: "8px 10px" }} />
-      <div style={{ ...S.mono, fontSize: 11, color: SUB, marginTop: 8 }}>
-        {k ? `${k.ip} / ${k.maske} · MAC ${k.mac}` : cfg.netz ? <span style={{ color: "#ff5d5d" }}>Karte nicht verbunden</span> : `${karten.length} Karten, das Betriebssystem wählt`}
-      </div>
-    </Section>
-  );
-}
-
 // Standalone: Name, unter dem dieser PC in der eigenen Regie erscheint (sonst die PC-ID)
 function LokalName({ cfg, mutate }) {
   const [name, setName] = useState(cfg.pcId || "");
@@ -136,19 +121,6 @@ export default function SetupTab({ cfg, mutate, g, jetzt, notify, goTab, standal
         {standalone ? <><LokalName cfg={cfg} mutate={mutate} /><SpielerName cfg={cfg} mutate={mutate} g={g} notify={notify} pcId={cfg.pcId.trim() || "Dieser PC"} /></> : check ? <Liste punkte={check.allgemein} /> : <div style={S.empty}>Prüfe …</div>}
         {standalone && <p style={S.hint}>Standalone: Die Spiele auf diesem PC melden ihre Events direkt an die Regie. Eine Session braucht es dafür nicht.</p>}
       </Section>
-
-      {!standalone && <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.4fr) minmax(0,1fr)", gap: 20, alignItems: "stretch" }}>
-      <Section title="Mini-Overlay" right={<div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-        <Toggle checked={cfg.overlay?.an} label="Anzeigen, wenn die App minimiert ist" onChange={(v) => mutate((d) => { d.overlay = { ...(d.overlay || {}), an: v }; })} />
-        <button style={S.smallBtn} onClick={async () => { await api.overlayZuruecksetzen(); notify("Overlay steht wieder oben rechts."); }}><LocateFixed size={12} /> Position zurücksetzen</button>
-      </div>}>
-        <div style={{ display: "flex", gap: 14, alignItems: "center", opacity: cfg.overlay?.an ? 1 : 0.45 }}>
-          <OverlayVorschau farbe={ampel.farbe} />
-          <span style={{ fontSize: 13, color: PUNKT[ampel.farbe] }}>{ampel.text}</span>
-        </div>
-      </Section>
-      <Netzwerkkarte cfg={cfg} mutate={mutate} />
-      </div>}
 
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 20, alignItems: "start" }}>
         <Section title={<span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>Counter-Strike 2 <SpielChip spiel="cs2" /></span>}
@@ -213,6 +185,18 @@ export default function SetupTab({ cfg, mutate, g, jetzt, notify, goTab, standal
         </Section>
       </div>
       <OverdriveAnleitung punkte={check?.overdrive} mac={mac} />
+      {!standalone && <>
+        <div className="sp-section-label" style={{ margin: "8px 0 10px" }}>Einstellungen</div>
+        <Section title="Mini-Overlay" right={<div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <Toggle checked={cfg.overlay?.an} label="Anzeigen, wenn die App minimiert ist" onChange={(v) => mutate((d) => { d.overlay = { ...(d.overlay || {}), an: v }; })} />
+          <button style={S.smallBtn} onClick={async () => { await api.overlayZuruecksetzen(); notify("Overlay steht wieder oben rechts."); }}><LocateFixed size={12} /> Position zurücksetzen</button>
+        </div>}>
+          <div style={{ display: "flex", gap: 14, alignItems: "center", opacity: cfg.overlay?.an ? 1 : 0.45 }}>
+            <OverlayVorschau farbe={ampel.farbe} />
+            <span style={{ fontSize: 13, color: PUNKT[ampel.farbe] }}>{ampel.text}</span>
+          </div>
+        </Section>
+      </>}
     </>
   );
 }

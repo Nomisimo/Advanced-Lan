@@ -32,7 +32,7 @@ function standardRegie() {
     ersetzt: {}, // { [spiel]: [event] } hier gelten die allgemeinen Befehle nicht (core/aktionen.js)
     // Tab „Plan“: Plätze der Game-PCs, je Ziel eine Spalte, Game-PC-Vorlage (core/plan.js)
     plan: standardPlan(),
-    // Tab „Setup“: Game-Stats-Screen (Spielstand, beste Spieler, letzte Events) als Pop-out-Fenster oder NDI-Stream
+    // Tab „Stats-Screen“: Game-Stats-Screen (Spielstand, beste Spieler, letzte Events) als Pop-out-Fenster oder NDI-Stream
     stats: { an: false, ndi: false, ndiName: "Advanced LAN Stats", layout: standardLayout() },
   };
 }

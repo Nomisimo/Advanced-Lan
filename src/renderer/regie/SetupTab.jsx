@@ -1,10 +1,7 @@
-import React, { useState, useEffect } from "react";
-import { S, LINE, SUB, MUTED, OK, WARN, ERR, ACCENT, GLOW } from "../theme.js";
-import { Section, Check, Field, KartenWahl, useKarten, Toggle, Dot } from "../ui.jsx";
-import { api } from "../api.js";
-import { StatsBuehne } from "../StatsScreen.jsx";
+import React from "react";
+import { LINE, SUB, MUTED, OK, WARN } from "../theme.js";
+import { Section, Check } from "../ui.jsx";
 import { SPIELE } from "../../core/spiele.js";
-import { MonitorPlay, X, Cast, LayoutTemplate } from "lucide-react";
 
 // Welche Spiele die Regie nutzt. Nur diese erscheinen in „Control“ und „Signale“.
 function Spiele({ cfg, mutate, notify }) {
@@ -54,95 +51,11 @@ function RegieCheck({ cfg, status, standalone }) {
   );
 }
 
-const MAC = typeof navigator !== "undefined" && /Mac/.test(navigator.userAgent);
-
-// Game-Stats-Screen: Pop-out-Fenster und NDI-Stream (nur Regie und Standalone)
-function StatsScreenSetup({ cfg, mutate, status, log, goTab }) {
-  const s = cfg.stats || {}, st = status.stats || {}, ndi = st.ndi || {};
-  const [ndiCheck, setNdiCheck] = useState(null);
-  const [name, setName] = useState(s.ndiName || "");
-  useEffect(() => { if (api.ndiPruefen) api.ndiPruefen().then(setNdiCheck); else setNdiCheck({ verfuegbar: false, fehler: "nur in der App, nicht in der Browser-Vorschau" }); }, []);
-  useEffect(() => setName(s.ndiName || ""), [s.ndiName]);
-  const set = (k, v) => mutate((d) => { d.stats = { ...d.stats, [k]: v }; });
-  const an = !!s.an, ndiGeht = ndiCheck?.verfuegbar !== false;
-  const ndiText = !an ? "aus" : !s.ndi ? "aus" : ndi.fehler ? ndi.fehler : ndi.laeuft ? `sendet als „${ndi.name}“ · ${ndi.aufloesung}, ${ndi.fps} fps · ${ndi.verbindungen || 0} Empfänger · ${ndi.bilder || 0} Bilder` : "startet …";
-  const ndiFarbe = !an || !s.ndi ? MUTED : ndi.fehler ? ERR : ndi.laeuft ? OK : WARN;
-  return (
-    <Section title="Game-Stats-Screen" subtitle="Spielstand, Zahlen des Matches, beste Spieler und letzte Events des aktiven Spiels für Publikum und Stream. Als eigenes Fenster (zweiter Bildschirm, Beamer) oder als NDI-Quelle für OBS, vMix und Co."
-      right={<Toggle checked={an} label="Einschalten" onChange={(v) => set("an", v)} />}>
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr) 384px", gap: 16, alignItems: "start", opacity: an ? 1 : 0.5 }}>
-        <div style={{ border: `1px solid ${LINE}`, borderRadius: 8, padding: 14, background: "#1a1820" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700, marginBottom: 6 }}><MonitorPlay size={15} /> Pop-out-Fenster <span style={{ flex: 1 }} /><Dot color={st.fenster ? OK : MUTED} glow={st.fenster} /></div>
-          <div style={{ fontSize: 12, color: SUB, lineHeight: 1.5, marginBottom: 12 }}>Auf einen zweiten Bildschirm ziehen, Doppelklick schaltet Vollbild. Auch über den Knopf <b>Stats</b> oben in der Kopfzeile.</div>
-          <button disabled={!an} style={st.fenster ? S.secondaryBtn : S.primaryBtn} onClick={() => api.statsFenster(!st.fenster)}>
-            {st.fenster ? <><X size={14} /> Fenster schließen</> : <><MonitorPlay size={14} /> Fenster öffnen</>}
-          </button>
-        </div>
-        <div style={{ border: `1px solid ${LINE}`, borderRadius: 8, padding: 14, background: "#1a1820" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700, marginBottom: 6 }}><Cast size={15} /> NDI-Stream <span style={{ flex: 1 }} /><Toggle disabled={!an || !ndiGeht} checked={s.ndi} label="Senden" onChange={(v) => set("ndi", v)} /></div>
-          <Field label="Name der NDI-Quelle" hint="So erscheint die Quelle in OBS, vMix oder NDI Studio Monitor">
-            <input style={S.input} value={name} disabled={!an} maxLength={60} onChange={(e) => setName(e.target.value)} onBlur={() => name.trim() && name.trim() !== s.ndiName ? set("ndiName", name.trim()) : setName(s.ndiName || "")} onKeyDown={(e) => e.key === "Enter" && e.target.blur()} />
-          </Field>
-          <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, marginTop: 10, color: ndiFarbe }}><Dot color={ndiFarbe} glow={ndi.laeuft} /> {ndiGeht ? ndiText : `nicht verfügbar: ${ndiCheck?.fehler || ""}`}</div>
-          {an && s.ndi && ndi.laeuft && !ndi.verbindungen && <div style={{ fontSize: 11, color: WARN, marginTop: 8, lineHeight: 1.5 }}>{MAC ? "Kein Empfänger sieht die Quelle? Unter Systemeinstellungen → Datenschutz & Sicherheit → Lokales Netzwerk muss Advanced LAN erlaubt sein. Ist der Schalter schon an, einmal aus- und wieder einschalten und die App neu starten. Sender und Empfänger müssen im selben Netz sein." : "Kein Empfänger sieht die Quelle? Die Windows-Firewall muss Advanced LAN im privaten Netz erlauben (Windows-Sicherheit → Firewall → App zulassen), und Sender und Empfänger müssen im selben Netz sein."}</div>}
-          <div style={{ fontSize: 10, color: MUTED, marginTop: 8 }}>1920×1080, 30 fps, im selben Netz.{ndi.version ? ` ${ndi.version}.` : ""} NDI® ist eine eingetragene Marke von Vizrt NDI AB.</div>
-        </div>
-        <div>
-          <div style={{ width: 384, height: 216, borderRadius: 8, overflow: "hidden", border: `1px solid ${an ? ACCENT : LINE}`, boxShadow: an ? GLOW : "none", position: "relative" }}>
-            <div style={{ width: 1920, height: 1080, transform: "scale(0.2)", transformOrigin: "0 0", pointerEvents: "none" }}>
-              <StatsBuehne status={status} cfg={{ regie: cfg }} log={log} />
-            </div>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
-            <span style={{ fontSize: 10, color: MUTED, flex: 1 }}>Vorschau</span>
-            {goTab && <button style={S.smallBtn} onClick={() => goTab("screen")}><LayoutTemplate size={12} /> Layout bearbeiten</button>}
-          </div>
-        </div>
-      </div>
-    </Section>
-  );
-}
-
-// Netzwerkkarten: Empfang der Game-PCs und Senden der OSC-Befehle getrennt wählbar
-export function Netzwerk({ cfg, mutate, status }) {
-  const karten = useKarten();
-  const set = (k, v) => mutate((d) => { d.netz = { ...d.netz, [k]: v }; });
-  const eigene = cfg.targets.filter((t) => t.netz).length;
-  return (
-    <Section title="Netzwerkkarten" subtitle="Automatisch: das Betriebssystem wählt. Mit fester Karte bleibt jeder Verkehr in seinem Netz, z. B. Game-PCs im LAN und Licht im eigenen Netz.">
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-        <Field label="Empfangen: Session für die Game-PCs" hint={status.session.offen ? `lauscht auf ${status.session.ip || "allen Karten"}, Port ${status.session.port}` : "Session ist geschlossen"}>
-          <KartenWahl karten={karten} wert={cfg.netz?.empfang} onChange={(v) => set("empfang", v)} leer="Alle Karten" />
-        </Field>
-        <Field label="Senden: OSC-Befehle an die Ziele" hint={`Standard für alle Ziele${eigene ? `, ${eigene} Ziel(e) mit eigener Karte` : ""} (Tab „Ziele“)`}>
-          <KartenWahl karten={karten} wert={cfg.netz?.senden} onChange={(v) => set("senden", v)} />
-        </Field>
-      </div>
-      <table style={S.table}>
-        <thead><tr>{["Karte", "IP", "Maske", "MAC"].map((h) => <th key={h} style={S.th}>{h}</th>)}</tr></thead>
-        <tbody>{karten.map((k) => (
-          <tr key={k.name + k.ip}>
-            <td style={{ ...S.td, fontWeight: 600 }}>{k.name}</td>
-            <td style={{ ...S.td, ...S.mono }}>{k.ip}</td>
-            <td style={{ ...S.td, ...S.mono, color: SUB }}>{k.maske}</td>
-            <td style={{ ...S.td, ...S.mono, color: SUB }}>{k.mac}</td>
-          </tr>
-        ))}</tbody>
-      </table>
-      {!karten.length && <div style={S.empty}>Keine aktive Netzwerkkarte gefunden.</div>}
-    </Section>
-  );
-}
-
 export default function SetupTab(props) {
   return (
-    <>
-      <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 20, alignItems: "start" }}>
-        <Spiele {...props} />
-        <RegieCheck {...props} />
-      </div>
-      <StatsScreenSetup {...props} />
-      <Netzwerk {...props} />
-    </>
+    <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 20, alignItems: "start" }}>
+      <Spiele {...props} />
+      <RegieCheck {...props} />
+    </div>
   );
 }

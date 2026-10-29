@@ -128,6 +128,7 @@ function browserApi() {
       cfg.gamepc.spieler = spieler; // wie in der App: nur über spielerSetzen
       cfg.regie.armed = !!neu.regie?.armed;
       if (gp.zustand === "verbunden") cfg.gamepc.pcId = pcId; // PC-ID nur ohne aktive Session
+      regie.matchAktualisieren(); // anderes Spiel oder andere Match-Wahl
       speichern(); return status();
     },
     setModus: async (m) => {

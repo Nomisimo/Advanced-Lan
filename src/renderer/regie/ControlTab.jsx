@@ -1,10 +1,9 @@
 import React, { useState } from "react";
 import { S, ACCENT, ACCENT_HI, LINE, SUB, MUTED, ERR, OK, WARN, CT, TT, BLAU, ORANGE, GLOW, teamFarbe } from "../theme.js";
 import { uiConfirm } from "../dialog.jsx";
-import { Section, TeamChip, Dot, EventIcon, eventLabel, zeit, Leer, SpielChip, th, td } from "../ui.jsx";
+import { Section, TeamChip, Dot, EventIcon, eventLabel, zeit, Leer, SpielChip, Toggle, th, td } from "../ui.jsx";
 import { api } from "../api.js";
 import { SPIELE, SPIEL_BY_ID } from "../../core/spiele.js";
-import { matchCheck } from "../../core/match-check.js";
 import { Bomb, CircleCheck, CircleX, CircleMinus, Unplug, Crown, RotateCcw, Sun, Moon } from "lucide-react";
 
 const PHASEN = { warmup: "Aufwärmen", live: "Live", intermission: "Halbzeit", gameover: "Match vorbei" };
@@ -262,6 +261,48 @@ const Erkennt = ({ spiele, aktiv }) => {
   );
 };
 
+// Spielstand eines Matches als Text
+function matchText(spiel, st) {
+  if (!st) return "";
+  if (spiel === "rl") return `${st.arena || "Arena"} · ${st.blau ?? 0}:${st.orange ?? 0}${st.match ? ` · Match ${String(st.match).slice(0, 8)}` : ""}`;
+  if (spiel === "cs2") return `${st.map} · ${st.ct}:${st.tt}`;
+  return [st.map, st.score && Object.keys(st.score).length ? Object.values(st.score).join(":") : "", st.match && `Match ${String(st.match).slice(0, 8)}`].filter(Boolean).join(" · ");
+}
+
+// Welche Matches laufen, wie viele PCs sind drin, welches zählt. Nur das gewählte löst Signale aus und füllt Statistik und Stats-Screen.
+function MatchWahl({ cfg, mutate, status }) {
+  const matches = status.matches || [], auto = cfg.match?.auto !== false;
+  const schalten = (id) => mutate((d) => { d.match = { auto: false, wahl: id }; });
+  const ohne = cfg.aktivesSpiel === "finals" ? "The Finals liefert keine Matchdaten: alle Events zählen."
+    : cfg.aktivesSpiel === "valorant" ? "Noch keine Matchdaten. Valorant braucht auf den Game-PCs „Team dieses PCs: Automatisch (Riot Client)“, sonst zählen alle Events."
+    : "Noch keine Matchdaten: Sie kommen, sobald die Game-PCs im Spiel sind. Bis dahin zählen alle Events.";
+  return (
+    <Section title="Matches" right={<Toggle checked={auto} label="Automatisch: Match mit den meisten PCs" title="Schaltet immer auf das Match, in dem die meisten Game-PCs sind"
+      onChange={(v) => mutate((d) => { d.match = { auto: v, wahl: v ? "" : status.match || "" }; })} />}>
+      {!matches.length ? <Leer>{ohne}</Leer> : (
+        <div style={{ display: "grid", gap: 8 }}>
+          {matches.map((m) => {
+            const an = m.id === status.match;
+            return (
+              <div key={m.id} style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", padding: "9px 12px", borderRadius: 8, background: an ? ACCENT + "22" : "#1e1c26", border: `1px solid ${an ? ACCENT : LINE}` }}>
+                <div style={{ fontSize: 20, fontWeight: 800, minWidth: 34, textAlign: "center", color: an ? ACCENT_HI : SUB, fontVariantNumeric: "tabular-nums" }} title="PCs in diesem Match">{m.anzahl}</div>
+                <div style={{ flex: 1, minWidth: 160 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>{matchText(cfg.aktivesSpiel, m.stand) || "Match"}</div>
+                  <div style={{ fontSize: 12, color: SUB }}>{m.anzahl === 1 ? "1 PC" : `${m.anzahl} PCs`}: {m.pcs.join(", ")}</div>
+                </div>
+                {an ? <span style={{ ...S.badge, background: ACCENT, color: "#fff" }}>{auto ? "Aktiv (automatisch)" : "Aktiv"}</span>
+                  : <button style={S.secondaryBtn} onClick={() => schalten(m.id)}>Auf dieses Match schalten</button>}
+              </div>
+            );
+          })}
+          {!auto && <p style={{ ...S.hint, margin: 0 }}>Fest gewählt: Beginnt ein neues Match, bleibt die Regie bei den PCs dieses Matches. Automatisch wieder einschalten, um immer dem Match mit den meisten PCs zu folgen.</p>}
+          {!status.match && <p style={{ ...S.hint, margin: 0, color: WARN }}>Das gewählte Match läuft nicht mehr: alle Events zählen, bis ein Match gewählt ist.</p>}
+        </div>
+      )}
+    </Section>
+  );
+}
+
 const Ampel = ({ ok, teil, title }) => (
   <span title={title} style={{ display: "inline-flex", color: ok ? OK : teil ? WARN : ERR }}>
     {ok ? <CircleCheck size={15} /> : teil ? <CircleMinus size={15} /> : <CircleX size={15} />}
@@ -279,19 +320,21 @@ function Verbindungscheck({ cfg, status, jetzt }) {
   const ok = pcs.filter((p) => pruefen(p).ok).length;
   // Plätze aus dem Plan, für die noch kein PC da ist (virtuelle PCs)
   const geplant = (cfg.plan?.pcs || []).filter((x) => !pcs.some((p) => p.pcId === x.pcId));
-  const mc = matchCheck(pcs, cfg.aktivesSpiel);
-  const standText = (st) => !st ? "" : cfg.aktivesSpiel === "rl" ? `${st.arena || "Arena"} · ${st.blau}:${st.orange}${st.match ? ` · Match ${st.match}` : ""}`
-    : cfg.aktivesSpiel === "cs2" ? `${st.map} · ${st.ct}:${st.tt}` : [st.map, st.match && `Match ${st.match}`].filter(Boolean).join(" · ");
+  // Match je PC aus der Regie (core/match-check.js): gleich = im gewählten Match
+  const matches = status.matches || [], gewaehlt = matches.find((m) => m.id === status.match);
+  const matchVon = (pcId) => matches.find((m) => m.pcs.includes(pcId));
+  const imMatch = matches.reduce((n, m) => n + m.anzahl, 0), anders = gewaehlt ? imMatch - gewaehlt.anzahl : 0;
+  const standText = (st) => matchText(cfg.aktivesSpiel, st);
   return (
     <Section title="Verbindungscheck" right={pcs.length > 0 && <span style={{ display: "inline-flex", gap: 12, fontSize: 12, fontWeight: 700 }}>
-      {mc.gesamt > 1 && <span style={{ color: mc.anzahl === mc.gesamt ? OK : WARN }} title={`Die meisten: ${standText(mc.ref)}`}>{mc.anzahl === mc.gesamt ? "alle im selben Match" : `${mc.gesamt - mc.anzahl} in anderem Match`}</span>}
+      {imMatch > 1 && gewaehlt && <span style={{ color: anders ? WARN : OK }} title={`Gewählt: ${standText(gewaehlt.stand)}`}>{anders ? `${anders} in anderem Match` : "alle im selben Match"}</span>}
       <span style={{ color: ok === pcs.length ? OK : WARN }}>{ok} / {pcs.length} PCs ok</span>
     </span>}>
       {pcs.length === 0 && !geplant.length ? <Leer>Kein PC in der Session.</Leer> : (
         <div style={{ overflowX: "auto" }}>
         <table style={{ ...S.table, marginTop: 0 }}>
           <thead><tr>
-            <th style={th()}>PC</th><th style={th({ textAlign: "center" })}>Verbindung</th><th style={th({ textAlign: "center" })}>Daten</th><th style={th({ textAlign: "center" })}>Spiel</th><th style={th({ textAlign: "center" })} title="Gleiches Match wie die meisten PCs (CS2: Map und Spielstand, sonst Match-ID)">Match</th>
+            <th style={th()}>PC</th><th style={th({ textAlign: "center" })}>Verbindung</th><th style={th({ textAlign: "center" })}>Daten</th><th style={th({ textAlign: "center" })}>Spiel</th><th style={th({ textAlign: "center" })} title="Im gewählten Match (CS2: Map und Spielstand, sonst Match-ID). Events aus anderen Matches werden verworfen">Match</th>
             <th style={th()}>Ping</th><th style={th()}>Spieler</th><th style={th()}>Erkennt</th><th style={th()}>Zuletzt</th><th style={th()}></th>
           </tr></thead>
           <tbody>
@@ -303,8 +346,8 @@ function Verbindungscheck({ cfg, status, jetzt }) {
                   <td style={td({ textAlign: "center" })}><Ampel ok={c.verbunden} title={c.verbunden ? "verbunden" : "getrennt"} /></td>
                   <td style={td({ textAlign: "center" })}><Ampel ok={c.daten} teil={c.verbunden} title={c.daten ? "Daten kommen" : "keine aktuellen Daten"} /></td>
                   <td style={td({ textAlign: "center" })}>{p.spiel ? <SpielChip spiel={p.spiel} aktiv={c.spiel} /> : <span style={{ color: MUTED }}>–</span>}</td>
-                  <td style={td({ textAlign: "center" })}>{mc.ergebnis[p.pcId] ? <Ampel ok={mc.ergebnis[p.pcId] === "gleich"} teil
-                    title={mc.ergebnis[p.pcId] === "gleich" ? `gleiches Match: ${standText(p.stand)}` : `anderes Match: ${standText(p.stand)}, die meisten: ${standText(mc.ref)}`} /> : <span style={{ color: MUTED }} title="kein Spielstand vom aktiven Spiel">–</span>}</td>
+                  <td style={td({ textAlign: "center" })}>{matchVon(p.pcId) && gewaehlt ? <Ampel ok={matchVon(p.pcId) === gewaehlt} teil
+                    title={matchVon(p.pcId) === gewaehlt ? `gewähltes Match: ${standText(p.stand)}` : `anderes Match: ${standText(p.stand)}, gewählt: ${standText(gewaehlt.stand)}. Seine Events werden verworfen`} /> : <span style={{ color: MUTED }} title="keine Matchdaten vom aktiven Spiel: Events zählen immer">–</span>}</td>
                   <td style={td({ color: p.ping == null ? MUTED : p.ping > 50 ? WARN : SUB, fontSize: 12, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" })}>{p.sim ? "–" : p.ping == null ? "–" : `${p.ping} ms`}</td>
                   <td style={td({ fontSize: 12 })}>{s.spieler ? <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>{s.spieler} <TeamChip team={s.team} /></span> : <span style={{ color: MUTED }}>–</span>}</td>
                   <td style={td({ whiteSpace: "nowrap" })} title={(p.spiele || []).map((x) => SPIEL_BY_ID[x]?.name || x).join(", ")}><Erkennt spiele={p.spiele || []} aktiv={cfg.aktivesSpiel} /></td>
@@ -407,6 +450,7 @@ export default function ControlTab({ cfg, mutate, status, log, jetzt, zurueckset
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.25fr) minmax(0,1fr)", gap: 20, alignItems: "start" }}>
         <div>
+          <MatchWahl cfg={cfg} mutate={mutate} status={status} />
           <Verbindungscheck cfg={cfg} status={status} jetzt={jetzt} />
           <Statistik cfg={cfg} status={status} />
         </div>

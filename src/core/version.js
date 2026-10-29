@@ -6,6 +6,14 @@ const REPO = "Nomisimo/Advanced-Lan";
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
+  "0.1.0-beta.13": [
+    "Valorant: das Team jedes Game-PCs kommt automatisch vom Riot Client, schon in der Agentenwahl. Rot = TEAM A (beginnt im Angriff), Blau = TEAM B. Das Team bleibt das ganze Match gleich, auch nach dem Seitenwechsel",
+    "Bilderkennung → Valorant → „Team dieses PCs“: neu „Automatisch (Riot Client)“, Standard. Darunter steht, welches Team erkannt ist. Ohne Riot Client oder außerhalb eines Matches gilt das zuletzt gewählte Team",
+    "Control: neuer Bereich „Matches“ zeigt jedes laufende Match des aktiven Spiels mit Anzahl und Namen der PCs. „Auf dieses Match schalten“ wählt eins fest aus",
+    "Nur das gewählte Match löst Signale aus und füllt Statistik und Stats-Screen. Events von PCs in einem anderen Match landen unter „Verworfen“ mit dem Grund „anderes Match“",
+    "„Automatisch“ (Standard) schaltet immer auf das Match mit den meisten PCs. Fest gewählt folgt die Regie den PCs dieses Matches auch ins nächste",
+    "Erkennung: Rocket League über die MatchGuid, Dota 2 über die Match-ID, CS2 über Map und Spielstand, Valorant über die MatchID vom Riot Client. The Finals hat keine Matchdaten, dort zählen alle Events",
+  ],
   "0.1.0-beta.12": [
     "Ohne Overwolf: die App läuft jetzt auf normalem Electron und wird mit electron-builder gebaut. Keine Overwolf-Laufzeit, keine Nutzungsdaten an Overwolf",
     "Alle Spiele und Events bleiben: CS2 und Dota 2 über Valve GSI, Rocket League über die Stats API, Valorant und The Finals über Bilderkennung, Mini-Overlay, Namens-Popup, Simulator und Netzwerk wie bisher",

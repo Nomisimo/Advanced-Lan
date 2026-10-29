@@ -52,7 +52,7 @@ Der Modus wird beim ersten Start gewählt (Standalone: Textknopf unten in der Mi
 | Valorant | Bilderkennung | TEAM A, TEAM B (stellt jeder PC ein) | 10 PCs, Runde |
 | The Finals | Bilderkennung | TEAM A bis TEAM D | – |
 
-Overwolf ist raus: Die App läuft auf normalem Electron, nutzt keine Overwolf-Spielereignisse (GEP) und wird nur über GitHub verteilt. Optional kann ein Valorant-PC zusätzlich die Overwolf-App „Automation Overdrive“ nutzen (eigene Installation, siehe Setup).
+Overwolf ist raus: Die App läuft auf normalem Electron, nutzt keine Overwolf-Spielereignisse (GEP) und wird nur über GitHub verteilt. Optional kann ein Valorant-PC zusätzlich die Overwolf-App „Automation Overdrive“ nutzen (eigene Installation, siehe Setup). Der Knopf „Automation Overdrive öffnen“ im Setup startet sie über Overwolf oder führt zum Store.
 
 ## Screenshots
 

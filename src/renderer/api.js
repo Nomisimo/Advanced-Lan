@@ -176,6 +176,7 @@ function browserApi() {
     onConfig: abo("config"),
     onMeldung: abo("meldung"),
     openExternal: async (url) => window.open(url, "_blank"),
+    overdriveOeffnen: async () => { window.open("https://www.overwolf.com/app/raimen_ttv-automation_overdrive", "_blank"); return { art: "store", text: "In der Vorschau kein Overwolf: die Seite im Overwolf-Store ist offen." }; },
     feedbackOeffnen: async () => window.open(feedbackUrl({ version: __APP_VERSION__, system: navigator.userAgent, modus: cfg.modus }), "_blank"),
     // Updates: im Browser nur Hinweis und Download-Seite
     fetchReleases: async () => { try { const r = await fetch("https://api.github.com/repos/Nomisimo/Advanced-Lan/releases?per_page=20"); return r.ok ? r.json() : null; } catch { return null; } },
@@ -286,6 +287,7 @@ function browserApi() {
         return { id: `${id}-aktionen`, spiel: id, label: `${id === "valorant" ? "Valorant" : "The Finals"}: Aktionen eingerichtet`, ok: n > 0, warn: true, detail: n ? `${n} Aktionen` : "noch keine: im Tab „Bilderkennung“ anlegen oder importieren" };
       }),
       overdrive: [
+        { id: "od-installiert", label: "Automation Overdrive installiert", ok: false, warn: true, detail: "fehlt: Knopf oben führt zum Store" },
         { id: "od-empfang", label: "Empfang bereit", ok: true, detail: "localhost:44206" },
         { id: "od-verbunden", label: "Automation Overdrive verbunden", ok: false, warn: true, detail: "In der Vorschau kein Overwolf" },
         { id: "od-daten", label: "Valorant-Events kommen an", ok: false, warn: true, detail: "noch keins, kommt beim ersten Kill" },

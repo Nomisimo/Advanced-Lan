@@ -6,6 +6,10 @@ const REPO = "Nomisimo/Advanced-Lan";
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
+  "0.1.0-beta.15": [
+    "Game-PC → Setup: Knopf „Automation Overdrive öffnen“. Startet die installierte Overwolf-App direkt über Overwolf. Fehlt sie, öffnet sich die Seite im Overwolf-Store, fehlt Overwolf, die Download-Seite",
+    "Setup-Check zeigt, ob Automation Overdrive installiert ist und in welcher Version",
+  ],
   "0.1.0-beta.13": [
     "Valorant: das Team jedes Game-PCs kommt automatisch vom Riot Client, schon in der Agentenwahl. Rot = TEAM A (beginnt im Angriff), Blau = TEAM B. Das Team bleibt das ganze Match gleich, auch nach dem Seitenwechsel",
     "Bilderkennung → Valorant → „Team dieses PCs“: neu „Automatisch (Riot Client)“, Standard. Darunter steht, welches Team erkannt ist. Ohne Riot Client oder außerhalb eines Matches gilt das zuletzt gewählte Team",

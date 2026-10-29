@@ -10,6 +10,7 @@ const { findeCs2CfgOrdner, findeRlConfigOrdner, findeDotaCfgOrdner, steamLocalCo
 const { BildDienst } = require('./bild');
 const { RlClient } = require('./rl-client');
 const { OverdriveServer } = require('./overdrive-server');
+const { overdriveInstalliert, overdriveOeffnen } = require('./overdrive-start');
 const { RiotClient } = require('./riot-client');
 const { Regie } = require('../core/regie');
 const { RegieSim } = require('../core/regie-sim');
@@ -386,8 +387,10 @@ function bildCheck() {
 
 // Automation Overdrive (Valorant): Empfang auf Port 44206, App verbunden, Events kommen an. Optional, deshalb nur Hinweise.
 function overdriveCheck() {
-  const o = overdrive.status(), alter = alterVon(o.letzte);
+  const o = overdrive.status(), alter = alterVon(o.letzte), inst = overdriveInstalliert();
   return [
+    ...(inst ? [{ id: 'od-installiert', label: 'Automation Overdrive installiert', ok: !!inst.app, warn: true,
+      detail: inst.app ? `Version ${inst.app.version}` : inst.overwolf ? 'fehlt: Knopf oben führt zum Store' : 'Overwolf fehlt: Knopf oben führt zum Download' }] : []),
     { id: 'od-empfang', label: 'Empfang bereit', ok: o.laeuft, detail: o.fehler ? `${o.fehler}: Touch Portal mit dem Overdrive-Plugin beenden` : `localhost:${o.port ?? OVERDRIVE_PORT}` },
     { id: 'od-verbunden', label: 'Automation Overdrive verbunden', ok: o.verbunden > 0, warn: true, detail: o.verbunden ? 'Overwolf-App ist verbunden' : 'Overwolf und Automation Overdrive starten' },
     { id: 'od-daten', label: 'Valorant-Events kommen an', ok: alter != null && alter < 600, warn: true, detail: alter == null ? 'noch keins, kommt beim ersten Kill' : `zuletzt vor ${alter} s` },
@@ -942,6 +945,7 @@ ipcMain.on('erkennung-text', (e, id, png) => bild.text(e.sender, id, png));
 ipcMain.on('erkennung-status', (e, s) => bild.meldung(e.sender, s));
 ipcMain.handle('gamepc-sim-stop', () => { gpSim.stop(); });
 ipcMain.handle('gamepc-sim-neu', () => { gpSim.neu(); });
+ipcMain.handle('overdrive-oeffnen', () => overdriveOeffnen(shell));
 ipcMain.handle('open-external', (_, url) => { if (/^https?:\/\//i.test(url)) shell.openExternal(url); });
 
 /* ── Start ────────────────────────────────────────────────────────────── */

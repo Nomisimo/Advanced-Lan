@@ -19,7 +19,7 @@ const EIGENE = Array.from({ length: 6 }, (_, i) => ({ id: `eigene_${i + 1}`, lab
 const BILD_SPIELE = [
   {
     id: "valorant", name: "Valorant", kurz: "VAL", farbe: "#ff4655", teams: ["TEAM A", "TEAM B"],
-    exe: "valorant-win64-shipping.exe", fenster: "VALORANT",
+    exe: "valorant-win64-shipping.exe", fenster: "VALORANT", riot: true, // riot: Team kann der Riot Client liefern (riot-team.js)
     events: [
       M("match_start", "Match startet"), M("match_won", "Match gewonnen", { team: true, art: "matchende" }),
       R("round_start", "Kaufphase (Runde startet)", { art: "start" }), R("round_end", "Runde gewonnen", { team: true, art: "ende" }),
@@ -132,7 +132,8 @@ function erkennungsAuftrag(aktionen) {
 
 function standardBildSpiel(id) {
   // quelle: "auto" (Spielfenster, sobald es offen ist), "bildschirm" (eingestellter Bildschirm) oder "fenster:<Titel>"
-  return { team: BILD_BY_ID[id].teams[0], quelle: "auto", aufloesung: null, aktionen: [] }; // aufloesung: { b, h } des Bildes, in dem die Bereiche gezogen wurden
+  // teamAuto: Team vom Riot Client übernehmen (nur Spiele mit riot), team gilt dann nur, solange keins erkannt ist
+  return { team: BILD_BY_ID[id].teams[0], teamAuto: !!BILD_BY_ID[id].riot, quelle: "auto", aufloesung: null, aktionen: [] }; // aufloesung: { b, h } des Bildes, in dem die Bereiche gezogen wurden
 }
 function standardBild() {
   return { an: true, display: "", fps: 4, spiele: Object.fromEntries(BILD_SPIELE.map((s) => [s.id, standardBildSpiel(s.id)])) };
@@ -147,6 +148,7 @@ function migrateBild(v) {
     const alt = v.spiele?.[s.id] || {};
     spiele[s.id] = {
       team: s.teams.includes(alt.team) ? alt.team : s.teams[0],
+      teamAuto: !!s.riot && alt.teamAuto !== false,
       quelle: quelleOk(alt.quelle),
       aufloesung: aufloesung(alt.aufloesung),
       aktionen: (Array.isArray(alt.aktionen) ? alt.aktionen : []).map((a) => migrateAktion(a, s.id)).filter(Boolean).slice(0, 40),

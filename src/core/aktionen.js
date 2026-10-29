@@ -21,7 +21,6 @@ const AKTIONEN = [
   { id: "match_start", label: "Match startet", gruppe: "Match", events: { cs2: ["match_live"], valorant: ["match_start"], rl: ["match_start"], dota2: ["match_start"], finals: ["match_start"] } },
   { id: "win", label: "Sieg / Match vorbei", gruppe: "Match", events: { cs2: ["match_end"], valorant: ["match_won"], rl: ["match_end"], dota2: ["match_end"], finals: ["match_won"] } },
 ];
-const AKTION_BY_ID = Object.fromEntries(AKTIONEN.map((a) => [a.id, a]));
 
 // Allgemeine Aktion eines Spiel-Events, sonst null
 const aktionVon = (spiel, type) => AKTIONEN.find((a) => a.events[spiel]?.includes(type)) || null;
@@ -50,4 +49,4 @@ function migrateErsetzt(e) {
   return out;
 }
 
-module.exports = { ALLGEMEIN, AKTIONEN, AKTION_BY_ID, aktionVon, istErsetzt, geerbt, modus, migrateErsetzt };
+module.exports = { ALLGEMEIN, AKTIONEN, aktionVon, istErsetzt, geerbt, modus, migrateErsetzt };

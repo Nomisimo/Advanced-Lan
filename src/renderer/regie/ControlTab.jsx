@@ -104,21 +104,7 @@ function Statistik({ cfg, status }) {
         <Zahl label="Multikills" wert={m.multikills || 0} />
         <Zahl label="Aces" wert={m.aces || 0} farbe={m.aces ? ACCENT_HI : undefined} />
       </div>
-      {st?.top?.length > 0 && (
-        <table style={{ ...S.table, marginTop: 0 }}>
-          <thead><tr><th style={th()}>Spieler</th><th style={th()}>Team</th><th style={th({ textAlign: "right" })}>K</th><th style={th({ textAlign: "right" })}>D</th><th style={th({ textAlign: "right" })}>HS</th><th style={th({ textAlign: "right" })}>MVP</th></tr></thead>
-          <tbody>{st.top.map((p, i) => (
-            <tr key={p.name}>
-              <td style={td({ fontWeight: i === 0 ? 700 : 400 })}>{i === 0 && <Crown size={12} color={ACCENT_HI} style={{ marginRight: 5, verticalAlign: -1 }} />}{p.name}</td>
-              <td style={td()}><TeamChip team={p.team} /></td>
-              <td style={td({ textAlign: "right", fontWeight: 700 })}>{p.kills}</td>
-              <td style={td({ textAlign: "right", color: SUB })}>{p.tode}</td>
-              <td style={td({ textAlign: "right", color: SUB })}>{p.headshots}</td>
-              <td style={td({ textAlign: "right", color: SUB })}>{p.mvps}</td>
-            </tr>
-          ))}</tbody>
-        </table>
-      )}
+      <TopSpieler top={st?.top} spalten={[["K", "kills"], ["D", "tode"], ["HS", "headshots"], ["MVP", "mvps"]]} />
     </Section>
   );
 }
@@ -156,43 +142,27 @@ function RlStatistik({ status }) {
         <Zahl label="Demolitions" wert={m.demos || 0} />
         <Zahl label="Anstöße" wert={m.anstoesse || 0} />
       </div>
-      {st?.top?.length > 0 && (
-        <table style={{ ...S.table, marginTop: 0 }}>
-          <thead><tr><th style={th()}>Spieler</th><th style={th()}>Team</th><th style={th({ textAlign: "right" })}>Tore</th><th style={th({ textAlign: "right" })}>Vorl.</th><th style={th({ textAlign: "right" })}>Parad.</th><th style={th({ textAlign: "right" })}>Schüsse</th><th style={th({ textAlign: "right" })}>Demos</th></tr></thead>
-          <tbody>{st.top.map((p, i) => (
-            <tr key={p.name}>
-              <td style={td({ fontWeight: i === 0 ? 700 : 400 })}>{i === 0 && <Crown size={12} color={ACCENT_HI} style={{ marginRight: 5, verticalAlign: -1 }} />}{p.name}</td>
-              <td style={td()}><TeamChip team={p.team} /></td>
-              <td style={td({ textAlign: "right", fontWeight: 700 })}>{p.tore}</td>
-              <td style={td({ textAlign: "right", color: SUB })}>{p.vorlagen}</td>
-              <td style={td({ textAlign: "right", color: SUB })}>{p.paraden}</td>
-              <td style={td({ textAlign: "right", color: SUB })}>{p.schuesse}</td>
-              <td style={td({ textAlign: "right", color: SUB })}>{p.demos}</td>
-            </tr>
-          ))}</tbody>
-        </table>
-      )}
+      <TopSpieler top={st?.top} spalten={[["Tore", "tore"], ["Vorl.", "vorlagen"], ["Parad.", "paraden"], ["Schüsse", "schuesse"], ["Demos", "demos"]]} />
     </Section>
   );
 }
 
-// Dota 2 und Overwolf-Spiele: Spielstand, Zahlen des Matches, beste Spieler
+// Dota 2, Valorant und The Finals: Spielstand, Zahlen des Matches, beste Spieler
 const DOTA_PHASE = { HERO_SELECTION: "Heldenwahl", STRATEGY_TIME: "Strategiezeit", PRE_GAME: "Vorbereitung", GAME_IN_PROGRESS: "Live", POST_GAME: "Match vorbei" };
 function AllgemeinStatistik({ spiel, status }) {
   const st = status.statistik?.spiel === spiel.id ? status.statistik : null;
   const stand = status.stand?.spiel === spiel.id ? status.stand : null;
   if (!st && !stand) return <Section title="Statistik"><Leer>Noch keine Daten.</Leer></Section>;
   const m = st?.match || { siege: {} }, r = st?.runde || {};
-  const dota = spiel.id === "dota2", br = spiel.art === "br", [t1, t2] = spiel.teams;
+  const dota = spiel.id === "dota2", [t1, t2] = spiel.teams;
   const mitAssists = spiel.events.some((e) => e.id === "assist");
   const punkte = (t) => (dota ? stand?.score?.[t] : m.siege?.[t]) ?? 0;
   const zahlen = [
     ["Kills", m.kills], ["Tode", m.tode],
     ...(mitAssists ? [["Assists", m.assists]] : []),
     ...(spiel.events.some((e) => e.id === "headshot") ? [["Headshots", m.headshots]] : []),
-    ...(br && spiel.events.some((e) => /knock/.test(e.id)) ? [["Niedergeschl.", m.knocks]] : []),
     ...(dota ? [["Multikills", m.multikills], ["Türme", m.tuerme], ["Roshan", m.roshan]] : []),
-    ...(!dota && !br ? [["Runden", m.runden]] : []),
+    ...(!dota ? [["Runden", m.runden]] : []),
   ];
   return (
     <Section title="Statistik" right={<span style={{ display: "flex", gap: 6 }}>
@@ -201,45 +171,36 @@ function AllgemeinStatistik({ spiel, status }) {
       {dota && stand?.phase === "GAME_IN_PROGRESS" && <span style={S.chip}>{stand.tag ? <Sun size={11} /> : <Moon size={11} />} {stand.tag ? "Tag" : "Nacht"}</span>}
       {m.vorbei && !(dota && stand?.phase === "POST_GAME") && <span style={S.chip}>Match vorbei</span>}
     </span>}>
-      {t1 && t2 ? (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 22, marginBottom: 14 }}>
-          <Team name={t1} score={punkte(t1)} farbe={teamFarbe(t1)} sieger={m.sieger === t1} />
-          <div style={{ textAlign: "center", minWidth: 70 }}>
-            {dota ? <><div style={{ fontSize: 22, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>{uhr(Math.max(0, stand?.zeit ?? 0))}</div><div style={{ fontSize: 10, color: SUB }}>Kills · Spielzeit</div></>
-              : <><div style={{ fontSize: 24, color: MUTED }}>:</div><div style={{ fontSize: 10, color: SUB }}>Runden{r.nr ? ` · Runde ${r.nr}` : ""}</div></>}
-          </div>
-          <Team name={t2} score={punkte(t2)} farbe={teamFarbe(t2)} sieger={m.sieger === t2} />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 22, marginBottom: 14 }}>
+        <Team name={t1} score={punkte(t1)} farbe={teamFarbe(t1)} sieger={m.sieger === t1} />
+        <div style={{ textAlign: "center", minWidth: 70 }}>
+          {dota ? <><div style={{ fontSize: 22, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>{uhr(Math.max(0, stand?.zeit ?? 0))}</div><div style={{ fontSize: 10, color: SUB }}>Kills · Spielzeit</div></>
+            : <><div style={{ fontSize: 24, color: MUTED }}>:</div><div style={{ fontSize: 10, color: SUB }}>Runden{r.nr ? ` · Runde ${r.nr}` : ""}</div></>}
         </div>
-      ) : (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 30, marginBottom: 14 }}>
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 44, fontWeight: 800, lineHeight: 1.05 }}>{stand?.uebrig ?? "–"}</div>
-            <div style={{ fontSize: 11, color: SUB }}>Spieler übrig</div>
-          </div>
-          {m.siegerSpieler && <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 22, fontWeight: 800, color: spiel.farbe, textShadow: `0 0 14px ${spiel.farbe}` }}><Crown size={18} style={{ verticalAlign: -2 }} /> {m.siegerSpieler}</div>
-            <div style={{ fontSize: 11, color: SUB }}>Squad gewinnt</div>
-          </div>}
-        </div>
-      )}
+        <Team name={t2} score={punkte(t2)} farbe={teamFarbe(t2)} sieger={m.sieger === t2} />
+      </div>
       <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(zahlen.length, 5)},1fr)`, gap: 8, marginBottom: 14 }}>
         {zahlen.map(([label, w]) => <Zahl key={label} label={label} wert={w || 0} />)}
       </div>
-      {st?.top?.length > 0 && (
-        <table style={{ ...S.table, marginTop: 0 }}>
-          <thead><tr><th style={th()}>Spieler</th>{t1 && <th style={th()}>Team</th>}<th style={th({ textAlign: "right" })}>K</th><th style={th({ textAlign: "right" })}>D</th>{mitAssists && <th style={th({ textAlign: "right" })}>A</th>}</tr></thead>
-          <tbody>{st.top.map((p, i) => (
-            <tr key={p.name}>
-              <td style={td({ fontWeight: i === 0 ? 700 : 400 })}>{i === 0 && <Crown size={12} color={ACCENT_HI} style={{ marginRight: 5, verticalAlign: -1 }} />}{p.name}</td>
-              {t1 && <td style={td()}><TeamChip team={p.team} /></td>}
-              <td style={td({ textAlign: "right", fontWeight: 700 })}>{p.kills}</td>
-              <td style={td({ textAlign: "right", color: SUB })}>{p.tode}</td>
-              {mitAssists && <td style={td({ textAlign: "right", color: SUB })}>{p.assists}</td>}
-            </tr>
-          ))}</tbody>
-        </table>
-      )}
+      <TopSpieler top={st?.top} spalten={[["K", "kills"], ["D", "tode"], ...(mitAssists ? [["A", "assists"]] : [])]} />
     </Section>
+  );
+}
+
+// Beste Spieler des Matches: Name (Krone für Platz 1), Team und die Zahlen des Spiels als [Überschrift, Feld]
+function TopSpieler({ top, spalten }) {
+  if (!top?.length) return null;
+  return (
+    <table style={{ ...S.table, marginTop: 0 }}>
+      <thead><tr><th style={th()}>Spieler</th><th style={th()}>Team</th>{spalten.map(([k]) => <th key={k} style={th({ textAlign: "right" })}>{k}</th>)}</tr></thead>
+      <tbody>{top.map((p, i) => (
+        <tr key={p.name}>
+          <td style={td({ fontWeight: i === 0 ? 700 : 400 })}>{i === 0 && <Crown size={12} color={ACCENT_HI} style={{ marginRight: 5, verticalAlign: -1 }} />}{p.name}</td>
+          <td style={td()}><TeamChip team={p.team} /></td>
+          {spalten.map(([k, feld], j) => <td key={k} style={td(j === 0 ? { textAlign: "right", fontWeight: 700 } : { textAlign: "right", color: SUB })}>{p[feld]}</td>)}
+        </tr>
+      ))}</tbody>
+    </table>
   );
 }
 

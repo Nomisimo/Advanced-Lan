@@ -21,7 +21,6 @@ const EVENT_TYPES = [
   { id: "flashed", label: "Spieler geblendet", gruppe: "Spieler", team: true, spieler: true },
   { id: "mvp", label: "Runden-MVP", gruppe: "Spieler", team: true, spieler: true },
 ];
-const EVENT_BY_ID = Object.fromEntries(EVENT_TYPES.map((e) => [e.id, e]));
 const BOMBE = { planted: ["bomb_planted", "T"], defused: ["bomb_defused", "CT"], exploded: ["bomb_exploded", "T"] };
 
 // Spieler, deren Werte ein Client verlässlich meldet: alle (Observer/GOTV) oder nur der eigene Spieler.
@@ -107,4 +106,4 @@ class Dedupe {
   }
 }
 
-module.exports = { EVENT_TYPES, EVENT_BY_ID, detectEvents, spielerListe, Dedupe };
+module.exports = { EVENT_TYPES, detectEvents, spielerListe, Dedupe };

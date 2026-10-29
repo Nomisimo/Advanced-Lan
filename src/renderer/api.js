@@ -300,7 +300,6 @@ function browserApi() {
       statusMelden(); return status();
     },
     nameFragen: async () => ({ fehler: "Das Namens-Popup gibt es nur in der App." }),
-    cs2Ordner: async () => null,
     cfgInstallieren: async () => ({ fehler: "In der Browser-Vorschau nicht möglich." }),
     dotaCfgInstallieren: async () => ({ fehler: "In der Browser-Vorschau nicht möglich." }),
     dotaCfgSpeichern: async () => { download(DOTA_CFG_DATEI, dotaCfg({ port: cfg.gamepc.gsiPort, token: cfg.gamepc.gsiToken })); return { ok: true, pfad: DOTA_CFG_DATEI }; },

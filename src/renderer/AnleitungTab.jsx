@@ -72,8 +72,8 @@ const Regie = ({ goTab }) => (
       <b> Test</b> sendet den Befehl sofort, auch bei Ausgabe aus (ohne PC-Filter als erster Platz des Plans).
     </Schritt>
     <Schritt n={6} titel="Proben" onGo={goTab && (() => goTab("sim"))} goLabel="Simulator">
-      Der Simulator spielt das aktive Spiel mit virtuellen Game-PCs und derselben Erkennung wie echte PCs: CS2, Dota 2, Overwatch 2 und Rainbow Six mit 10 PCs (5 gegen 5), Marvel Rivals mit 12 (6 gegen 6), Rocket League mit 6 (3 gegen 3),
-      Fortnite und PUBG mit 8 PCs in zwei Vierer-Squads, Apex mit 6 PCs in zwei Trios. Bei Battle Royales spielen die LAN-Squads in einer vollen Lobby, eine Runde ist eine Zone.
+      Der Simulator spielt das aktive Spiel mit virtuellen Game-PCs und derselben Erkennung wie echte PCs: CS2, Dota 2 und Valorant mit 10 PCs (5 gegen 5), Rocket League mit 6 (3 gegen 3).
+      Für The Finals gibt es keinen Simulator.
       Einzelne Events lassen sich direkt auslösen. Simulierte PCs spielen die Plätze aus dem Plan (SIM 03 ist Platz 3), so lassen sich Befehle mit <Kbd>{"{plan}"}</Kbd> ohne echte PCs proben.
     </Schritt>
     <Schritt n={7} titel="Live gehen" onGo={goTab && (() => goTab("control"))} goLabel="Control">

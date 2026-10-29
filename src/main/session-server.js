@@ -50,7 +50,7 @@ class SessionServer {
     this.ausrufen();
     // Verbindungscheck: alle 3 s ein Ping an jeden PC, die Antwortzeit sieht die Regie im Tab „Control“
     this.pingTimer = setInterval(() => {
-      for (const [pcId, ws] of this.verbindungen) {
+      for (const ws of this.verbindungen.values()) {
         if (ws.readyState !== 1) continue;
         this.pingStart.set(ws, Date.now());
         try { ws.ping(); } catch {}

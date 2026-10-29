@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { S, LINE, SUB, MUTED, OK, WARN, teamFarbe } from "../theme.js";
+import { S, LINE, SUB, OK, WARN, teamFarbe } from "../theme.js";
 import { api } from "../api.js";
 import { Section, Check, Field, TeamChip, SpielChip, Kbd, Toggle, KartenWahl, useKarten } from "../ui.jsx";
 import { karteFuer } from "../../core/netzwerk.js";

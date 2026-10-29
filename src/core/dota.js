@@ -6,6 +6,7 @@
 // Reine Funktionen ohne Node-Abhängigkeiten: laufen im Hauptprozess und in der Browser-Vorschau.
 
 const { Dedupe } = require("./events");
+const { gsiDatei } = require("./cfg");
 
 const DOTA_APPID = 570;
 const TEAM = { radiant: "RADIANT", dire: "DIRE" };
@@ -151,27 +152,7 @@ const DOTA_CFG_ORDNER = "Steam\\steamapps\\common\\dota 2 beta\\game\\dota\\cfg\
 const DOTA_CFG_DATEI = "gamestate_integration_advancedlan.cfg";
 const DOTA_STARTOPTION = "-gamestateintegration";
 
-function dotaCfg({ port, token }) {
-  return [
-    '"Advanced LAN"',
-    "{",
-    `\t"uri"\t\t"http://127.0.0.1:${port}/gsi"`,
-    '\t"timeout"\t"1.1"',
-    '\t"buffer"\t"0.0"',
-    '\t"throttle"\t"0.1"',
-    '\t"heartbeat"\t"10.0"',
-    '\t"auth"',
-    "\t{",
-    `\t\t"token"\t"${token}"`,
-    "\t}",
-    '\t"data"',
-    "\t{",
-    ...["provider", "map", "player", "hero", "buildings", "events", "roshan"].map((k) => `\t\t"${k}"\t"1"`),
-    "\t}",
-    "}",
-    "",
-  ].join("\r\n");
-}
+const dotaCfg = ({ port, token }) => gsiDatei({ port, token, daten: ["provider", "map", "player", "hero", "buildings", "events", "roshan"] });
 
 // Startoptionen von Dota (App 570) aus Steams localconfig.vdf. null = nicht gefunden.
 function dotaStartoptionen(vdf) {

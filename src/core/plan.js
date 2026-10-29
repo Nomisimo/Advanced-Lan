@@ -117,7 +117,4 @@ function zuordnen(plan, { pcId = "", geraet = {} } = {}, belegt = new Set()) {
   return { pcId: eigen, platz: null, grund: eigen ? "eigen" : "" };
 }
 
-// Plätze ohne verbundenen PC, für Control, Session und Signale
-const virtuellePcs = (plan, pcs = []) => (plan?.pcs || []).filter((p) => !pcs.some((x) => x.pcId === p.pcId && x.verbunden && !x.sim));
-
-module.exports = { standardPlan, migratePlan, istLeer, pcIdFuer, plaetzeAnlegen, platzVon, planWert, planVars, rechnerPasst, zuordnen, virtuellePcs, PLAN_VARS, STANDARD_REGEL, MAX_PLAETZE };
+module.exports = { standardPlan, migratePlan, istLeer, pcIdFuer, plaetzeAnlegen, platzVon, planWert, planVars, rechnerPasst, zuordnen, PLAN_VARS, STANDARD_REGEL, MAX_PLAETZE };

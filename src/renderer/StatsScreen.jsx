@@ -62,24 +62,6 @@ const Chip = ({ children, farbe }) => (
   <span style={{ fontSize: 22, padding: "6px 16px", borderRadius: 30, border: `1px solid ${farbe || LINE}`, color: farbe || "#d4d0de", background: "rgba(26,24,32,.8)", whiteSpace: "nowrap" }}>{children}</span>
 );
 
-function BattleRoyale({ d, spiel }) {
-  return (
-    <Panel style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 120 }}>
-      <div style={{ textAlign: "center" }}>
-        <div style={{ fontSize: 200, fontWeight: 800, lineHeight: 1, color: "#fff", textShadow: `0 0 34px ${spiel.farbe}aa` }}>{d.br.uebrig ?? "–"}</div>
-        <div style={{ fontSize: 32, color: SUB, marginTop: 10 }}>Spieler übrig</div>
-      </div>
-      {d.br.sieger && (
-        <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 72, fontWeight: 800, color: spiel.farbe, textShadow: `0 0 26px ${spiel.farbe}`, display: "inline-flex", alignItems: "center", gap: 18 }}><Crown size={64} /> {d.br.sieger}</div>
-          <div style={{ fontSize: 32, color: SUB, marginTop: 10 }}>Squad gewinnt</div>
-        </div>
-      )}
-      {d.chips.length > 0 && <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>{d.vorbei && <Chip farbe={WARN}>Match vorbei</Chip>}{d.chips.map((c) => <Chip key={c}>{c}</Chip>)}</div>}
-    </Panel>
-  );
-}
-
 function Bestenliste({ d, mitTeam, titel, zeilen }) {
   const zelle = { padding: "8px 14px", fontSize: 28, borderBottom: `1px solid ${LINE}` };
   const kopf = { ...zelle, fontSize: 20, color: SUB, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", borderBottom: `2px solid ${LINE}` };
@@ -137,7 +119,7 @@ function Spielstand({ d, spiel, h }) {
           <div style={{ fontSize: 64, fontWeight: 800, color: "#fff" }}>Warten auf Spieldaten …</div>
           <div style={{ fontSize: 28, color: SUB }}>{spiel ? `${spiel.name}: der Screen füllt sich, sobald das Match läuft` : "Kein aktives Spiel"}</div>
         </Panel>
-      ) : d.br ? <BattleRoyale d={d} spiel={spiel} /> : d.teams ? (
+      ) : d.teams ? (
         <><TeamBlock t={d.teams[0]} h={h} /><Mitte d={d} /><TeamBlock t={d.teams[1]} rechts h={h} /></>
       ) : <Panel style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}><Mitte d={d} /></Panel>}
     </div>

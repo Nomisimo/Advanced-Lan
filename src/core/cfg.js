@@ -5,7 +5,8 @@
 const CFG_ORDNER = "Steam\\steamapps\\common\\Counter-Strike Global Offensive\\game\\csgo\\cfg";
 const CFG_DATEI = "gamestate_integration_advancedlan.cfg";
 
-function gsiCfg({ port, token }) {
+// Aufbau der Datei ist bei CS2 und Dota 2 gleich (Valve GSI), nur die Datenblöcke unterscheiden sich
+function gsiDatei({ port, token, daten }) {
   return [
     '"Advanced LAN"',
     "{",
@@ -20,11 +21,13 @@ function gsiCfg({ port, token }) {
     "\t}",
     '\t"data"',
     "\t{",
-    ...["provider", "map", "round", "player_id", "player_state", "player_match_stats", "allplayers_id", "allplayers_state", "allplayers_match_stats", "bomb", "phase_countdowns"].map((k) => `\t\t"${k}"\t"1"`),
+    ...daten.map((k) => `\t\t"${k}"\t"1"`),
     "\t}",
     "}",
     "",
   ].join("\r\n");
 }
 
-module.exports = { gsiCfg, CFG_ORDNER, CFG_DATEI };
+const gsiCfg = ({ port, token }) => gsiDatei({ port, token, daten: ["provider", "map", "round", "player_id", "player_state", "player_match_stats", "allplayers_id", "allplayers_state", "allplayers_match_stats", "bomb", "phase_countdowns"] });
+
+module.exports = { gsiCfg, gsiDatei, CFG_ORDNER, CFG_DATEI };

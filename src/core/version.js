@@ -6,6 +6,11 @@ const REPO = "Nomisimo/Advanced-Lan";
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
+  "0.1.0-beta.17": [
+    "Aufgeräumt: ungenutzter Code und Reste der entfernten Battle-Royale-Spiele (Spieler übrig, Squad gewinnt, Niedergeschlagen) sind raus, die Anleitung nennt beim Simulator nur noch die aktuellen Spiele",
+    "Doppelter Code zusammengelegt: Simulator-Knöpfe in Regie und Game-PC, Tab-Leiste, Bestenlisten im Control-Tab, cfg-Dateien von CS2 und Dota 2 und das Installieren und Speichern der Spiel-Dateien",
+    "„Speichern unter …“ für cfg und ini meldet Schreibfehler jetzt als Meldung statt still abzubrechen",
+  ],
   "0.1.0-beta.12": [
     "Ohne Overwolf: die App läuft jetzt auf normalem Electron und wird mit electron-builder gebaut. Keine Overwolf-Laufzeit, keine Nutzungsdaten an Overwolf",
     "Alle Spiele und Events bleiben: CS2 und Dota 2 über Valve GSI, Rocket League über die Stats API, Valorant und The Finals über Bilderkennung, Mini-Overlay, Namens-Popup, Simulator und Netzwerk wie bisher",

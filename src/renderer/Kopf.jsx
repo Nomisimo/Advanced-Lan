@@ -1,5 +1,5 @@
 import React from "react";
-import { S, LINE, SUB } from "./theme.js";
+import { S } from "./theme.js";
 import { uiConfirm } from "./dialog.jsx";
 import APP_ICON_SVG from "../../assets/app-icon/icon.svg";
 import { Repeat } from "lucide-react";

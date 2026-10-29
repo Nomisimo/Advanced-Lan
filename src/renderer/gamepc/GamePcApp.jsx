@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { S, OK, WARN, ERR, MUTED, ACCENT } from "../theme.js";
 import { api } from "../api.js";
 import Kopf from "../Kopf.jsx";
+import { Dot, TabLeiste, useTab } from "../ui.jsx";
 import SessionTab from "./SessionTab.jsx";
 import SetupTab from "./SetupTab.jsx";
 import AppEinstellungen from "../AppEinstellungen.jsx";
@@ -20,8 +21,7 @@ export default function GamePcApp({ cfg: alles, mutate: mutateAlles, ersetzen, s
   const g = st.gamepc;
   const mutate = (fn) => mutateAlles((d) => fn(d.gamepc));
   const [log, setLog] = useState([]);
-  const [tab, setTab] = useState(() => { try { const t = localStorage.getItem("advancedlan_gamepc_tab"); return TABS.some(([k]) => k === t) ? t : "session"; } catch { return "session"; } });
-  useEffect(() => { try { localStorage.setItem("advancedlan_gamepc_tab", tab); } catch {} }, [tab]);
+  const [tab, setTab] = useTab("advancedlan_gamepc_tab", TABS, "session");
   useEffect(() => {
     api.gamePcLog().then(setLog);
     return api.onGamePcEvent((e) => setLog((l) => [e, ...l].slice(0, 200)));
@@ -29,7 +29,7 @@ export default function GamePcApp({ cfg: alles, mutate: mutateAlles, ersetzen, s
   const c = g.client;
   const [zText, zFarbe] = ZUSTAND[c.zustand] || ZUSTAND.getrennt;
   const frisch = (t) => t && jetzt - t < 15000;
-  const cs2Aktiv = frisch(g.letzte) || frisch(g.rl?.letzte) || Object.values(g.daten || {}).some((d) => frisch(d.letzte)); // irgendein Spiel liefert Daten
+  const spielDaten = frisch(g.letzte) || frisch(g.rl?.letzte) || Object.values(g.daten || {}).some((d) => frisch(d.letzte)); // irgendein Spiel liefert Daten
   const shared = { cfg, mutate, g, log, jetzt, notify, goTab: setTab };
 
   return (
@@ -40,17 +40,12 @@ export default function GamePcApp({ cfg: alles, mutate: mutateAlles, ersetzen, s
       </>}>
         <ShowKnopf cfg={alles} ersetzen={ersetzen} notify={notify} />
       </Kopf>
-      <nav style={S.nav}>
-        {TABS.map(([k, label, Ic]) => (
-          <button key={k} style={{ ...S.navBtn, ...(tab === k ? S.navBtnActive : {}) }} onClick={() => setTab(k)}>
-            <Ic size={14} />{label}
-            {k === "session" && <span style={{ width: 7, height: 7, borderRadius: "50%", background: zFarbe, boxShadow: c.zustand === "verbunden" ? `0 0 6px ${OK}` : "none" }} />}
-            {k === "setup" && <span style={{ width: 7, height: 7, borderRadius: "50%", background: cs2Aktiv ? OK : WARN, boxShadow: cs2Aktiv ? `0 0 6px ${OK}` : "none" }} />}
-            {k === "sim" && g.sim?.laeuft && <span style={{ width: 7, height: 7, borderRadius: "50%", background: ACCENT, boxShadow: `0 0 6px ${ACCENT}` }} />}
-            {k === "events" && log.length > 0 && <span style={{ ...S.badge, background: "#2f2c3a", color: MUTED }}>{log.length}</span>}
-          </button>
-        ))}
-      </nav>
+      <TabLeiste tabs={TABS} tab={tab} setTab={setTab} marke={(k) => <>
+        {k === "session" && <Dot size={7} color={zFarbe} glow={c.zustand === "verbunden"} />}
+        {k === "setup" && <Dot size={7} color={spielDaten ? OK : WARN} glow={spielDaten} />}
+        {k === "sim" && g.sim?.laeuft && <Dot size={7} color={ACCENT} glow />}
+        {k === "events" && log.length > 0 && <span style={{ ...S.badge, background: "#2f2c3a", color: MUTED }}>{log.length}</span>}
+      </>} />
       <div style={{ flex: 1, minHeight: 0, overflow: "auto" }} key={tab}>
         <main style={S.main}>
           <div style={{ animation: "npFade .18s ease" }}>

@@ -6,7 +6,7 @@ const REPO = "Nomisimo/Advanced-Lan";
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
-  "0.1.0-beta.17": [
+  "0.1.0-beta.18": [
     "Exklusives Vollbild: der Game-PC erkennt, wenn ein Spiel im exklusiven Vollbild läuft. Dort zeichnet Windows keine Fenster darüber, Mini-Overlay und Namens-Popup sind unsichtbar",
     "Das Namens-Popup wartet dann, bis das Spiel das Vollbild verlässt (Alt+Tab oder Spiel beendet), statt ungesehen abzulaufen",
     "Regie → Session: Spielernamen der Game-PCs direkt eintragen und das Namens-Popup am PC zeigen lassen. Hinweise „Exklusives Vollbild“ und „Name offen“, auch im Tab „Control“",

@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { S, ACCENT, ACCENT_HI, LINE, SUB, MUTED, OK, ERR, WARN, FELD, GLOW } from "../theme.js";
-import { Section, Field, Toggle, Dot } from "../ui.jsx";
+import { S, ACCENT, ACCENT_HI, LINE, SUB, MUTED, WARN, FELD, GLOW } from "../theme.js";
+import { Section, Field, Toggle } from "../ui.jsx";
 import { uiConfirm } from "../dialog.jsx";
-import { api } from "../api.js";
 import { StatsBuehne } from "../StatsScreen.jsx";
+import StatsAusgabe from "./StatsAusgabe.jsx";
 import { SPIEL_BY_ID } from "../../core/spiele.js";
 import { B, H, MIN, MAX_TEXTE, ANZEIGE, HINTERGRUENDE, PLATZHALTER, standardLayout, migrateLayout, neuerText, einrasten } from "../../core/stats-layout.js";
 import { statsBeispiel } from "../../core/stats-beispiel.js";
-import { Type, Eye, EyeOff, Undo2, Redo2, RotateCcw, Copy, Trash2, ArrowUpToLine, ArrowDownToLine, AlignLeft, AlignCenter, AlignRight, MonitorPlay, Cast, Move } from "lucide-react";
+import { Type, Eye, EyeOff, Undo2, Redo2, RotateCcw, Copy, Trash2, ArrowUpToLine, ArrowDownToLine, AlignLeft, AlignCenter, AlignRight, Cast, Move } from "lucide-react";
 
 // Editor des Game-Stats-Screens: Anzeigen und Texte per Drag and Drop auf der 1920×1080-Fläche anordnen,
 // Größe an den Griffen ändern, Texte schreiben. Gespeichert in cfg.regie.stats.layout; Pop-out-Fenster und NDI zeigen es sofort.
@@ -38,7 +38,7 @@ const Zahl = ({ label, wert, onChange, min = 0, max = 9999 }) => (
   </Field>
 );
 
-export default function ScreenTab({ cfg, mutate, status, log, goTab }) {
+export default function ScreenTab({ cfg, mutate, status, log }) {
   const gespeichert = useMemo(() => migrateLayout(cfg.stats?.layout), [cfg.stats?.layout]);
   const [layout, setLayout] = useState(gespeichert);
   const [auswahl, setAuswahl] = useState(null);
@@ -158,8 +158,6 @@ export default function ScreenTab({ cfg, mutate, status, log, goTab }) {
   const vStatus = beispiel ? { ...status, ...bsp.regie } : status;
   const vLog = beispiel ? bsp.log : log;
 
-  const st = status.stats || {}, ndi = st.ndi || {}, aus = !cfg.stats?.an;
-  const ausgabe = aus ? "Stats-Screen ist aus (Setup)" : [st.fenster ? "Pop-out-Fenster offen" : "", cfg.stats?.ndi ? (ndi.fehler ? `NDI: ${ndi.fehler}` : ndi.laeuft ? `NDI „${ndi.name}“ sendet` : "NDI startet …") : ""].filter(Boolean).join(" · ") || "Kein Fenster offen, NDI aus";
 
   return (
     <>
@@ -171,9 +169,7 @@ export default function ScreenTab({ cfg, mutate, status, log, goTab }) {
           <button style={S.primaryBtn} disabled={texte >= MAX_TEXTE} onClick={() => textNeu()}><Type size={14} /> Text hinzufügen</button>
         </div>}>
         <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", fontSize: 12, color: SUB, marginBottom: 10 }}>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Dot color={aus ? MUTED : ndi.fehler ? ERR : ndi.laeuft || st.fenster ? OK : WARN} glow={ndi.laeuft} />{ausgabe}</span>
-          {aus && <button style={S.smallBtn} onClick={() => goTab("setup")}>Zum Setup</button>}
-          {!aus && <button style={S.smallBtn} onClick={() => api.statsFenster(!st.fenster)}><MonitorPlay size={12} /> {st.fenster ? "Fenster schließen" : "Fenster öffnen"}</button>}
+          {!cfg.stats?.an && <span style={{ color: WARN }}>Stats-Screen ist aus: unten unter „Ausgabe“ einschalten</span>}
           <span style={{ flex: 1 }} />
           <Toggle checked={beispiel} onChange={setBeispiel} label={`Beispieldaten${spiel ? ` (${spiel.kurz})` : ""}`} title="Nur im Editor: Anzeigen mit einem laufenden Beispiel-Match füllen" />
           <label style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>Raster
@@ -230,6 +226,7 @@ export default function ScreenTab({ cfg, mutate, status, log, goTab }) {
           </div>
         </div>
       </Section>
+      <StatsAusgabe cfg={cfg} mutate={mutate} status={status} />
     </>
   );
 }

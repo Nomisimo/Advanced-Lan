@@ -62,7 +62,6 @@ contextBridge.exposeInMainWorld('regieAPI', {
   gamePcLog:       call('gamepc-log'),
   verbinden:       call('verbinden'),
   trennen:         call('trennen'),
-  cs2Ordner:       call('cs2-ordner'),
   setupCheck:      call('setup-check'),
   rlIniInstallieren: call('rl-ini-installieren'),
   rlIniSpeichern:  call('rl-ini-speichern'),

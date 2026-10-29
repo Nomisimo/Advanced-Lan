@@ -116,6 +116,4 @@ function befehleFuer(cfg, ev) {
 const zeigeArg = (a) => (a.type === "s" ? JSON.stringify(a.value) : a.type === "T" || a.type === "F" ? a.type : String(a.value));
 const zeigeNachricht = (n) => [n.address, ...n.args.map(zeigeArg)].join(" ");
 
-const slug = (s) => String(s || "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "") || "x";
-
-module.exports = { baueNachrichten, nutztPlan, testNachricht, befehleFuer, zuweisungen, passt, parseArgs, einsetzen, zeigeNachricht, EVENT_VARS, slug };
+module.exports = { baueNachrichten, nutztPlan, testNachricht, befehleFuer, zuweisungen, passt, parseArgs, einsetzen, zeigeNachricht, EVENT_VARS };

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { S, ACCENT, LINE, SUB, MUTED, ERR, WARN, OK, GLOW_STARK } from "../theme.js";
+import { S, ACCENT, SUB, MUTED, ERR, WARN, OK, GLOW_STARK } from "../theme.js";
 import { api } from "../api.js";
 import Kopf from "../Kopf.jsx";
+import { Dot, TabLeiste, useTab } from "../ui.jsx";
 import { SPIEL_BY_ID } from "../../core/spiele.js";
 import ControlTab from "./ControlTab.jsx";
 import SetupTab from "./SetupTab.jsx";
@@ -18,7 +19,8 @@ import GpSetupTab from "../gamepc/SetupTab.jsx";
 import BildTab from "../gamepc/BildTab.jsx";
 import { Gauge, ListChecks, Send, FlaskConical, BookOpen, Power, Radio, KeyRound, TriangleAlert, Settings, Gamepad2, MonitorPlay, ScanEye, LayoutGrid } from "lucide-react";
 
-const TABS_REGIE = [["control", "Control", Gauge], ["signale", "Signale", ListChecks], ["ziele", "Ziele", Send], ["plan", "Plan", LayoutGrid], ["session", "Session", KeyRound], ["setup", "Setup", Settings], ["screen", "Screen", MonitorPlay], ["sim", "Simulator", FlaskConical], ["hilfe", "Anleitung", BookOpen]];
+// Control ist der Live-Tab, danach die Einrichtung in der Reihenfolge, in der man sie braucht
+const TABS_REGIE = [["control", "Control", Gauge], ["session", "Session", KeyRound], ["ziele", "Ziele", Send], ["plan", "Plan", LayoutGrid], ["signale", "Signale", ListChecks], ["screen", "Stats-Screen", MonitorPlay], ["setup", "Setup", Settings], ["sim", "Simulator", FlaskConical], ["hilfe", "Anleitung", BookOpen]];
 // Standalone: dazu der Tab „Spiele“ mit dem Setup der Spiele auf diesem PC (wie auf einem Game-PC)
 const TABS_STANDALONE = [...TABS_REGIE.slice(0, 7), ["spiele", "Spiele", Gamepad2], ["bild", "Bilderkennung", ScanEye], ...TABS_REGIE.slice(7)];
 const LOG_MAX = 300;
@@ -36,8 +38,7 @@ export default function RegieApp({ cfg: alles, mutate: mutateAlles, ersetzen, st
   const status = st.regie;
   const mutate = useCallback((fn) => mutateAlles((d) => fn(d.regie)), [mutateAlles]);
   const [log, setLog] = useState([]);
-  const [tab, setTab] = useState(() => { try { const t = localStorage.getItem("advancedlan_regie_tab"); return TABS.some(([k]) => k === t) ? t : standalone ? "spiele" : "control"; } catch { return standalone ? "spiele" : "control"; } });
-  useEffect(() => { try { localStorage.setItem("advancedlan_regie_tab", tab); } catch {} }, [tab]);
+  const [tab, setTab] = useTab("advancedlan_regie_tab", TABS, standalone ? "spiele" : "control");
   useEffect(() => {
     api.regieLog().then(setLog);
     return api.onRegieEvent((e) => setLog((l) => logEinfuegen(l, e)));
@@ -73,16 +74,11 @@ export default function RegieApp({ cfg: alles, mutate: mutateAlles, ersetzen, st
           <Power size={15} /> {an ? "AUSGABE AN" : "AUSGABE AUS"}
         </button>
       </Kopf>
-      <nav style={S.nav}>
-        {TABS.map(([k, label, Ic]) => (
-          <button key={k} style={{ ...S.navBtn, ...(tab === k ? S.navBtnActive : {}) }} onClick={() => setTab(k)}>
-            <Ic size={14} />{label}
-            {k === "plan" && cfg.plan.pcs.length > 0 && <span style={{ ...S.badge, background: "#2f2c3a", color: SUB }}>{cfg.plan.pcs.length}</span>}
-            {k === "control" && <span style={{ ...S.badge, background: verbunden.length ? OK + "33" : "#2f2c3a", color: verbunden.length ? OK : MUTED }}>{verbunden.length}</span>}
-            {k === "session" && <span style={{ width: 7, height: 7, borderRadius: "50%", background: ses.offen ? OK : WARN, boxShadow: ses.offen ? `0 0 6px ${OK}` : "none" }} />}
-          </button>
-        ))}
-      </nav>
+      <TabLeiste tabs={TABS} tab={tab} setTab={setTab} marke={(k) => <>
+        {k === "plan" && cfg.plan.pcs.length > 0 && <span style={{ ...S.badge, background: "#2f2c3a", color: SUB }}>{cfg.plan.pcs.length}</span>}
+        {k === "control" && <span style={{ ...S.badge, background: verbunden.length ? OK + "33" : "#2f2c3a", color: verbunden.length ? OK : MUTED }}>{verbunden.length}</span>}
+        {k === "session" && <Dot size={7} color={ses.offen ? OK : WARN} glow={ses.offen} />}
+      </>} />
       <div style={{ flex: 1, minHeight: 0, overflow: "auto" }} key={tab}>
         <main style={S.main}>
           <div style={{ animation: "npFade .18s ease" }}>

@@ -49,11 +49,11 @@ const Regie = ({ goTab }) => (
     </Schritt>
     <Schritt n={2} titel="Session öffnen" onGo={goTab && (() => goTab("session"))} goLabel="Session">
       Name und Passwort festlegen, <b>Öffnen</b>. Die Session wird per mDNS im Netz angekündigt. Ändert man das Passwort, müssen alle PCs neu beitreten.
-      Darunter steht, wer verbunden ist: PC-ID, Hostname, IP, MAC, Ping, App-Version und die Netzwerkkarte des PCs. Eine andere App-Version als die der Regie ist orange.
+      Darunter steht, wer verbunden ist: PC-ID, Hostname, IP, MAC, Ping, App-Version und die Netzwerkkarte des PCs. Eine andere App-Version als die der Regie ist orange. Ganz unten die Netzwerkkarte, über die die Regie die Game-PCs empfängt.
     </Schritt>
     <Schritt n={3} titel="Ziele anlegen" onGo={goTab && (() => goTab("ziele"))} goLabel="Ziele">
       Unten in der <b>Ziel-Datenbank</b> die Software oder das Gerät wählen und <b>Anlegen</b>. Dann IP-Adresse eintragen; der Port ist auf den Standard des Geräts gesetzt.
-      Auf dem Gerät selbst muss OSC-Empfang eingeschaltet sein (siehe „Ziele einrichten“ unten). <b>Test</b> schickt eine harmlose Nachricht, bei QLab zum Beispiel <Kbd>/thump</Kbd>.
+      Auf dem Gerät selbst muss OSC-Empfang eingeschaltet sein (siehe „Ziele einrichten“ unten). Unter der Liste die Netzwerkkarte, über die die OSC-Befehle rausgehen. <b>Test</b> schickt eine harmlose Nachricht, bei QLab zum Beispiel <Kbd>/thump</Kbd>.
     </Schritt>
     <Schritt n={4} titel="Plan anlegen" onGo={goTab && (() => goTab("plan"))} goLabel="Plan">
       Im Tab <b>Plan</b> mit <b>Plätze anlegen</b> die Game-PCs vorab eintragen (PC 01 bis PC 10), auch ohne dass ein Rechner verbunden ist. Je Ziel gibt es eine Spalte:
@@ -72,8 +72,8 @@ const Regie = ({ goTab }) => (
       <b> Test</b> sendet den Befehl sofort, auch bei Ausgabe aus (ohne PC-Filter als erster Platz des Plans).
     </Schritt>
     <Schritt n={6} titel="Proben" onGo={goTab && (() => goTab("sim"))} goLabel="Simulator">
-      Der Simulator spielt das aktive Spiel mit virtuellen Game-PCs und derselben Erkennung wie echte PCs: CS2, Dota 2, Overwatch 2 und Rainbow Six mit 10 PCs (5 gegen 5), Marvel Rivals mit 12 (6 gegen 6), Rocket League mit 6 (3 gegen 3),
-      Fortnite und PUBG mit 8 PCs in zwei Vierer-Squads, Apex mit 6 PCs in zwei Trios. Bei Battle Royales spielen die LAN-Squads in einer vollen Lobby, eine Runde ist eine Zone.
+      Der Simulator spielt das aktive Spiel mit virtuellen Game-PCs und derselben Erkennung wie echte PCs: CS2, Dota 2 und Valorant mit 10 PCs (5 gegen 5), Rocket League mit 6 (3 gegen 3).
+      Für The Finals gibt es keinen Simulator.
       Einzelne Events lassen sich direkt auslösen. Simulierte PCs spielen die Plätze aus dem Plan (SIM 03 ist Platz 3), so lassen sich Befehle mit <Kbd>{"{plan}"}</Kbd> ohne echte PCs proben.
     </Schritt>
     <Schritt n={7} titel="Live gehen" onGo={goTab && (() => goTab("control"))} goLabel="Control">
@@ -124,7 +124,7 @@ const GamePc = ({ goTab }) => (
     <P>
       <b>Mini-Overlay:</b> Ist die App minimiert, zeigt ein kleines App-Icon über allen Fenstern, ob alles läuft. Grün: Session verbunden und ein Spiel liefert Daten.
       Orange: verbindet gerade oder kein Spiel liefert Daten. Rot: keine Session, abgelehnt oder CS2-Empfang gestört. Das Icon lässt sich verschieben, ein Klick öffnet die App.
-      Ein- und ausschalten im Tab <b>Setup</b>.
+      Ein- und ausschalten im Tab <b>Setup</b> unter „Einstellungen“.
     </P>
     <P>
       <b>Exklusives Vollbild:</b> Läuft ein Spiel im exklusiven Vollbild, schreibt es direkt auf den Monitor und Windows zeichnet keine anderen Fenster darüber.
@@ -256,8 +256,8 @@ const Netz = () => (
       <li>Bricht die Verbindung ab, verbindet sich der Game-PC selbst neu. Events aus der Pause werden nicht nachgeschickt, damit nichts zur falschen Zeit kommt.</li>
       <li>Die Spiele senden nur an die App auf demselben PC: CS2 und Dota 2 an <Kbd>127.0.0.1:3000</Kbd>, Rocket League auf <Kbd>127.0.0.1:49124</Kbd>. Dafür muss nichts in der Firewall freigegeben werden.</li>
       <li>Windows-Firewall: auf der Regie eingehend TCP 47801 erlauben, auf allen PCs UDP 5353. Beim ersten Start fragt Windows meist selbst.</li>
-      <li><b>Netzwerkkarten</b>: Die Regie wählt im Tab <b>Setup</b> getrennt, über welche Karte sie Game-PCs empfängt und über welche sie OSC sendet; im Tab <b>Ziele</b> kann jedes Ziel eine eigene Karte bekommen.
-        Der Game-PC wählt seine Karte im Tab <b>Setup</b>. Die App bindet Empfang und Absender an die IP der Karte. Das ist eindeutig, wenn jede Karte in einem eigenen Netz (Subnetz) liegt, z. B. LAN <Kbd>192.168.1.x</Kbd> und Licht <Kbd>2.x.x.x</Kbd>.
+      <li><b>Netzwerkkarten</b>: Die Regie wählt im Tab <b>Session</b>, über welche Karte sie Game-PCs empfängt, und im Tab <b>Ziele</b>, über welche sie OSC sendet; dort kann jedes Ziel auch eine eigene Karte bekommen.
+        Der Game-PC wählt seine Karte im Tab <b>Session</b>. Die App bindet Empfang und Absender an die IP der Karte. Das ist eindeutig, wenn jede Karte in einem eigenen Netz (Subnetz) liegt, z. B. LAN <Kbd>192.168.1.x</Kbd> und Licht <Kbd>2.x.x.x</Kbd>.
         Liegen zwei Karten im selben Subnetz, entscheidet das Betriebssystem nach seiner Routing-Tabelle. Liegt ein Ziel nicht im Netz der gewählten Karte, zeigt der Tab Ziele einen Hinweis.</li>
       <li style={{ color: SUB }}>Der Modus (Regie oder Game-PC) lässt sich oben rechts wechseln.</li>
     </L>
@@ -318,12 +318,12 @@ const StatsHilfe = ({ goTab }) => (
   <Section title="Game-Stats-Screen">
     <P>
       Ein Bildschirm für Publikum und Stream: Spielstand, Runde oder Spielzeit, Zahlen des Matches, die besten Spieler und die letzten Events des aktiven Spiels.
-      Er wird nur in der Regie (und im Standalone) im Tab <b>Setup</b> eingeschaltet. Gestaltet ist er für 1920×1080 und passt sich jedem Fenster an.
+      Er wird nur in der Regie (und im Standalone) im Tab <b>Stats-Screen</b> eingeschaltet. Gestaltet ist er für 1920×1080 und passt sich jedem Fenster an.
     </P>
     <L>
-      <li><b>Pop-out-Fenster:</b> Knopf <b>Stats</b> oben in der Kopfzeile oder im Setup. Das Fenster auf einen zweiten Bildschirm oder Beamer ziehen, Doppelklick schaltet Vollbild.</li>
-      <li><b>NDI-Stream:</b> im Setup einschalten und einen Namen vergeben. OBS (mit NDI-Plugin), vMix oder ein NDI-Monitor im selben Netz sehen die Quelle unter diesem Namen, 1920×1080 mit 30 Bildern pro Sekunde. NDI braucht kein offenes Fenster. Im Setup zählt die Zeile die gesendeten Bilder und Empfänger mit. Sieht kein Empfänger die Quelle, muss die Windows-Firewall Advanced LAN im privaten Netz erlauben.</li>
-      <li><b>Screen-Editor (Tab Screen):</b> Anzeigen (Logo, Spiel, Session, LIVE, Spielstand, Zahlen, Bestenliste, Events) per Drag and Drop verschieben, an den Griffen vergrößern, ausblenden und eigene Texte dazulegen. Texte kennen Platzhalter wie <Kbd>{"{spiel}"}</Kbd>, <Kbd>{"{session}"}</Kbd> oder <Kbd>{"{score1}"}</Kbd>. Jede Änderung wird gespeichert und gilt sofort im Fenster und im NDI-Stream. Hintergrund auch schwarz oder grün für Chroma-Key.</li>
+      <li><b>Pop-out-Fenster:</b> Knopf <b>Stats</b> oben in der Kopfzeile oder im Tab Stats-Screen. Das Fenster auf einen zweiten Bildschirm oder Beamer ziehen, Doppelklick schaltet Vollbild.</li>
+      <li><b>NDI-Stream:</b> im Tab Stats-Screen einschalten und einen Namen vergeben. OBS (mit NDI-Plugin), vMix oder ein NDI-Monitor im selben Netz sehen die Quelle unter diesem Namen, 1920×1080 mit 30 Bildern pro Sekunde. NDI braucht kein offenes Fenster. Dort zählt die Zeile die gesendeten Bilder und Empfänger mit. Sieht kein Empfänger die Quelle, muss die Windows-Firewall Advanced LAN im privaten Netz erlauben.</li>
+      <li><b>Screen-Editor (Tab Stats-Screen, unter der Ausgabe):</b> Anzeigen (Logo, Spiel, Session, LIVE, Spielstand, Zahlen, Bestenliste, Events) per Drag and Drop verschieben, an den Griffen vergrößern, ausblenden und eigene Texte dazulegen. Texte kennen Platzhalter wie <Kbd>{"{spiel}"}</Kbd>, <Kbd>{"{session}"}</Kbd> oder <Kbd>{"{score1}"}</Kbd>. Jede Änderung wird gespeichert und gilt sofort im Fenster und im NDI-Stream. Hintergrund auch schwarz oder grün für Chroma-Key.</li>
     </L>
     <P><span style={{ color: SUB }}>NDI® ist eine eingetragene Marke von Vizrt NDI AB.</span></P>
     {goTab && <button style={S.smallBtn} onClick={() => goTab("setup")}>Zum Setup</button>}

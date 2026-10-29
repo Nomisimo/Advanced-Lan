@@ -29,7 +29,7 @@ const BILDER = process.argv[3] || require('os').tmpdir();
   });
   await page.reload();
   // Ohne Session springt die Regie zuerst zum Tab „Session“
-  await page.getByRole('button', { name: 'Screen', exact: true }).click();
+  await page.getByRole('button', { name: 'Stats-Screen', exact: true }).click();
   const flaeche = page.getByTestId('screen-flaeche');
   await flaeche.waitFor();
   await page.waitForTimeout(300);

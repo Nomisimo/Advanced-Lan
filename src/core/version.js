@@ -6,12 +6,29 @@ const REPO = "Nomisimo/Advanced-Lan";
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
-  "0.1.0-beta.14": [
+  "0.1.0-beta.17": [
     "Exklusives Vollbild: der Game-PC erkennt, wenn ein Spiel im exklusiven Vollbild läuft. Dort zeichnet Windows keine Fenster darüber, Mini-Overlay und Namens-Popup sind unsichtbar",
     "Das Namens-Popup wartet dann, bis das Spiel das Vollbild verlässt (Alt+Tab oder Spiel beendet), statt ungesehen abzulaufen",
     "Regie → Session: Spielernamen der Game-PCs direkt eintragen und das Namens-Popup am PC zeigen lassen. Hinweise „Exklusives Vollbild“ und „Name offen“, auch im Tab „Control“",
     "Mini-Overlay und Namens-Popup holen sich jede Sekunde die oberste Ebene zurück, wenn sich ein randloses Spiel darüber legt",
     "Game-PC → Session: Warnung mit den richtigen Spieleinstellungen (Valorant „Vollbild im Fenster“, CS2 „Vollbild (Fenster)“, Rocket League „Randlos“)",
+  ],
+  "0.1.0-beta.16": [
+    "Windows: das Advanced-LAN-Icon erscheint jetzt überall, in der Taskleiste, im Startmenü, auf der Desktop-Verknüpfung, an der .exe und im Installer statt des Electron-Logos",
+    "Windows: angeheftete Taskleisten-Verknüpfung und laufende App teilen sich ein Icon statt zwei nebeneinander",
+    "Mac: schärferes Dock-Icon (1024 px)",
+  ],
+  "0.1.0-beta.15": [
+    "Game-PC → Setup: Knopf „Automation Overdrive öffnen“. Startet die installierte Overwolf-App direkt über Overwolf. Fehlt sie, öffnet sich die Seite im Overwolf-Store, fehlt Overwolf, die Download-Seite",
+    "Setup-Check zeigt, ob Automation Overdrive installiert ist und in welcher Version",
+  ],
+  "0.1.0-beta.13": [
+    "Valorant: das Team jedes Game-PCs kommt automatisch vom Riot Client, schon in der Agentenwahl. Rot = TEAM A (beginnt im Angriff), Blau = TEAM B. Das Team bleibt das ganze Match gleich, auch nach dem Seitenwechsel",
+    "Bilderkennung → Valorant → „Team dieses PCs“: neu „Automatisch (Riot Client)“, Standard. Darunter steht, welches Team erkannt ist. Ohne Riot Client oder außerhalb eines Matches gilt das zuletzt gewählte Team",
+    "Control: neuer Bereich „Matches“ zeigt jedes laufende Match des aktiven Spiels mit Anzahl und Namen der PCs. „Auf dieses Match schalten“ wählt eins fest aus",
+    "Nur das gewählte Match löst Signale aus und füllt Statistik und Stats-Screen. Events von PCs in einem anderen Match landen unter „Verworfen“ mit dem Grund „anderes Match“",
+    "„Automatisch“ (Standard) schaltet immer auf das Match mit den meisten PCs. Fest gewählt folgt die Regie den PCs dieses Matches auch ins nächste",
+    "Erkennung: Rocket League über die MatchGuid, Dota 2 über die Match-ID, CS2 über Map und Spielstand, Valorant über die MatchID vom Riot Client. The Finals hat keine Matchdaten, dort zählen alle Events",
   ],
   "0.1.0-beta.12": [
     "Ohne Overwolf: die App läuft jetzt auf normalem Electron und wird mit electron-builder gebaut. Keine Overwolf-Laufzeit, keine Nutzungsdaten an Overwolf",

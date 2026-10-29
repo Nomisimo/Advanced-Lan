@@ -8,9 +8,9 @@ import { SPIELE } from "../../core/spiele.js";
 import { CFG_ORDNER, CFG_DATEI } from "../../core/cfg.js";
 import { RL_INI_DATEI, RL_INI_ORDNER } from "../../core/rl-ini.js";
 import { DOTA_CFG_DATEI, DOTA_CFG_ORDNER, DOTA_STARTOPTION } from "../../core/dota.js";
-import { OVERDRIVE_PORT } from "../../core/overdrive.js";
+import { OVERDRIVE_PORT, OVERDRIVE_STORE_URL, OVERWOLF_URL } from "../../core/overdrive.js";
 import SpielerName from "./SpielerName.jsx";
-import { FileDown, Download, RefreshCw, LocateFixed, BookOpen, ScanEye, ExternalLink } from "lucide-react";
+import { FileDown, Download, RefreshCw, LocateFixed, BookOpen, ScanEye, ExternalLink, Play } from "lucide-react";
 
 // Offizielle Dokumentation der Datenquellen, öffnet im Browser
 const DOKU = {
@@ -26,12 +26,19 @@ const DOKU = {
 };
 // Valorant ohne Bilderkennung: zwei Apps von Overwolf, die die Live-Events von Overwolf an diese App weitergeben
 const OVERDRIVE_LINKS = [
-  ["Overwolf herunterladen", "https://www.overwolf.com/"],
-  ["Automation Overdrive im Overwolf-Store", "https://www.overwolf.com/app/raimen_ttv-automation_overdrive"],
+  ["Overwolf herunterladen", OVERWOLF_URL],
+  ["Automation Overdrive im Overwolf-Store", OVERDRIVE_STORE_URL],
   ["Anleitung von Automation Overdrive", "https://github.com/raimen-ttv/Automation-Overdrive"],
 ];
 
-function OverdriveAnleitung({ punkte, mac }) {
+function OverdriveAnleitung({ punkte, mac, neuPruefen }) {
+  const [meldung, setMeldung] = useState(null);
+  // Startet die installierte App über Overwolf, sonst Store- oder Download-Seite
+  const oeffnen = async () => {
+    const r = await api.overdriveOeffnen();
+    setMeldung(r);
+    if (neuPruefen) setTimeout(neuPruefen, 4000);
+  };
   const schritt = { display: "flex", gap: 10, alignItems: "flex-start", fontSize: 13, lineHeight: 1.5, padding: "6px 0" };
   const nr = { flexShrink: 0, width: 20, height: 20, borderRadius: "50%", background: "#ff465533", color: "#ff4655", fontSize: 11, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center", marginTop: 1 };
   const schritte = [
@@ -43,7 +50,9 @@ function OverdriveAnleitung({ punkte, mac }) {
   ];
   return (
     <Section title={<span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>Valorant über Automation Overdrive <SpielChip spiel="valorant" /></span>}
-      subtitle="Optional, zusätzlich zur Bilderkennung: Overwolf liest die Events und Automation Overdrive schickt sie an diese App. Runden und Spike kommen weiter nur aus der Bilderkennung.">
+      subtitle="Optional, zusätzlich zur Bilderkennung: Overwolf liest die Events und Automation Overdrive schickt sie an diese App. Runden und Spike kommen weiter nur aus der Bilderkennung."
+      right={<button style={S.primaryBtn} onClick={oeffnen}><Play size={14} /> Automation Overdrive öffnen</button>}>
+      {meldung && <p style={{ ...S.hint, marginTop: 0, color: meldung.art === "gestartet" ? OK : WARN }}>{meldung.text}</p>}
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.2fr) minmax(0,1fr)", gap: 20, alignItems: "start" }}>
         <div>
           {schritte.map((t, i) => <div key={i} style={schritt}><span style={nr}>{i + 1}</span><span>{t}</span></div>)}
@@ -212,7 +221,7 @@ export default function SetupTab({ cfg, mutate, g, jetzt, notify, goTab, standal
           <p style={S.hint}>Spiel im randlosen Fenstermodus starten, sonst kann die Aufnahme schwarz bleiben.</p>
         </Section>
       </div>
-      <OverdriveAnleitung punkte={check?.overdrive} mac={mac} />
+      <OverdriveAnleitung punkte={check?.overdrive} mac={mac} neuPruefen={laden} />
     </>
   );
 }

@@ -7,10 +7,13 @@ const { befehleFuer, zeigeNachricht } = require("./signal");
 const { Statistik } = require("./statistik");
 const { SPIEL_BY_ID } = require("./spiele");
 const { leseSpieler } = require("./protokoll");
+const { matchGruppen, matchWahl } = require("./match-check");
 
 const LOG_MAX = 300;
 // Zählen dasselbe wie die Filter im Event-Log, nur ohne dessen Grenze von LOG_MAX Einträgen.
 // fehler = Ereignisse mit mindestens einem Fehler, gesendet = einzelne OSC-Nachrichten.
+// Dasselbe Match? CS2: gleiche Map und gemeinsame PCs, auch wenn sich die ID geändert hat (sie hängt am ersten PC)
+const gleichesMatch = (a, b) => a.id === b.id || (b.id.startsWith("cs2:") && a.id.split(":")[1] === b.id.split(":")[1] && a.pcs.some((p) => b.pcs.includes(p)));
 const neueZaehler = () => ({ ereignisse: 0, eingerichtet: 0, verworfen: 0, gesendet: 0, fehler: 0 });
 
 class Regie {
@@ -27,6 +30,32 @@ class Regie {
     this.zaehler = neueZaehler();
     this.nr = 0;
     this.statistik = new Statistik();
+    // Matches des aktiven Spiels (match-check.js) und das gewählte: nur dessen Events lösen Signale aus und zählen in der Statistik
+    this.gruppen = [];
+    this.match = null;
+    this.matchVorher = { id: "", pcs: [], folgt: "" };
+  }
+
+  // Matches neu bestimmen (nach Status, Verbindung, Event oder geänderter Einstellung). Wechselt das gewählte Match,
+  // fängt die Statistik neu an und der Spielstand kommt vom neuen Match.
+  matchAktualisieren() {
+    const aktiv = this.aktiv(), einstellung = this.getConfig().match || { auto: true, wahl: "" };
+    this.gruppen = matchGruppen([...this.pcs.values()], aktiv);
+    const vorher = this.matchVorher.id.startsWith(`${aktiv}:`) ? this.matchVorher : { id: "", pcs: [], folgt: "" };
+    const g = matchWahl(this.gruppen, einstellung, vorher);
+    const alt = this.match;
+    this.match = g;
+    if (!g) return;
+    this.matchVorher = { id: g.id, pcs: g.pcs, folgt: einstellung.auto === false ? einstellung.wahl : "" };
+    if (alt && !gleichesMatch(alt, g)) this.statistik.reset(aktiv);
+    this.stand = { ...g.stand, spiel: aktiv, t: this.now() };
+  }
+
+  // Ist dieser PC in einem anderen als dem gewählten Match? Ohne Matchdaten (kein Spielstand, The Finals) nie.
+  imAnderenMatch(pcId) {
+    if (!this.match) return false;
+    const g = this.gruppen.find((x) => x.pcs.includes(pcId));
+    return !!g && g.id !== this.match.id;
   }
 
   aktiv() { return this.getConfig().aktivesSpiel; }
@@ -75,7 +104,7 @@ class Regie {
 
   pcGetrennt(pcId) {
     const p = this.pcs.get(pcId);
-    if (p) { p.verbunden = false; this.emit("status"); }
+    if (p) { p.verbunden = false; this.matchAktualisieren(); this.emit("status"); }
   }
 
   pcPing(pcId, ms) {
@@ -83,14 +112,17 @@ class Regie {
     if (p) { p.ping = ms; p.pingT = this.now(); this.emit("status"); }
   }
 
-  pcEntfernen(pcId) { this.pcs.delete(pcId); this.emit("status"); }
+  pcEntfernen(pcId) { this.pcs.delete(pcId); this.matchAktualisieren(); this.emit("status"); }
 
   // Status-Meldung eines Game-PCs (Spieler, Leben, Spielstand)
   pcStatus(pcId, { spiel, status, stand }) {
     const p = this.pcs.get(pcId);
     if (!p) return;
     Object.assign(p, { spiel: spiel || p.spiel, status: status || p.status, t: this.now() });
-    if (stand) { p.stand = stand; if (p.spiel === this.aktiv()) this.stand = { ...stand, spiel: p.spiel, t: this.now() }; }
+    if (stand) p.stand = stand;
+    this.matchAktualisieren();
+    // Spielstand kommt vom gewählten Match; ohne Matches (z. B. The Finals) vom letzten PC
+    if (stand && p.spiel === this.aktiv() && !this.match) this.stand = { ...stand, spiel: p.spiel, t: this.now() };
     this.emit("status");
   }
 
@@ -100,6 +132,8 @@ class Regie {
     if (p) { p.t = this.now(); p.spiel = spiel; }
     const e = { ...ev, spiel, pc: pcId, pcId }, quelle = p?.sim ? "sim" : "pc";
     if (spiel !== this.aktiv()) return this.verwerfen(e, "anderes Spiel", quelle);
+    this.matchAktualisieren();
+    if (this.imAnderenMatch(pcId)) return this.verwerfen(e, "anderes Match", quelle);
     if (!this.dedupe.accept(e, this.now())) return this.verwerfen(e, "doppelt", quelle); // mehrere PCs melden dieselbe Runde
     return this.fire(e, quelle);
   }
@@ -183,7 +217,9 @@ class Regie {
 
   snapshot() {
     const namen = this.namen();
-    return { pcs: [...this.pcs.values()], stand: this.stand, zaehler: { ...this.zaehler }, aktivesSpiel: this.aktiv(), statistik: this.statistik.json((n) => namen[n]), namen };
+    // matches: alle Matches des aktiven Spiels, match: das gewählte (Tab „Control“)
+    const matches = this.gruppen.map(({ id, pcs, anzahl, stand }) => ({ id, pcs, anzahl, stand }));
+    return { pcs: [...this.pcs.values()], stand: this.stand, matches, match: this.match?.id || "", zaehler: { ...this.zaehler }, aktivesSpiel: this.aktiv(), statistik: this.statistik.json((n) => namen[n]), namen };
   }
 }
 

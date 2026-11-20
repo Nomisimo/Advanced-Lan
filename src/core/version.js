@@ -6,6 +6,12 @@ const REPO = "Nomisimo/Advanced-Lan";
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
+  "0.1.0-beta.18": [
+    "Valorant über Shots Fired (Overwolf): die App nimmt auf jedem Game-PC einen Webhook an (http://localhost:44207/valorant) und übernimmt alle Overwolf-Events für Valorant, auch Spike gelegt, entschärft und explodiert",
+    "Rundengewinner und Matchgewinner kommen aus dem Spielstand von Overwolf (13 Runden, in der Verlängerung 2 Vorsprung), auch in Custom Matches ohne Match-Ende",
+    "Game-PC → Setup: Anleitung für Shots Fired mit Prüfliste und „Letzte Anfragen“, die zeigen, was Shots Fired wirklich schickt",
+    "Valorant: neues Event „Spike explodiert“, auch in der Bilderkennung, in Signalen und Statistik",
+  ],
   "0.1.0-beta.17": [
     "Regie: Tabs in der Reihenfolge der Einrichtung: Control, Session, Ziele, Plan, Signale, Stats-Screen, Setup, Simulator, Anleitung",
     "Regie: Tab „Screen“ heißt jetzt „Stats-Screen“ und enthält alles zum Game-Stats-Screen: Editor und darunter Einschalten, Pop-out-Fenster und NDI (vorher im Setup)",

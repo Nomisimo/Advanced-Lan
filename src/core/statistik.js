@@ -96,6 +96,7 @@ class Statistik {
         break;
       case "spike_planted": r.bombe = "planted"; m.bomben++; break;
       case "spike_defused": r.bombe = "defused"; break;
+      case "spike_detonated": r.bombe = "exploded"; break;
       case "kill": r.kills++; m.kills++; this.sp(ev).kills++; break;
       case "headshot": r.headshots++; m.headshots++; this.sp(ev).headshots++; break;
       case "death": r.tode++; m.tode++; this.sp(ev).tode++; break;

@@ -286,6 +286,11 @@ function browserApi() {
         const n = cfg.gamepc.bild.spiele[id].aktionen.length;
         return { id: `${id}-aktionen`, spiel: id, label: `${id === "valorant" ? "Valorant" : "The Finals"}: Aktionen eingerichtet`, ok: n > 0, warn: true, detail: n ? `${n} Aktionen` : "noch keine: im Tab „Bilderkennung“ anlegen oder importieren" };
       }),
+      shotsfired: [
+        { id: "sf-empfang", label: "Webhook bereit", ok: true, detail: "http://localhost:44207/valorant" },
+        { id: "sf-anfragen", label: "Shots Fired schickt Anfragen", ok: false, warn: true, detail: "In der Vorschau kein Overwolf" },
+        { id: "sf-daten", label: "Valorant-Events erkannt", ok: false, warn: true, detail: "noch keins" },
+      ],
       overdrive: [
         { id: "od-installiert", label: "Automation Overdrive installiert", ok: false, warn: true, detail: "fehlt: Knopf oben führt zum Store" },
         { id: "od-empfang", label: "Empfang bereit", ok: true, detail: "localhost:44206" },

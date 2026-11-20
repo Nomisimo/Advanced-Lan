@@ -7,6 +7,13 @@ const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
   "0.1.0-beta.18": [
+    "Neue Spiele: Fortnite (Battle Royale) und League of Legends. Dazu The Finals über Shots Fired",
+    "Shots Fired (Overwolf) für Valorant, Fortnite, LoL und The Finals: je Spiel eine Webhook-Adresse (http://localhost:44207/valorant, /fortnite, /lol, /finals), Format { gameId, event, data } wie Shots Fired es schickt",
+    "League of Legends über Riots Live Client Data API, ohne Overwolf: Team automatisch, Kill, Tod, Assist, Double bis Pentakill, First Blood, Türme, Inhibitoren, Drachen, Elder, Herold, Larven, Atakhan, Baron, gestohlene Objekte, Ace, Sieg oder Niederlage",
+    "Fortnite: Match-Start, Battle Bus, Landung, Eliminierung, Gegner niedergeschlagen, Assist, selbst niedergeschlagen, ausgeschieden, wiederbelebt, Top 10, Top 5, Victory Royale",
+    "Vorrang der Quellen je Event: Spiel-Schnittstelle vor Shots Fired vor Automation Overdrive vor Bilderkennung. Was eine bessere Quelle liefert, zählt aus einer schlechteren nicht doppelt",
+    "Game-PC → Setup: Shots Fired mit Anleitung je Spiel, Event-Liste und Adresse zum Kopieren, LoL-Prüfliste, Automation Overdrive eingeklappt im Hintergrund. Anleitung: neuer Abschnitt zu den Overwolf-Spielen",
+    "Stats-Screen für LoL (Kills je Team, Türme, Drachen, Barone, Inhibitoren) und Fortnite (Eliminierungen, Niedergeschlagen, Victory Royale)",
     "Valorant über Shots Fired (Overwolf): die App nimmt auf jedem Game-PC einen Webhook an (http://localhost:44207/valorant) und übernimmt alle Overwolf-Events für Valorant, auch Spike gelegt, entschärft und explodiert",
     "Rundenstart aus der Rundenphase (Kaufphase), Rundenende mit Sieger aus dem Spielstand, ohne Spielstand Rundenende ohne Sieger aus der Rundenphase",
     "Rundengewinner und Matchgewinner kommen aus dem Spielstand von Overwolf (13 Runden, in der Verlängerung 2 Vorsprung), auch in Custom Matches ohne Match-Ende",

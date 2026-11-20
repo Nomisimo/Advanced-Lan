@@ -48,14 +48,17 @@ export const TeamChip = ({ team }) => team ? (
 ) : null;
 
 
-const ICONS = { Match: Trophy, Runde: Timer, Bombe: Bomb, Spieler: Crosshair };
+const ICONS = { Match: Trophy, Runde: Timer, Bombe: Bomb, Spieler: Crosshair, Ziel: Castle };
 const RL_ICONS = { goal: Goal, assist: Handshake, hat_trick: Flame, save: Shield, epic_save: ShieldCheck, shot: Target, demolition: CarFront, crossbar: Flag, kickoff: Play, overtime: Timer, podium: Medal, mvp: Crown, replay_start: Repeat, replay_end: Repeat, match_start: Trophy, match_end: Trophy };
 // Dota 2 und die Bild-Spiele (Valorant, The Finals)
 const ALLE_ICONS = { match_start: Play, match_end: Trophy, match_won: Trophy, draft: Users, pre_game: Timer, day: Sun, night: Moon,
   roshan_killed: Swords, aegis: Shield, tower_destroyed: Castle, barracks_destroyed: Castle, round_start: Timer, round_end: Flag,
   kill: Crosshair, headshot: Target, assist: Handshake, death: Skull,
   revived: HeartPulse, spike_planted: Bomb, spike_defused: ShieldOff, spike_detonated: Bomb, double_kill: Zap, triple_kill: Zap, ultra_kill: Zap, rampage: Flame,
-  ace: Zap, clutch: Flame, thrifty: Medal, eliminated: UserX, team_wipe: UserX, vault_opened: Castle, cashout_started: Timer, cashout_stolen: Swords, cashout_done: Crown };
+  ace: Zap, clutch: Flame, thrifty: Medal, eliminated: UserX, team_wipe: UserX, vault_opened: Castle, cashout_started: Timer, cashout_stolen: Swords, cashout_done: Crown,
+  bus: Play, landed: Flag, top10: Medal, top5: Medal, knockout: Target, knocked: UserX, quadra_kill: Zap, penta_kill: Flame,
+  minions: Users, first_blood: Crosshair, first_tower: Castle, inhibitor_destroyed: Castle, dragon_killed: Flame, elder_killed: Flame, herald_killed: Swords,
+  grubs_killed: Swords, atakhan_killed: Swords, baron_killed: Crown, objective_stolen: Zap, team_ace: UserX };
 export function EventIcon({ type, spiel = "cs2", size = 15 }) {
   if (spiel === "rl" && RL_ICONS[type]) { const Ic = RL_ICONS[type]; return <Ic size={size} />; }
   if (spiel !== "cs2" && spiel !== "rl" && ALLE_ICONS[type]) { const Ic = ALLE_ICONS[type]; return <Ic size={size} />; }

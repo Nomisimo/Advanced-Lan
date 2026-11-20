@@ -1,10 +1,15 @@
 "use strict";
-// Valorant über die Overwolf-App „Shots Fired“ (Mike Holloway). Shots Fired gibt die Live-Events von Overwolf (GEP)
-// unverändert an einen Webhook weiter. Diese App ist der Webhook: Auf dem Game-PC lauscht sie auf
-// http://localhost:44207 und nimmt jede Anfrage an. Das genaue Format der Anfragen ist nicht dokumentiert,
-// deshalb liest shotsfiredEvents() mehrere übliche Formen und alles, was ankommt, wird mitgeschrieben (letzte Anfragen).
+// Overwolf-Events über die Overwolf-App „Shots Fired“ (Mike Holloway). Shots Fired gibt die Live-Events von Overwolf (GEP)
+// unverändert an einen Webhook weiter. Diese App ist der Webhook: Auf dem Game-PC lauscht sie auf http://localhost:44207,
+// je Spiel ein eigener Pfad (/valorant, /fortnite, /lol, /finals).
 //
-// GEP-Daten für Valorant (OW-Electron-Doku, supported-games/valorant):
+// Format laut Shots-Fired-Doku (github.com/ministerofpanic/shots-fired-support) und Beispielserver (artdevgame/kills-death-wins):
+//   POST, JSON { gameId: <Overwolf-Spiel-ID>, event: "<feature>.<name>", data: <Daten von Overwolf> }
+//   z. B. { gameId: 21216, event: "kill.kill", data: 3 } oder { gameId: 21216, event: "rank.rank", data: 1 }
+// Info-Updates kommen genauso, mit dem Schlüssel als Namen (z. B. "match_info.score"). Weil das nicht genauer dokumentiert ist,
+// liest zerlegen() auch andere übliche Formen, und der Empfänger schreibt jede Anfrage mit (Setup → „Letzte Anfragen“).
+//
+// Valorant (OW-Electron-Doku, supported-games/valorant):
 // - Events: match_start, match_end, kill, death, assist, headshot, spike_planted, spike_defused, spike_detonated
 // - Info-Updates: round_phase (shopping, combat, end), score / match_score ({ won, lost } aus Sicht dieses Spielers)
 // Rundenstart, Rundenende, Rundengewinner und Matchgewinner gibt es für Valorant nicht als Event (anders als bei R6 oder OW2):
@@ -12,11 +17,23 @@
 // als Rundenende ohne Sieger. Kommen trotzdem round_start oder round_end als Event, werden sie übernommen.
 // match_end kommt laut Doku nicht bei Custom Matches, deshalb zählt auch der Stand (13 Runden mit 2 Vorsprung).
 // Riot-Regel: kein Spike-Timer. Gelegt, entschärft und explodiert sind einzelne Cues.
+//
+// Fortnite: kill (Eliminierung), knockout (Gegner niedergeschlagen), assist, death, knockedout (selbst niedergeschlagen), revived,
+// matchStart, matchEnd, dazu die Info-Updates phase (aircraft = Battle Bus, landed) und rank (Platzierung, 1 = Victory Royale).
+// The Finals: match_start, match_end, elimination (eigener Kill), death.
+// League of Legends: kill, death, assist, matchStart, matchEnd und die Multikills der Ansage. Besser und vollständiger kommt LoL
+// über Riots Live Client Data API (lol.js), die hat Vorrang.
 // Reine Funktionen ohne Node-Abhängigkeiten: laufen im Hauptprozess, in der Oberfläche und in den Tests.
 
 const SHOTSFIRED_PORT = 44207;
 const SHOTSFIRED_STORE_URL = "https://www.overwolf.com/app/mike_holloway-shots_fired";
-const SHOTSFIRED_URL = `http://localhost:${SHOTSFIRED_PORT}/valorant`;
+const SHOTSFIRED_BASIS = `http://localhost:${SHOTSFIRED_PORT}`;
+const SF_SPIELE = ["valorant", "fortnite", "lol", "finals"];
+const sfUrl = (spiel) => `${SHOTSFIRED_BASIS}/${spiel}`;
+const SHOTSFIRED_URL = sfUrl("valorant");
+// Overwolf-Spiel-IDs (gameId in der Anfrage), falls der Pfad fehlt. The Finals nur über den Pfad.
+const SF_GAME_IDS = { 21640: "valorant", 21216: "fortnite", 5426: "lol" };
+const PFAD_ALIAS = { valorant: "valorant", val: "valorant", fortnite: "fortnite", fn: "fortnite", lol: "lol", league: "lol", leagueoflegends: "lol", finals: "finals", thefinals: "finals", the_finals: "finals" };
 
 // GEP-Event → Event der Valorant-Quelle (bild-spiele.js)
 const SF_EVENTS = {
@@ -25,21 +42,23 @@ const SF_EVENTS = {
   round_start: "round_start", round_end: "round_end",
 };
 const SCORE_KEYS = ["score", "match_score"];
-// Info-Updates, die gelesen werden (kill_feed kommt je nach Version als Event oder Info-Update)
-const INFO_KEYS = [...SCORE_KEYS, "round_phase", "kill_feed"];
+// Valorant: Events und Info-Updates, die gelesen werden (kill_feed kommt je nach Version als Event oder Info-Update)
+const VAL = { events: SF_EVENTS, infos: [...SCORE_KEYS, "round_phase", "kill_feed"] };
 const SIEG_RUNDEN = 13;
 
 const norm = (s) => String(s ?? "").trim().toLowerCase().replace(/[\s\-.]+/g, "_");
 const json = (v) => { if (typeof v !== "string") return v; const t = v.trim(); if (!/^[{[]/.test(t)) return v; try { return JSON.parse(t); } catch { return v; } };
 
-// Name eines Events → Event-ID oder null. Nimmt auch „Spike Planted“ oder „valorant.spike_planted“.
-function eventName(name) {
+// Name eines Events → Event-ID oder null. Nimmt auch „Spike Planted“, „match_info.spike_planted“ oder „kill.kill“.
+function eventName(name, map = SF_EVENTS) {
   const n = norm(name);
   if (!n) return null;
-  if (SF_EVENTS[n]) return SF_EVENTS[n];
-  const teil = Object.keys(SF_EVENTS).filter((k) => n.endsWith(`_${k}`) || n.endsWith(`:${k}`)).sort((a, b) => b.length - a.length)[0];
-  return teil ? SF_EVENTS[teil] : null;
+  if (map[n]) return map[n];
+  const teil = Object.keys(map).filter((k) => n.endsWith(`_${k}`) || n.endsWith(`:${k}`)).sort((a, b) => b.length - a.length)[0];
+  return teil ? map[teil] : null;
 }
+// Letzter Teil eines Namens: „match_info.score“ → „score“
+const schluessel = (name) => norm(String(name ?? "").split(".").pop());
 
 // Spielstand { won, lost } aus einem Wert (Objekt oder JSON-Text)
 function scoreVon(v) {
@@ -49,22 +68,25 @@ function scoreVon(v) {
   return Number.isFinite(won) && Number.isFinite(lost) ? { won, lost } : null;
 }
 
-// Eine Anfrage (Text oder Objekt) → { events: [Name], infos: [{ key, value }] }
-function zerlegen(body) {
+// Eine Anfrage (Text oder Objekt) → { events: [{ name, data }], infos: [{ key, value }] }
+// spiel: { events: Name → Event-ID, infos: [Schlüssel] } des Spiels, Standard Valorant
+function zerlegen(body, spiel = VAL) {
   const out = { events: [], infos: [] };
+  const map = spiel.events, INFO_KEYS = spiel.infos;
+  const eventName_ = (n) => eventName(n, map);
   const besuche = (x, tiefe = 0) => {
     x = json(x);
     if (tiefe > 5 || x == null) return;
-    if (typeof x === "string") { if (eventName(x)) out.events.push(x); return; }
+    if (typeof x === "string") { if (eventName_(x)) out.events.push({ name: x, data: null }); return; }
     if (Array.isArray(x)) { x.forEach((y) => besuche(y, tiefe + 1)); return; }
     if (typeof x !== "object") return;
     // GEP-Events: { events: [{ name, data }] } oder ein einzelnes { name, data }
     if (Array.isArray(x.events)) x.events.forEach((y) => besuche(y, tiefe + 1));
     const name = x.event ?? x.name ?? x.eventName ?? x.event_name ?? x.type ?? x.key ?? x.id;
     if (typeof name === "string") {
-      if (INFO_KEYS.includes(norm(name))) out.infos.push({ key: norm(name), value: x.value ?? x.data ?? x.val });
-      else if (eventName(name)) out.events.push(name);
-      else if (typeof x.value === "string" && eventName(x.value)) out.events.push(x.value);
+      if (INFO_KEYS.includes(schluessel(name))) out.infos.push({ key: schluessel(name), value: x.value ?? x.data ?? x.val });
+      else if (eventName_(name)) out.events.push({ name, data: x.data ?? x.value ?? null });
+      else if (typeof x.value === "string" && eventName_(x.value)) out.events.push({ name: x.value, data: null });
     }
     // GEP-Info-Updates: { info: { match_info: { score: "{…}" } } } oder { feature, key, value }
     const info = json(x.info);
@@ -73,7 +95,9 @@ function zerlegen(body) {
       if (g && typeof g === "object") for (const [k, v] of Object.entries(g)) if (INFO_KEYS.includes(k)) out.infos.push({ key: k, value: v });
     }
     for (const k of INFO_KEYS) if (x[k] != null && k !== name) out.infos.push({ key: k, value: x[k] });
-    for (const k of ["event", "data", "payload", "body", "message"]) if (x[k] != null && typeof json(x[k]) === "object") besuche(x[k], tiefe + 1);
+    // Verschachtelt ({ event: { name } }, { payload: … }), aber nicht die Daten eines schon erkannten Events
+    const erkannt = typeof name === "string" && (INFO_KEYS.includes(schluessel(name)) || eventName_(name));
+    for (const k of ["event", "data", "payload", "body", "message"]) if (x[k] != null && !(erkannt && k === "data") && typeof json(x[k]) === "object") besuche(x[k], tiefe + 1);
   };
   besuche(body);
   return out;
@@ -93,7 +117,7 @@ const wahr = (v) => v === true || v === "true" || v === 1 || v === "1";
 
 // Anfrage → Nachrichten für die Valorant-Quelle: [{ event, seite }]. seite: eigen = Team dieses PCs, gegner = das andere, keins = ohne Team.
 function shotsfiredEvents(body, z = sfZustand()) {
-  const { events, infos } = zerlegen(body);
+  const { events, infos } = zerlegen(body, VAL);
   const raus = [];
   const matchSieg = (seite) => { if (!z.entschieden) { z.entschieden = true; raus.push({ event: "match_won", seite }); } };
   z.r = z.r || neueRunde();
@@ -129,7 +153,7 @@ function shotsfiredEvents(body, z = sfZustand()) {
     if (s.won >= SIEG_RUNDEN && s.won - s.lost >= 2) matchSieg("eigen");
     else if (s.lost >= SIEG_RUNDEN && s.lost - s.won >= 2) matchSieg("gegner");
   }
-  for (const n of events) {
+  for (const { name: n } of events) {
     const id = eventName(n);
     if (id === "match_start") { z.score = null; z.entschieden = false; z.phase = ""; z.r = neueRunde(); raus.push({ event: id, seite: "eigen" }); }
     else if (id === "kill") {
@@ -148,4 +172,87 @@ function shotsfiredEvents(body, z = sfZustand()) {
   return raus;
 }
 
-module.exports = { ACE_KILLS, SHOTSFIRED_PORT, SHOTSFIRED_URL, SHOTSFIRED_STORE_URL, SF_EVENTS, shotsfiredEvents, sfZustand, zerlegen, scoreVon, eventName };
+/* ── Fortnite ─────────────────────────────────────────────────────────── */
+const FN = {
+  events: { kill: "kill", knockout: "knockout", assist: "assist", death: "death", knockedout: "knocked", revived: "revived",
+    matchstart: "match_start", match_start: "match_start", matchend: "match_end", match_end: "match_end" },
+  infos: ["rank", "phase"],
+};
+const fnZustand = () => ({ laeuft: false, platz: null, bus: false, landed: false, top10: false, top5: false, sieg: false });
+function fortniteEvents(body, z = fnZustand()) {
+  const { events, infos } = zerlegen(body, FN);
+  const raus = [], eig = (event) => raus.push({ event, seite: "eigen" });
+  const start = () => { Object.assign(z, fnZustand(), { laeuft: true }); eig("match_start"); };
+  for (const { key, value } of infos) {
+    const v = json(value);
+    if (key === "phase") {
+      const p = norm(v?.phase ?? v);
+      if ((p === "aircraft" || p === "airfield") && !z.laeuft) start();
+      if (p === "aircraft" && !z.bus) { z.bus = true; eig("bus"); }
+      if (p === "landed" && !z.landed) { z.landed = true; eig("landed"); }
+    } else if (key === "rank") {
+      const platz = Number(v?.rank ?? v);
+      if (!Number.isFinite(platz) || platz < 1) continue;
+      z.platz = platz;
+      if (platz <= 10 && !z.top10) { z.top10 = true; eig("top10"); }
+      if (platz <= 5 && !z.top5) { z.top5 = true; eig("top5"); }
+      if (platz === 1 && !z.sieg) { z.sieg = true; eig("match_won"); }
+    }
+  }
+  for (const { name } of events) {
+    const id = eventName(name, FN.events);
+    if (id === "match_start") start();
+    else if (id === "match_end") { if (!z.sieg) eig("match_end"); z.laeuft = false; }
+    else if (id) eig(id);
+  }
+  return raus;
+}
+
+/* ── The Finals ───────────────────────────────────────────────────────── */
+const FIN = { events: { match_start: "match_start", match_end: "match_end", elimination: "kill", kill: "kill", death: "death", revived: "revived" }, infos: [] };
+const finalsEvents = (body) => zerlegen(body, FIN).events.map(({ name }) => ({ event: eventName(name, FIN.events), seite: "eigen" })).filter((n) => n.event);
+
+/* ── League of Legends (nur, wenn die Live Client Data API nicht läuft) ──── */
+const LOL = {
+  events: { kill: "kill", death: "death", assist: "assist", matchstart: "match_start", match_start: "match_start", matchend: "match_end", match_end: "match_end",
+    double_kill: "double_kill", triple_kill: "triple_kill", quadra_kill: "quadra_kill", penta_kill: "penta_kill" },
+  infos: [],
+};
+const lolEvents = (body) => zerlegen(body, LOL).events.map(({ name }) => ({ event: eventName(name, LOL.events), seite: "eigen" })).filter((n) => n.event);
+
+/* ── Einrichtung (Setup und Anleitung) ─────────────────────────────────── */
+// Je Spiel: Events und Info-Updates, die man in Shots Fired als Webhook-Aktion anlegt, und was daraus wird
+const SF_EINRICHTEN = {
+  valorant: [["spike_planted, spike_defused, spike_detonated", "Spike gelegt, entschärft, explodiert"], ["match_start, match_end", "Match startet, Match vorbei"],
+    ["kill, death, assist, headshot", "Kill, Tod, Assist, Headshot, dazu Ace (5 Kills in einer Runde)"], ["kill_feed", "für Clutch (letzter Überlebender gewinnt)"],
+    ["round_phase", "Rundenstart (Kaufphase) und Rundenende"], ["score", "Rundengewinner und Matchgewinner (13 Runden, 2 Vorsprung)"]],
+  fortnite: [["matchStart, matchEnd", "Match startet, Match vorbei"], ["kill, knockout, assist", "Eliminierung, Gegner niedergeschlagen, Assist"],
+    ["death, knockedout, revived", "Ausgeschieden, selbst niedergeschlagen, wiederbelebt"], ["phase", "Battle Bus startet, gelandet"], ["rank", "Top 10, Top 5, Victory Royale (Platz 1)"]],
+  lol: [["kill, death, assist", "Kill, Tod, Assist"], ["matchStart, matchEnd", "Spiel startet, Spiel vorbei"], ["Multikills der Ansage", "Double bis Pentakill"]],
+  finals: [["match_start, match_end", "Match startet, Match vorbei"], ["elimination, death", "Kill, Spieler stirbt"]],
+};
+
+/* ── Verteilen ────────────────────────────────────────────────────────── */
+// Spiel einer Anfrage: Pfad (/fortnite) vor gameId
+function sfSpiel(pfad, body) {
+  const seg = norm(String(pfad || "").split("?")[0].split("/").filter(Boolean)[0] || "").replace(/_/g, "");
+  if (PFAD_ALIAS[seg] || PFAD_ALIAS[norm(seg)]) return PFAD_ALIAS[seg] || PFAD_ALIAS[norm(seg)];
+  const b = json(body);
+  const id = b && typeof b === "object" ? Number(b.gameId ?? b.game_id ?? b.gameID) : NaN;
+  // Overwolf hängt manchmal eine Klassen-ID an (z. B. 216401 statt 21640): auf die bekannten IDs kürzen
+  const passend = Object.keys(SF_GAME_IDS).find((k) => id === Number(k) || Math.floor(id / 10) === Number(k));
+  return passend ? SF_GAME_IDS[passend] : null;
+}
+const sfZustaende = () => ({ valorant: sfZustand(), fortnite: fnZustand() });
+// Anfrage → { spiel, nachrichten: [{ event, seite }] }. spiel null: unbekanntes Spiel, nur mitschreiben.
+function shotsfiredNachrichten(body, pfad = "/", z = sfZustaende()) {
+  const spiel = sfSpiel(pfad, body);
+  if (spiel === "valorant") return { spiel, nachrichten: shotsfiredEvents(body, (z.valorant ||= sfZustand())) };
+  if (spiel === "fortnite") return { spiel, nachrichten: fortniteEvents(body, (z.fortnite ||= fnZustand())) };
+  if (spiel === "finals") return { spiel, nachrichten: finalsEvents(body) };
+  if (spiel === "lol") return { spiel, nachrichten: lolEvents(body) };
+  return { spiel: null, nachrichten: [] };
+}
+
+module.exports = { SF_EINRICHTEN, ACE_KILLS, SHOTSFIRED_PORT, SHOTSFIRED_URL, SHOTSFIRED_BASIS, SHOTSFIRED_STORE_URL, SF_SPIELE, SF_GAME_IDS, sfUrl, SF_EVENTS,
+  shotsfiredEvents, fortniteEvents, finalsEvents, lolEvents, shotsfiredNachrichten, sfSpiel, sfZustand, fnZustand, sfZustaende, zerlegen, scoreVon, eventName };

@@ -282,14 +282,19 @@ function browserApi() {
         { id: "dota-empfang", label: "Empfang bereit", ok: true, detail: `127.0.0.1:${cfg.gamepc.gsiPort} (wie CS2)` },
         { id: "dota-daten", label: "Dota 2 sendet Daten", ok: false, detail: "In der Vorschau kein Dota 2" },
       ],
-      bild: ["valorant", "finals"].map((id) => {
+      bild: ["valorant", "finals", "fortnite", "lol"].map((id) => {
         const n = cfg.gamepc.bild.spiele[id].aktionen.length;
-        return { id: `${id}-aktionen`, spiel: id, label: `${id === "valorant" ? "Valorant" : "The Finals"}: Aktionen eingerichtet`, ok: n > 0, warn: true, detail: n ? `${n} Aktionen` : "noch keine: im Tab „Bilderkennung“ anlegen oder importieren" };
+        return { id: `${id}-aktionen`, spiel: id, label: `${{ valorant: "Valorant", finals: "The Finals", fortnite: "Fortnite", lol: "League of Legends" }[id]}: Aktionen eingerichtet`, ok: n > 0, warn: true, detail: n ? `${n} Aktionen` : "noch keine: im Tab „Bilderkennung“ anlegen oder importieren" };
       }),
       shotsfired: [
-        { id: "sf-empfang", label: "Webhook bereit", ok: true, detail: "http://localhost:44207/valorant" },
+        { id: "sf-empfang", label: "Webhook bereit", ok: true, detail: "localhost:44207" },
         { id: "sf-anfragen", label: "Shots Fired schickt Anfragen", ok: false, warn: true, detail: "In der Vorschau kein Overwolf" },
-        { id: "sf-daten", label: "Valorant-Events erkannt", ok: false, warn: true, detail: "noch keins" },
+        ...[["valorant", "Valorant"], ["fortnite", "Fortnite"], ["lol", "League of Legends"], ["finals", "The Finals"]].map(([id, n]) => ({ id: `sf-${id}`, spiel: id, label: `${n}: Events erkannt`, ok: false, warn: true, detail: `noch keins (Adresse http://localhost:44207/${id})` })),
+      ],
+      lol: [
+        { id: "lol-api", label: "Live Client Data API erreichbar", ok: false, warn: true, detail: "nur während eines Spiels (nicht im Client-Menü)" },
+        { id: "lol-team", label: "Team erkannt", ok: false, warn: true, detail: "kommt mit dem Spielstart" },
+        { id: "lol-daten", label: "LoL-Events kommen an", ok: false, warn: true, detail: "noch keins" },
       ],
       overdrive: [
         { id: "od-installiert", label: "Automation Overdrive installiert", ok: false, warn: true, detail: "fehlt: Knopf oben führt zum Store" },

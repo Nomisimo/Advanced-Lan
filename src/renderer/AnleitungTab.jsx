@@ -6,6 +6,8 @@ import { CFG_DATEI, CFG_ORDNER } from "../core/cfg.js";
 import { RL_INI_DATEI, RL_INI_ORDNER, RL_RATE } from "../core/rl-ini.js";
 import { DOTA_CFG_DATEI, DOTA_CFG_ORDNER, DOTA_STARTOPTION } from "../core/dota.js";
 import { STANDARD_HOTKEY, hotkeyText } from "../core/app-info.js";
+import { SF_SPIELE, sfUrl } from "../core/shotsfired.js";
+import { LOL_PORT } from "../core/lol.js";
 
 // Alle Erklärungen der App stehen hier, für beide Modi. Der eigene Modus steht oben.
 const P = ({ children }) => <p style={{ fontSize: 13, lineHeight: 1.7, color: "#d4d0de", margin: "0 0 10px" }}>{children}</p>;
@@ -175,12 +177,42 @@ const Dota = () => (
   </Section>
 );
 
-const Bild = () => (
-  <Section title="Valorant und The Finals (Bilderkennung)">
+const OverwolfSpiele = ({ goTab }) => (
+  <Section title="Valorant, Fortnite, League of Legends und The Finals">
     <P>
-      Beide Spiele haben keine offizielle Live-Schnittstelle. Die App schaut deshalb auf das Spielfenster des Game-PCs und vergleicht Bereiche, die du festlegst,
+      Diese Spiele haben keine Schnittstelle wie Valves GSI. Die App nimmt ihre Events aus mehreren Quellen und zählt jedes Event nur aus der besten,
+      die es gerade liefert. Liefert eine bessere Quelle ein Event, fällt dasselbe Event aus einer schlechteren 15 Minuten lang weg. Events, die nur eine
+      schlechtere Quelle kennt (z. B. Thrifty aus der Bilderkennung), gehen immer durch.
+    </P>
+    <L>
+      <li><b>1. Spiel-Schnittstelle:</b> nur LoL. Riots <b>Live Client Data API</b> läuft im Spiel auf <Kbd>https://127.0.0.1:{LOL_PORT}</Kbd>. Nichts einzurichten, kein Overwolf. Liefert Team (<Kbd>BLUE</Kbd>/<Kbd>RED</Kbd>), Kill, Tod, Assist, Double bis Pentakill, First Blood, Türme, Inhibitoren, Drachen, Elder, Herold, Larven, Atakhan, Baron, gestohlene Objekte, Ace und Sieg oder Niederlage.</li>
+      <li><b>2. Shots Fired (Overwolf):</b> für Valorant, Fortnite, The Finals und LoL. Overwolf liest die Spiele, die Overwolf-App <b>Shots Fired</b> schickt jedes Event per Webhook an diese App, je Spiel an eine eigene Adresse: {SF_SPIELE.map((id, i) => <span key={id}>{i ? ", " : ""}<Kbd>{sfUrl(id)}</Kbd></span>)}.</li>
+      <li><b>3. Automation Overdrive (Overwolf):</b> nur Valorant, nur Kill, Tod, Assist, Headshot und Match. Bleibt als Reserve.</li>
+      <li><b>4. Bilderkennung:</b> für alles, was die anderen nicht liefern. Einrichtung siehe unten.</li>
+    </L>
+    <P><b>Shots Fired einrichten</b> (einmal je Game-PC, Windows):</P>
+    <L>
+      <li>Overwolf installieren, darin <b>Shots Fired</b> aus dem Store installieren und starten.</li>
+      <li>In Shots Fired das Spiel wählen und je Event eine <b>Sequence</b> mit der Aktion <b>Webhook</b> anlegen, Adresse wie oben (im Game-PC-Setup gibt es dafür „Adresse kopieren“).</li>
+      <li>Welche Events je Spiel, steht im Game-PC-Setup unter „Overwolf-Spiele über Shots Fired“. Kurz: Valorant spike_planted, spike_defused, spike_detonated, match_start, match_end, kill, death, assist, headshot, kill_feed, round_phase, score. Fortnite matchStart, matchEnd, kill, knockout, assist, death, knockedout, revived, phase, rank. The Finals match_start, match_end, elimination, death. LoL kill, death, assist, matchStart, matchEnd.</li>
+      <li>Testen: im Setup unter „Letzte Anfragen“ steht jede Anfrage im Rohformat und welches Event daraus wurde.</li>
+    </L>
+    <P>
+      <b>Was die App selbst ableitet:</b> Valorant-Rundenstart (Kaufphase) und Rundenende mit Sieger aus dem Spielstand, Matchgewinner bei 13 Runden mit 2 Vorsprung (auch in Custom Matches, wo Overwolf kein Match-Ende schickt),
+      Ace bei 5 Kills in einer Runde, Clutch, wenn das eigene Team die Runde gewinnt und dieser Spieler als Letzter lebt. Fortnite: Battle Bus und Landung aus der Phase, Top 10, Top 5 und Victory Royale aus der Platzierung.
+      Teams: Valorant <Kbd>TEAM A</Kbd>/<Kbd>TEAM B</Kbd> (automatisch vom Riot Client), Fortnite und The Finals <Kbd>TEAM A</Kbd> bis <Kbd>TEAM D</Kbd> (je PC im Tab „Bilderkennung“), LoL automatisch.
+      Fortnite ist ein Battle Royale: keine Runden, jeder PC meldet seine eigenen Eliminierungen und seine Platzierung.
+    </P>
+    {goTab && <button style={S.smallBtn} onClick={() => goTab("setup")}>Zum Setup</button>}
+  </Section>
+);
+
+const Bild = () => (
+  <Section title="Bilderkennung (letzte Wahl)">
+    <P>
+      Für Events, die weder Shots Fired noch eine Spiel-Schnittstelle liefern, schaut die App auf das Spielfenster des Game-PCs und vergleicht Bereiche, die du festlegst,
       mit Frames aus deinem eigenen Gameplay. Optional muss dort zusätzlich ein Wort stehen (Texterkennung auf Englisch und Deutsch, läuft lokal ohne Internet).
-      Die Erkennung läuft auf dem Game-PC, die Events gehen wie bei allen Spielen an die Regie. Die App merkt selbst, wenn Valorant oder The Finals geöffnet wird, und nimmt das Spielfenster als Quelle. Sind beide offen, laufen zwei Erkennungen gleichzeitig. Unter „Bildquelle“ lässt sich je Spiel auch jedes andere offene Fenster oder Programm wählen, auch über einen Teil des Fenstertitels (z. B. „OBS“), oder der Bildschirm; mit „Bildschirm“ läuft die Erkennung zusätzlich, wenn die Regie das Spiel aktiv hat.
+      Die Erkennung läuft auf dem Game-PC, die Events gehen wie bei allen Spielen an die Regie. Die App merkt selbst, wenn Valorant, The Finals, Fortnite oder LoL geöffnet wird, und nimmt das Spielfenster als Quelle. Sind beide offen, laufen zwei Erkennungen gleichzeitig. Unter „Bildquelle“ lässt sich je Spiel auch jedes andere offene Fenster oder Programm wählen, auch über einen Teil des Fenstertitels (z. B. „OBS“), oder der Bildschirm; mit „Bildschirm“ läuft die Erkennung zusätzlich, wenn die Regie das Spiel aktiv hat.
       Die App liest keinen Speicher und greift nicht ins Spiel ein.
     </P>
     <L>
@@ -207,7 +239,7 @@ const Osc = () => (
     <P>In jedem Wert dürfen Platzhalter stehen, die beim Senden aus dem Event gefüllt werden:</P>
     <table style={{ ...S.table, marginTop: 0, marginBottom: 12 }}>
       <tbody>
-        {[["{spieler}", "Spielername"], ["{team}", "CT, T, BLUE, ORANGE, RADIANT, DIRE, TEAM A bis TEAM D"], ["{pc}", "PC-ID des meldenden PCs"], ["{runde}", "Rundennummer (CS2, Valorant, The Finals)"], ["{spiel}", "cs2, rl, dota2, valorant, finals"], ["{event}", "Event-ID, z. B. goal"]].map(([k, v]) => (
+        {[["{spieler}", "Spielername"], ["{team}", "CT, T, BLUE, ORANGE, RED, RADIANT, DIRE, TEAM A bis TEAM D"], ["{pc}", "PC-ID des meldenden PCs"], ["{runde}", "Rundennummer (CS2, Valorant, The Finals)"], ["{spiel}", "cs2, rl, dota2, valorant, finals, fortnite, lol"], ["{event}", "Event-ID, z. B. goal"]].map(([k, v]) => (
           <tr key={k}><td style={td({ ...S.mono, width: 120 })}>{k}</td><td style={td()}>{v}</td></tr>
         ))}
       </tbody>
@@ -346,6 +378,7 @@ export default function AnleitungTab({ modus, goTab }) {
       <Cs2 />
       <Rl />
       <Dota />
+      <OverwolfSpiele goTab={modus === "gamepc" ? goTab : null} />
       <Bild />
       <Osc />
       <ZieleEinrichten />

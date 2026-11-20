@@ -234,7 +234,7 @@ function matchText(spiel, st) {
 function MatchWahl({ cfg, mutate, status }) {
   const matches = status.matches || [], auto = cfg.match?.auto !== false;
   const schalten = (id) => mutate((d) => { d.match = { auto: false, wahl: id }; });
-  const ohne = cfg.aktivesSpiel === "finals" ? "The Finals liefert keine Matchdaten: alle Events zählen."
+  const ohne = ["finals", "fortnite", "lol"].includes(cfg.aktivesSpiel) ? "Dieses Spiel liefert keine Match-ID: alle Events zählen."
     : cfg.aktivesSpiel === "valorant" ? "Noch keine Matchdaten. Valorant braucht auf den Game-PCs „Team dieses PCs: Automatisch (Riot Client)“, sonst zählen alle Events."
     : "Noch keine Matchdaten: Sie kommen, sobald die Game-PCs im Spiel sind. Bis dahin zählen alle Events.";
   return (

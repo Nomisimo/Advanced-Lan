@@ -129,3 +129,38 @@ test("Shots Fired: Webhook per HTTP, schreibt Anfragen mit", async () => {
   await s.stop();
   assert.equal(s.status().laeuft, false);
 });
+
+test("Shots Fired: echtes Format { gameId, event: feature.name, data } für alle Spiele", () => {
+  const { shotsfiredNachrichten, sfZustaende, sfSpiel } = require("../src/core/shotsfired");
+  const z = sfZustaende();
+  const n = (pfad, body) => { const r = shotsfiredNachrichten(body, pfad, z); return `${r.spiel}:${r.nachrichten.map((x) => x.event + (x.seite !== "eigen" ? "/" + x.seite : "")).join(",")}`; };
+  assert.equal(sfSpiel("/", { gameId: 21216 }), "fortnite");
+  assert.equal(sfSpiel("/", { gameId: 216401 }), "valorant", "Overwolf-ID mit Klassen-Ziffer");
+  assert.equal(sfSpiel("/the-finals", {}), "finals");
+  assert.equal(sfSpiel("/irgendwas", {}), null);
+  // Valorant
+  assert.equal(n("/valorant", { gameId: 21640, event: "match_info.spike_planted", data: "" }), "valorant:spike_planted");
+  assert.equal(n("/", { gameId: 21640, event: "kill.kill", data: "1" }), "valorant:kill");
+  n("/valorant", { gameId: 21640, event: "match_info.score", data: '{"won":0,"lost":0}' });
+  assert.equal(n("/valorant", { gameId: 21640, event: "match_info.score", data: '{"won":0,"lost":1}' }), "valorant:round_end/gegner");
+  // Fortnite: Bus, Landung, Eliminierung, Platzierung bis zum Sieg
+  assert.equal(n("/fortnite", { gameId: 21216, event: "match.matchStart", data: "" }), "fortnite:match_start");
+  assert.equal(n("/fortnite", { gameId: 21216, event: "game_info.phase", data: "aircraft" }), "fortnite:bus");
+  assert.equal(n("/fortnite", { gameId: 21216, event: "game_info.phase", data: "landed" }), "fortnite:landed");
+  assert.equal(n("/fortnite", { gameId: 21216, event: "kill.kill", data: 1 }), "fortnite:kill");
+  assert.equal(n("/fortnite", { gameId: 21216, event: "kill.knockout", data: 1 }), "fortnite:knockout");
+  assert.equal(n("/fortnite", { gameId: 21216, event: "death.knockedout", data: "" }), "fortnite:knocked");
+  assert.equal(n("/fortnite", { gameId: 21216, event: "revived.revived", data: "" }), "fortnite:revived");
+  assert.equal(n("/fortnite", { gameId: 21216, event: "kill.hit", data: 1 }), "fortnite:", "Treffer ignoriert");
+  assert.equal(n("/fortnite", { gameId: 21216, event: "rank.rank", data: 8 }), "fortnite:top10");
+  assert.equal(n("/fortnite", { gameId: 21216, event: "rank.rank", data: 1 }), "fortnite:top5,match_won");
+  assert.equal(n("/fortnite", { gameId: 21216, event: "match.matchEnd", data: "" }), "fortnite:", "nach dem Sieg kein zweites Matchende");
+  assert.equal(n("/fortnite", { gameId: 21216, event: "match.matchStart", data: "" }), "fortnite:match_start");
+  assert.equal(n("/fortnite", { gameId: 21216, event: "death.death", data: "" }), "fortnite:death");
+  assert.equal(n("/fortnite", { gameId: 21216, event: "match.matchEnd", data: "" }), "fortnite:match_end");
+  // The Finals und LoL
+  assert.equal(n("/finals", { event: "match_info.elimination", data: "" }), "finals:kill");
+  assert.equal(n("/finals", { event: "match_info.match_end", data: "" }), "finals:match_end");
+  assert.equal(n("/lol", { gameId: 5426, event: "kill.kill", data: "" }), "lol:kill");
+  assert.equal(n("/lol", { gameId: 5426, event: "announcer.penta_kill", data: "" }), "lol:penta_kill");
+});

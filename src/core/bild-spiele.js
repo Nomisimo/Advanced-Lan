@@ -1,5 +1,7 @@
 "use strict";
-// Spiele ohne offizielle Live-Schnittstelle: Valorant und The Finals. Der Game-PC erkennt ihre Aktionen am Bild (bild-erkennung.js).
+// Spiele ohne offizielle Live-Schnittstelle von Valve oder Psyonix: Valorant, The Finals, Fortnite und League of Legends.
+// Ihre Events kommen bevorzugt von der Overwolf-App „Shots Fired“ (shotsfired.js), bei LoL zuerst von Riots Live Client Data API
+// (lol.js), danach von Automation Overdrive (nur Valorant) und zuletzt aus der Bilderkennung (Vorrang: quellen-vorrang.js). Der Game-PC erkennt ihre Aktionen am Bild (bild-erkennung.js).
 // Welche Stelle des Bildes welche Aktion ist, legt der Nutzer im Editor fest: Gameplay aufnehmen, Frame wählen, Bereich ziehen,
 // Event zuordnen, Threshold und optional ein Wort für die Texterkennung. Die Konfiguration lässt sich als Datei exportieren
 // und auf den anderen Game-PCs importieren. Kein Speicherlesen, kein Eingriff ins Spiel.
@@ -11,6 +13,8 @@ const { region, ankerVon, umrechnen, ANKER_H, ANKER_V, SIG_LAENGE, dekodieren } 
 
 const M = (id, label, x = {}) => ({ id, label, gruppe: "Match", ...x });
 const R = (id, label, x = {}) => ({ id, label, gruppe: "Runde", ...x });
+// Ziel: Objekt auf der Karte (LoL), mit dem Team, das es geholt hat
+const Z = (id, label) => ({ id, label, gruppe: "Ziel", team: true });
 const P = (id, label) => ({ id, label, gruppe: "Spieler", spieler: true, team: true });
 // Eigene Aktionen: frei benennbar im Editor, in „Signale“ als „Eigene Aktion n“
 const EIGENE = Array.from({ length: 6 }, (_, i) => ({ id: `eigene_${i + 1}`, label: `Eigene Aktion ${i + 1}`, gruppe: "Eigene", team: true }));
@@ -54,6 +58,8 @@ const BILD_SPIELE = [
       R("round_start", "Runde startet", { art: "start" }), R("round_end", "Runde gewonnen", { team: true, art: "ende" }),
       R("vault_opened", "Tresor geöffnet"), R("cashout_started", "Cashout gestartet", { team: true }), R("cashout_stolen", "Cashout gestohlen", { team: true }), R("cashout_done", "Cashout geschafft", { team: true }),
       P("kill", "Kill"), P("death", "Spieler stirbt"), P("revived", "Wiederbelebt"), R("team_wipe", "Team ausgelöscht", { team: true }),
+      // Liefert Shots Fired (Overwolf): Match vorbei ohne Sieger
+      M("match_end", "Match vorbei", { art: "matchende" }),
       ...EIGENE,
     ],
     vorschlaege: [
@@ -67,6 +73,44 @@ const BILD_SPIELE = [
       ["Team ausgelöscht", "team_wipe", "eigen", { x: 0.3, y: 0.3, b: 0.4, h: 0.1 }],
       ["Match gewonnen", "match_won", "eigen", { x: 0.3, y: 0.35, b: 0.4, h: 0.2 }],
       ["Ausgeschieden", "eliminated", "eigen", { x: 0.3, y: 0.35, b: 0.4, h: 0.2 }],
+    ],
+  },
+  {
+    // Battle Royale: keine Runden. Team = Squad dieses PCs (im Setup), Sieg = Platz 1 (Victory Royale)
+    id: "fortnite", name: "Fortnite", kurz: "FN", farbe: "#9d4dff", teams: ["TEAM A", "TEAM B", "TEAM C", "TEAM D"],
+    exe: "FortniteClient-Win64-Shipping.exe", fenster: "Fortnite",
+    events: [
+      M("match_start", "Match startet"), M("match_won", "Victory Royale", { team: true, art: "matchende" }), M("match_end", "Match vorbei", { art: "matchende" }),
+      M("bus", "Battle Bus startet"), M("landed", "Gelandet"), M("top10", "Top 10", { team: true }), M("top5", "Top 5", { team: true }),
+      P("kill", "Eliminierung"), P("knockout", "Gegner niedergeschlagen"), P("assist", "Assist"),
+      P("knocked", "Selbst niedergeschlagen"), P("death", "Ausgeschieden"), P("revived", "Wiederbelebt"),
+      ...EIGENE,
+    ],
+    vorschlaege: [
+      ["Victory Royale", "match_won", "eigen", { x: 0.25, y: 0.3, b: 0.5, h: 0.2 }],
+      ["Eliminierung", "kill", "eigen", { x: 0.35, y: 0.65, b: 0.3, h: 0.08 }],
+      ["Niedergeschlagen", "knockout", "eigen", { x: 0.35, y: 0.65, b: 0.3, h: 0.08 }],
+      ["Ausgeschieden", "death", "eigen", { x: 0.3, y: 0.3, b: 0.4, h: 0.15 }],
+    ],
+  },
+  {
+    // Zwei Teams wie im Spiel: Blau (ORDER, unten links) und Rot (CHAOS). Die Live Client Data API erkennt das Team selbst.
+    id: "lol", name: "League of Legends", kurz: "LOL", farbe: "#c89b3c", teams: ["BLUE", "RED"],
+    exe: "League of Legends.exe", fenster: "League of Legends (TM) Client",
+    events: [
+      M("match_start", "Spiel startet"), M("minions", "Vasallen erscheinen"),
+      M("match_won", "Nexus zerstört, Sieg", { team: true, art: "matchende" }), M("match_end", "Spiel vorbei", { art: "matchende" }),
+      Z("first_blood", "First Blood"), Z("first_tower", "Erster Turm"), Z("tower_destroyed", "Turm zerstört"), Z("inhibitor_destroyed", "Inhibitor zerstört"),
+      Z("dragon_killed", "Drache erlegt"), Z("elder_killed", "Elder-Drache erlegt"), Z("herald_killed", "Herold erlegt"), Z("grubs_killed", "Larven erlegt"),
+      Z("atakhan_killed", "Atakhan erlegt"), Z("baron_killed", "Baron erlegt"), Z("objective_stolen", "Objective gestohlen"), Z("team_ace", "Ace (Team ausgelöscht)"),
+      P("kill", "Kill"), P("death", "Spieler stirbt"), P("assist", "Assist"),
+      P("double_kill", "Double Kill"), P("triple_kill", "Triple Kill"), P("quadra_kill", "Quadra Kill"), P("penta_kill", "Pentakill"),
+      ...EIGENE,
+    ],
+    vorschlaege: [
+      ["Sieg", "match_won", "eigen", { x: 0.3, y: 0.3, b: 0.4, h: 0.2 }],
+      ["Niederlage", "match_won", "gegner", { x: 0.3, y: 0.3, b: 0.4, h: 0.2 }],
+      ["Pentakill", "penta_kill", "eigen", { x: 0.35, y: 0.2, b: 0.3, h: 0.1 }],
     ],
   },
 ];
@@ -241,7 +285,8 @@ class BildQuelle {
     if (typeof m.name === "string" && m.name) this.name = m.name;
     const z = this.z, roh = [];
     const team = m.seite === "gegner" ? this.gegner() : m.seite === "keins" ? "" : this.team; // keins: Rundenende ohne bekannten Sieger
-    const global = (type, extra = {}) => roh.push({ type, team: "", round: z.runde, ...extra });
+    // einmal: eindeutige ID eines Ereignisses, das alle PCs melden (z. B. EventID der LoL-API), damit die Regie es nur einmal zählt
+    const global = (type, extra = {}) => roh.push({ type, team: "", round: z.runde, ...(m.einmal ? { einmal: `${this.spiel}:${m.einmal}` } : {}), ...extra });
     // Erste Runde nach dem Matchende (oder überhaupt): neues Match
     const matchStart = () => { if (!z.laeuft) { this.neu(); z.laeuft = true; global("match_start", { round: 0 }); } };
     if (ev.art === "start") {

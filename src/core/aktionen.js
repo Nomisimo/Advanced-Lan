@@ -9,17 +9,17 @@
 const ALLGEMEIN = "allgemein";
 
 const AKTIONEN = [
-  { id: "kill", label: "Kill", gruppe: "Spieler", spieler: true, events: { cs2: ["kill"], valorant: ["kill"], dota2: ["kill"], finals: ["kill"], rl: ["demolition"] } },
-  { id: "death", label: "Tod", gruppe: "Spieler", spieler: true, events: { cs2: ["death"], valorant: ["death"], dota2: ["death"], finals: ["death"] } },
+  { id: "kill", label: "Kill", gruppe: "Spieler", spieler: true, events: { cs2: ["kill"], valorant: ["kill"], dota2: ["kill"], finals: ["kill"], fortnite: ["kill"], lol: ["kill"], rl: ["demolition"] } },
+  { id: "death", label: "Tod", gruppe: "Spieler", spieler: true, events: { cs2: ["death"], valorant: ["death"], dota2: ["death"], finals: ["death"], fortnite: ["death"], lol: ["death"] } },
   { id: "headshot", label: "Headshot", gruppe: "Spieler", spieler: true, events: { cs2: ["headshot"], valorant: ["headshot"] } },
-  { id: "assist", label: "Assist", gruppe: "Spieler", spieler: true, events: { valorant: ["assist"], dota2: ["assist"], rl: ["assist"] } },
-  { id: "ace", label: "Ace / Serie", gruppe: "Spieler", spieler: true, events: { cs2: ["ace"], valorant: ["ace"], dota2: ["rampage"], finals: ["team_wipe"], rl: ["hat_trick"] } },
+  { id: "assist", label: "Assist", gruppe: "Spieler", spieler: true, events: { valorant: ["assist"], dota2: ["assist"], rl: ["assist"], fortnite: ["assist"], lol: ["assist"] } },
+  { id: "ace", label: "Ace / Serie", gruppe: "Spieler", spieler: true, events: { cs2: ["ace"], valorant: ["ace"], dota2: ["rampage"], finals: ["team_wipe"], rl: ["hat_trick"], lol: ["penta_kill"] } },
   { id: "mvp", label: "MVP", gruppe: "Spieler", spieler: true, events: { cs2: ["mvp"], rl: ["mvp"] } },
-  { id: "objective", label: "Objective (Bombe, Spike, Tor, Turm, Cashout)", gruppe: "Ziel", events: { cs2: ["bomb_planted"], valorant: ["spike_planted"], rl: ["goal"], dota2: ["tower_destroyed"], finals: ["cashout_done"] } },
+  { id: "objective", label: "Objective (Bombe, Spike, Tor, Turm, Cashout)", gruppe: "Ziel", events: { cs2: ["bomb_planted"], valorant: ["spike_planted"], rl: ["goal"], dota2: ["tower_destroyed"], finals: ["cashout_done"], lol: ["tower_destroyed"] } },
   { id: "round_start", label: "Runde startet", gruppe: "Runde", events: { cs2: ["round_live"], valorant: ["round_start"], finals: ["round_start"], rl: ["kickoff"] } },
   { id: "round_end", label: "Runde vorbei", gruppe: "Runde", events: { cs2: ["round_end"], valorant: ["round_end"], finals: ["round_end"] } },
-  { id: "match_start", label: "Match startet", gruppe: "Match", events: { cs2: ["match_live"], valorant: ["match_start"], rl: ["match_start"], dota2: ["match_start"], finals: ["match_start"] } },
-  { id: "win", label: "Sieg / Match vorbei", gruppe: "Match", events: { cs2: ["match_end"], valorant: ["match_won"], rl: ["match_end"], dota2: ["match_end"], finals: ["match_won"] } },
+  { id: "match_start", label: "Match startet", gruppe: "Match", events: { cs2: ["match_live"], valorant: ["match_start"], rl: ["match_start"], dota2: ["match_start"], finals: ["match_start"], fortnite: ["match_start"], lol: ["match_start"] } },
+  { id: "win", label: "Sieg / Match vorbei", gruppe: "Match", events: { cs2: ["match_end"], valorant: ["match_won"], rl: ["match_end"], dota2: ["match_end"], finals: ["match_won"], fortnite: ["match_won"], lol: ["match_won"] } },
 ];
 
 // Allgemeine Aktion eines Spiel-Events, sonst null

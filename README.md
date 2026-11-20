@@ -9,7 +9,7 @@
 
 <p align="center"><img src="docs/screenshots/ablauf.jpg" alt="Ablauf: Game-PCs melden Events, die Regie schickt OSC-Befehle an Licht, Audio und Video" width="820"></p>
 
-Eine App für die LAN-Party: Die Game-PCs melden Spielereignisse aus CS2, Rocket League und Dota 2 über ihre offiziellen Schnittstellen, Valorant und The Finals über eine Bilderkennung, die Regie sendet daraus OSC-Befehle an Lichtpulte, Audio- und Videosoftware (z. B. grandMA3, QLab, Reaper, Resolume). Design und Aufbau wie [Netzwerkplaner](https://github.com/Nomisimo/Netzwerkplaner) und Stromplaner, Akzentfarbe Lila.
+Eine App für die LAN-Party: Die Game-PCs melden Spielereignisse aus CS2, Rocket League und Dota 2 über ihre offiziellen Schnittstellen, Valorant, Fortnite, League of Legends und The Finals über die Overwolf-App Shots Fired (LoL zuerst über Riots Live Client Data API) oder eine Bilderkennung, die Regie sendet daraus OSC-Befehle an Lichtpulte, Audio- und Videosoftware (z. B. grandMA3, QLab, Reaper, Resolume). Design und Aufbau wie [Netzwerkplaner](https://github.com/Nomisimo/Netzwerkplaner) und Stromplaner, Akzentfarbe Lila.
 
 Gebaut mit **Electron** und electron-builder, React 18 und esbuild. Ohne Overwolf. Die Oberfläche wird zu einer einzelnen Datei `dist-app/index.html` gebündelt.
 
@@ -49,10 +49,12 @@ Der Modus wird beim ersten Start gewählt (Standalone: Textknopf unten in der Mi
 | Counter-Strike 2 | Valve Game State Integration | CT, T | 10 PCs, Runde |
 | Rocket League | Psyonix Stats API | BLUE, ORANGE | 6 PCs, bis zum Tor |
 | Dota 2 | Valve Game State Integration | RADIANT, DIRE | 10 PCs, 5 Minuten |
-| Valorant | Bilderkennung | TEAM A, TEAM B (stellt jeder PC ein) | 10 PCs, Runde |
-| The Finals | Bilderkennung | TEAM A bis TEAM D | – |
+| Valorant | Shots Fired, Overdrive, Bilderkennung | TEAM A, TEAM B (stellt jeder PC ein) | 10 PCs, Runde |
+| The Finals | Shots Fired, Bilderkennung | TEAM A bis TEAM D | – |
+| Fortnite | Shots Fired, Bilderkennung | TEAM A bis TEAM D (Squad je PC) | – |
+| League of Legends | Live Client Data API, Shots Fired, Bilderkennung | BLUE, RED (automatisch) | – |
 
-Overwolf ist raus: Die App läuft auf normalem Electron, nutzt keine Overwolf-Spielereignisse (GEP) und wird nur über GitHub verteilt. Optional kann ein Valorant-PC zusätzlich die Overwolf-App „Automation Overdrive“ nutzen (eigene Installation, siehe Setup). Der Knopf „Automation Overdrive öffnen“ im Setup startet sie über Overwolf oder führt zum Store.
+Die App läuft auf normalem Electron und nutzt Overwolf nicht selbst. Overwolf-Spielereignisse kommen über die Overwolf-App **Shots Fired** (Mike Holloway): Sie schickt jedes Event als `POST { gameId, event: "<feature>.<name>", data }` an einen Webhook, hier `http://localhost:44207/<spiel>` (`src/core/shotsfired.js`, `src/main/shotsfired-server.js`). League of Legends kommt zuerst über Riots Live Client Data API (`https://127.0.0.1:2999`, `src/core/lol.js`). Vorrang je Event: Spiel-Schnittstelle, Shots Fired, Automation Overdrive, Bilderkennung (`src/core/quellen-vorrang.js`). Optional kann ein Valorant-PC zusätzlich die Overwolf-App „Automation Overdrive“ nutzen (eigene Installation, siehe Setup). Der Knopf „Automation Overdrive öffnen“ im Setup startet sie über Overwolf oder führt zum Store.
 
 ## Screenshots
 
@@ -95,7 +97,7 @@ Riot und Embark geben keine Live-Daten frei. Deshalb schaut die App auf dem Game
 
 Die App merkt selbst, wenn ein Spiel geöffnet wird (Fenstertitel `VALORANT` bzw. `THE FINALS`), und nimmt sein Fenster als Bildquelle. Sind mehrere Spiele offen, läuft für jedes eine eigene Erkennung. Je Spiel lässt sich als Bildquelle auch jedes andere offene Fenster oder Programm wählen (auch über einen Teil des Titels, z. B. „OBS“) oder der Bildschirm. Erkannt wird mit 2 bis 10 Bildern pro Sekunde. Verglichen werden verkleinerte Graustufen-Signaturen (`src/core/bild-erkennung.js`), die Ereignisse daraus macht `src/core/bild-spiele.js`, die Aufnahme läuft in einem unsichtbaren Fenster (`src/main/bild.js`, `src/renderer/erkennung.js`). Exklusives Vollbild lässt sich oft nicht aufnehmen (schwarzes Bild); die App warnt dann und empfiehlt „Randloses Fenster“.
 
-Valorant: Riot erlaubt keine Hinweise auf den Spike-Timer. Die App meldet deshalb nur „Spike gelegt“ und „Spike entschärft“, ohne Countdown.
+Valorant: Riot erlaubt keine Hinweise auf den Spike-Timer. Die App meldet deshalb nur „Spike gelegt“, „Spike entschärft“ und „Spike explodiert“ als einzelne Cues, ohne Countdown.
 
 ## OSC: Ziele und Signale
 

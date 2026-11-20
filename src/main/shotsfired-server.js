@@ -1,8 +1,8 @@
-// Game-PC: HTTP-Empfang (Webhook) für die Overwolf-App „Shots Fired“ (Valorant-Events, siehe core/shotsfired.js).
-// Lauscht nur lokal (127.0.0.1 und ::1) auf Port 44207 und nimmt jede Anfrage an, egal welcher Pfad oder welche Methode.
+// Game-PC: HTTP-Empfang (Webhook) für die Overwolf-App „Shots Fired“ (Valorant, Fortnite, LoL, The Finals, siehe core/shotsfired.js).
+// Lauscht nur lokal (127.0.0.1 und ::1) auf Port 44207 und nimmt jede Anfrage an. Das Spiel steht im Pfad (/fortnite) oder in gameId.
 // Die letzten Anfragen bleiben im Speicher (status().roh), damit man im Setup sieht, was Shots Fired wirklich schickt.
 const http = require('http');
-const { shotsfiredEvents, sfZustand } = require('../core/shotsfired');
+const { shotsfiredNachrichten, sfZustaende } = require('../core/shotsfired');
 
 const MAX_ROH = 30;
 const MAX_BODY = 64 * 1024;
@@ -18,7 +18,8 @@ class ShotsFiredServer {
     this.letzte = 0;
     this.anfragen = 0;
     this.roh = [];
-    this.z = sfZustand();
+    this.z = sfZustaende();
+    this.spiele = {}; // spiel → Zeit des letzten erkannten Events
   }
 
   async start(port) {
@@ -64,13 +65,13 @@ class ShotsFiredServer {
   }
 
   verarbeiten(daten, { methode = 'POST', pfad = '/' } = {}) {
-    const nachrichten = shotsfiredEvents(daten, this.z);
+    const { spiel, nachrichten } = shotsfiredNachrichten(daten, pfad, this.z);
     this.anfragen++;
     const text = typeof daten === 'string' ? daten : JSON.stringify(daten);
-    this.roh.unshift({ t: Date.now(), methode, pfad: String(pfad).slice(0, 200), body: text.slice(0, 2000), events: nachrichten.map((n) => n.event + (n.seite === 'gegner' ? ' (Gegner)' : '')) });
+    this.roh.unshift({ t: Date.now(), methode, pfad: String(pfad).slice(0, 200), body: text.slice(0, 2000), spiel, events: nachrichten.map((n) => n.event + (n.seite === 'gegner' ? ' (Gegner)' : '')) });
     this.roh.length = Math.min(this.roh.length, MAX_ROH);
-    if (nachrichten.length) this.letzte = Date.now();
-    for (const n of nachrichten) this.onEvent(n);
+    if (nachrichten.length) { this.letzte = Date.now(); this.spiele[spiel] = this.letzte; }
+    for (const n of nachrichten) this.onEvent({ spiel, ...n });
     this.onChange();
   }
 
@@ -81,7 +82,7 @@ class ShotsFiredServer {
   }
 
   status() {
-    return { laeuft: this.server.length > 0, port: this.port, fehler: this.fehler, letzte: this.letzte, anfragen: this.anfragen, roh: this.roh.slice(0, 10) };
+    return { laeuft: this.server.length > 0, port: this.port, fehler: this.fehler, letzte: this.letzte, spiele: { ...this.spiele }, anfragen: this.anfragen, roh: this.roh.slice(0, 10) };
   }
 }
 

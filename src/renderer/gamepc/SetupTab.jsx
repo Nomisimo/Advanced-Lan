@@ -8,7 +8,8 @@ import { CFG_ORDNER, CFG_DATEI } from "../../core/cfg.js";
 import { RL_INI_DATEI, RL_INI_ORDNER } from "../../core/rl-ini.js";
 import { DOTA_CFG_DATEI, DOTA_CFG_ORDNER, DOTA_STARTOPTION } from "../../core/dota.js";
 import { OVERDRIVE_PORT, OVERDRIVE_STORE_URL, OVERWOLF_URL } from "../../core/overdrive.js";
-import { SHOTSFIRED_URL, SHOTSFIRED_STORE_URL } from "../../core/shotsfired.js";
+import { SHOTSFIRED_STORE_URL, SF_SPIELE, SF_EINRICHTEN, sfUrl } from "../../core/shotsfired.js";
+import { LOL_PORT, LOL_DOKU_URL } from "../../core/lol.js";
 import SpielerName from "./SpielerName.jsx";
 import { FileDown, Download, RefreshCw, LocateFixed, BookOpen, ScanEye, ExternalLink, Play, Copy } from "lucide-react";
 
@@ -31,37 +32,48 @@ const OVERDRIVE_LINKS = [
   ["Anleitung von Automation Overdrive", "https://github.com/raimen-ttv/Automation-Overdrive"],
 ];
 
-// Shots Fired (Overwolf) schickt alle Overwolf-Events für Valorant an einen Webhook: diese App
+// Shots Fired (Overwolf) schickt alle Overwolf-Events von Valorant, Fortnite, LoL und The Finals an einen Webhook: diese App
+const SF_SPIEL_NAMEN = { valorant: "Valorant", fortnite: "Fortnite", lol: "League of Legends", finals: "The Finals" };
+const NR = { flexShrink: 0, width: 20, height: 20, borderRadius: "50%", background: "#ff465533", color: "#ff4655", fontSize: 11, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center", marginTop: 1 };
+const SCHRITT = { display: "flex", gap: 10, alignItems: "flex-start", fontSize: 13, lineHeight: 1.5, padding: "6px 0" };
+const Schritte = ({ liste }) => liste.map((t, i) => <div key={i} style={SCHRITT}><span style={NR}>{i + 1}</span><span>{t}</span></div>);
+
 function ShotsFiredAnleitung({ punkte, sf, mac, notify }) {
   const [offen, setOffen] = useState(false);
-  const kopieren = async () => {
-    try { await navigator.clipboard.writeText(SHOTSFIRED_URL); notify?.("Webhook-Adresse kopiert"); } catch { notify?.(SHOTSFIRED_URL); }
+  const [spiel, setSpiel] = useState("valorant");
+  const kopieren = async (url) => {
+    try { await navigator.clipboard.writeText(url); notify?.(`Adresse kopiert: ${url}`); } catch { notify?.(url); }
   };
-  const schritt = { display: "flex", gap: 10, alignItems: "flex-start", fontSize: 13, lineHeight: 1.5, padding: "6px 0" };
-  const nr = { flexShrink: 0, width: 20, height: 20, borderRadius: "50%", background: "#ff465533", color: "#ff4655", fontSize: 11, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center", marginTop: 1 };
+  const url = sfUrl(spiel);
   const schritte = [
-    <><b>Overwolf</b> und darin <b>Shots Fired</b> (von Mike Holloway, kostenlos) installieren.</>,
-    <>In Shots Fired für Valorant je Event eine Aktion <b>„Webhook“</b> anlegen, Adresse <Kbd>{SHOTSFIRED_URL}</Kbd>. Wichtig: <b>spike_planted</b>, <b>spike_defused</b>, <b>spike_detonated</b>, <b>match_start</b>, <b>match_end</b>, <b>kill</b>, <b>death</b>, <b>kill_feed</b>, dazu die Info-Updates <b>round_phase</b> (Rundenstart und -ende) und <b>score</b> (Rundengewinner, Matchgewinner).</>,
-    <>Ace (5 Kills in einer Runde) und Clutch (Runde gewonnen, alle 4 Mitspieler tot, du lebst) rechnet diese App aus <b>kill</b>, <b>death</b> und <b>kill_feed</b>. Thrifty liefert Overwolf nicht: dafür im Tab „Bilderkennung“ das Banner einrichten.</>,
-    <><b>Valorant spielen.</b> Rundengewinner und Matchgewinner leitet diese App aus dem Spielstand ab (13 Runden, in der Verlängerung 2 Vorsprung), auch in Custom Matches ohne match_end.</>,
-    <>Unter <b>Letzte Anfragen</b> steht, was Shots Fired wirklich schickt. Kommen Anfragen, aber keine Events, das Format dort ansehen.</>,
+    <><b>Overwolf</b> und darin <b>Shots Fired</b> (von Mike Holloway, kostenlos) installieren und Overwolf starten.</>,
+    <>In Shots Fired das Spiel wählen und je Event eine <b>Sequence</b> mit der Aktion <b>„Webhook“</b> anlegen. Adresse je Spiel (rechts kopieren): <Kbd>{url}</Kbd>. Shots Fired schickt dann <Kbd>{"{ gameId, event, data }"}</Kbd> per POST.</>,
+    <>Für {SF_SPIEL_NAMEN[spiel]} diese Events anlegen (alles, was sonst noch angeboten wird, schadet nicht, die App nimmt, was sie kennt):</>,
+    <><b>Testen:</b> In Shots Fired auf „Test“ drücken oder eine Runde spielen. Unten unter <b>Letzte Anfragen</b> steht jede Anfrage im Rohformat und was daraus wurde. Grün = erkannt.</>,
   ];
   return (
-    <Section title={<span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>Valorant über Shots Fired <SpielChip spiel="valorant" /></span>}
-      subtitle="Optional, zusätzlich zur Bilderkennung: Overwolf liest die Events, Shots Fired schickt sie per Webhook an diese App. Liefert auch Runden und Spike (gelegt, entschärft, explodiert)."
-      right={<button style={S.primaryBtn} onClick={kopieren}><Copy size={14} /> Webhook-Adresse kopieren</button>}>
+    <Section title={<span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>Overwolf-Spiele über Shots Fired <SpielChip spiel="valorant" /> <SpielChip spiel="fortnite" /> <SpielChip spiel="lol" /> <SpielChip spiel="finals" /></span>}
+      subtitle="Empfohlen für Valorant, Fortnite und The Finals: Overwolf liest die Events, Shots Fired schickt sie per Webhook an diese App. Hat Vorrang vor Automation Overdrive und der Bilderkennung. Bei LoL hat die Live Client Data API Vorrang."
+      right={<button style={S.primaryBtn} onClick={() => kopieren(url)}><Copy size={14} /> Adresse kopieren</button>}>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+        {SF_SPIELE.map((id) => <button key={id} style={{ ...S.smallBtn, ...(id === spiel ? { borderColor: "#ff4655", color: "#fff" } : {}) }} onClick={() => setSpiel(id)}>{SF_SPIEL_NAMEN[id]}</button>)}
+      </div>
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.2fr) minmax(0,1fr)", gap: 20, alignItems: "start" }}>
         <div>
-          {schritte.map((t, i) => <div key={i} style={schritt}><span style={nr}>{i + 1}</span><span>{t}</span></div>)}
+          <Schritte liste={schritte.slice(0, 3)} />
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, margin: "4px 0 6px 30px", maxWidth: "calc(100% - 30px)" }}>
+            <tbody>{SF_EINRICHTEN[spiel].map(([ev, was]) => <tr key={ev}><td style={{ padding: "3px 8px 3px 0", whiteSpace: "nowrap" }}><Kbd>{ev}</Kbd></td><td style={{ padding: "3px 0", color: SUB }}>{was}</td></tr>)}</tbody>
+          </table>
+          <div style={SCHRITT}><span style={NR}>4</span><span>{schritte[3]}</span></div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
-            {[["Overwolf herunterladen", OVERWOLF_URL], ["Shots Fired im Overwolf-Store", SHOTSFIRED_STORE_URL]].map(([titel, url]) => (
-              <button key={url} style={{ ...S.smallBtn, padding: "5px 9px" }} title={url} onClick={() => api.openExternal(url)}><ExternalLink size={12} /> {titel}</button>
+            {[["Overwolf herunterladen", OVERWOLF_URL], ["Shots Fired im Overwolf-Store", SHOTSFIRED_STORE_URL], ["Anleitung von Shots Fired", "https://github.com/ministerofpanic/shots-fired-support"]].map(([titel, u]) => (
+              <button key={u} style={{ ...S.smallBtn, padding: "5px 9px" }} title={u} onClick={() => api.openExternal(u)}><ExternalLink size={12} /> {titel}</button>
             ))}
           </div>
         </div>
         <div>
           {punkte && <Liste punkte={punkte} />}
-          <p style={S.hint}>{mac ? "Overwolf und Valorant gibt es nur für Windows. " : ""}Shots Fired ist nicht von uns. Riot-Regel: kein Spike-Timer, gelegt, entschärft und explodiert sind einzelne Cues.</p>
+          <p style={S.hint}>{mac ? "Overwolf und diese Spiele gibt es nur für Windows. " : ""}Shots Fired ist nicht von uns. Valorant: kein Spike-Timer (Riot-Regel), gelegt, entschärft und explodiert sind einzelne Cues. Thrifty liefert Overwolf nicht, dafür bleibt die Bilderkennung.</p>
         </div>
       </div>
       <button style={{ ...S.smallBtn, marginTop: 12 }} onClick={() => setOffen(!offen)}>{offen ? "Letzte Anfragen ausblenden" : `Letzte Anfragen (${sf?.anfragen || 0})`}</button>
@@ -70,7 +82,7 @@ function ShotsFiredAnleitung({ punkte, sf, mac, notify }) {
           {!sf?.roh?.length && <p style={{ ...S.hint, margin: 0 }}>Noch keine Anfrage angekommen.</p>}
           {sf?.roh?.map((r, i) => (
             <div key={i} style={{ fontSize: 12, padding: "6px 8px", background: "#1a1820", border: `1px solid ${LINE}`, borderRadius: 6 }}>
-              <div style={{ color: SUB }}>{new Date(r.t).toLocaleTimeString()} · {r.methode} {r.pfad} · {r.events.length ? <span style={{ color: OK }}>{r.events.join(", ")}</span> : <span style={{ color: WARN }}>kein bekanntes Event</span>}</div>
+              <div style={{ color: SUB }}>{new Date(r.t).toLocaleTimeString()} · {r.methode} {r.pfad} · {r.spiel ? SF_SPIEL_NAMEN[r.spiel] : <span style={{ color: WARN }}>Spiel unbekannt: Pfad /valorant, /fortnite, /lol oder /finals</span>} · {r.events.length ? <span style={{ color: OK }}>{r.events.join(", ")}</span> : <span style={{ color: WARN }}>kein bekanntes Event</span>}</div>
               <code style={{ display: "block", whiteSpace: "pre-wrap", wordBreak: "break-all", marginTop: 4 }}>{r.body || "(leer)"}</code>
             </div>
           ))}
@@ -80,8 +92,29 @@ function ShotsFiredAnleitung({ punkte, sf, mac, notify }) {
   );
 }
 
+// League of Legends: Riots eigene Live Client Data API, ohne Overwolf. Beste Quelle für LoL.
+function LolAnleitung({ punkte }) {
+  return (
+    <Section title={<span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>League of Legends über die Live Client Data API <SpielChip spiel="lol" /></span>}
+      subtitle="Offizielle Schnittstelle von Riot, läuft im Spiel selbst. Nichts einzurichten: Sobald ein Spiel läuft, liest diese App Team, Kills, Objekte und Spielende. Hat Vorrang vor Shots Fired und der Bilderkennung.">
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.2fr) minmax(0,1fr)", gap: 20, alignItems: "start" }}>
+        <div>
+          <Schritte liste={[
+            <>League of Legends normal starten, kein Overwolf nötig. Die Schnittstelle läuft auf <Kbd>https://127.0.0.1:{LOL_PORT}</Kbd> nur auf diesem PC und nur, solange ein Spiel läuft (nicht im Client-Menü, nicht im Ladebildschirm).</>,
+            <><b>Team</b> kommt aus dem Spiel: <Kbd>BLUE</Kbd> (unten links) oder <Kbd>RED</Kbd>. Das Team im Tab „Bilderkennung“ gilt nur, solange keins erkannt ist.</>,
+            <><b>Jeder PC</b> meldet Kills, Tode, Assists und Multikills seines Spielers. Objekte (Türme, Inhibitoren, Drachen, Herold, Larven, Atakhan, Baron, First Blood, Ace) und das Spielende melden alle PCs, die Regie zählt sie einmal.</>,
+          ]} />
+          <button style={{ ...S.smallBtn, padding: "5px 9px", marginTop: 10 }} title={LOL_DOKU_URL} onClick={() => api.openExternal(LOL_DOKU_URL)}><ExternalLink size={12} /> Riot: Game Client API</button>
+        </div>
+        <div>{punkte && <Liste punkte={punkte} />}</div>
+      </div>
+    </Section>
+  );
+}
+
 function OverdriveAnleitung({ punkte, mac, neuPruefen }) {
   const [meldung, setMeldung] = useState(null);
+  const [offen, setOffen] = useState(false);
   // Startet die installierte App über Overwolf, sonst Store- oder Download-Seite
   const oeffnen = async () => {
     const r = await api.overdriveOeffnen();
@@ -99,8 +132,10 @@ function OverdriveAnleitung({ punkte, mac, neuPruefen }) {
   ];
   return (
     <Section title={<span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>Valorant über Automation Overdrive <SpielChip spiel="valorant" /></span>}
-      subtitle="Optional, zusätzlich zur Bilderkennung: Overwolf liest die Events und Automation Overdrive schickt sie an diese App. Nur Kill, Tod, Assist, Headshot und Match. Runden und Spike über Shots Fired oder die Bilderkennung."
-      right={<button style={S.primaryBtn} onClick={oeffnen}><Play size={14} /> Automation Overdrive öffnen</button>}>
+      subtitle="Ältere Alternative zu Shots Fired, nur für Valorant und nur Kill, Tod, Assist, Headshot und Match. Shots Fired hat Vorrang, die Bilderkennung kommt danach."
+      right={<button style={S.smallBtn} onClick={() => setOffen(!offen)}>{offen ? "Einklappen" : "Anzeigen"}</button>}>
+      {offen && <>
+      <button style={{ ...S.smallBtn, marginBottom: 8 }} onClick={oeffnen}><Play size={13} /> Automation Overdrive öffnen</button>
       {meldung && <p style={{ ...S.hint, marginTop: 0, color: meldung.art === "gestartet" ? OK : WARN }}>{meldung.text}</p>}
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.2fr) minmax(0,1fr)", gap: 20, alignItems: "start" }}>
         <div>
@@ -116,6 +151,7 @@ function OverdriveAnleitung({ punkte, mac, neuPruefen }) {
           <p style={S.hint}>{mac ? "Overwolf und Valorant gibt es nur für Windows. " : ""}Automation Overdrive ist nicht von uns und wird seit 2022 nicht mehr aktualisiert. Liefert es keine Events mehr, bleibt die Bilderkennung.</p>
         </div>
       </div>
+      </>}
     </Section>
   );
 }
@@ -237,13 +273,14 @@ export default function SetupTab({ cfg, mutate, g, jetzt, notify, goTab, standal
           )}
         </Section>
 
-        <Section title="Valorant und The Finals" subtitle="Ohne offizielle Schnittstelle: Die App erkennt die Aktionen am Bild dieses PCs. Einrichten im Tab „Bilderkennung“: Gameplay aufnehmen, Bereiche als Aktionen anlegen oder die Datei eines anderen PCs importieren."
+        <Section title="Bilderkennung: Valorant, The Finals, Fortnite, LoL" subtitle="Letzte Wahl, wenn Shots Fired oder die Spiel-Schnittstelle ein Event nicht liefern (z. B. Thrifty): Die App erkennt die Aktionen am Bild dieses PCs. Einrichten im Tab „Bilderkennung“: Gameplay aufnehmen, Bereiche als Aktionen anlegen oder die Datei eines anderen PCs importieren."
           right={goTab && <button style={S.primaryBtn} onClick={() => goTab("bild")}><ScanEye size={14} /> Bilderkennung</button>}>
           {check?.bild && <Liste punkte={check.bild} />}
           <p style={S.hint}>Spiel im randlosen Fenstermodus starten, sonst kann die Aufnahme schwarz bleiben.</p>
         </Section>
       </div>
       <ShotsFiredAnleitung punkte={check?.shotsfired} sf={g.shotsfired} mac={mac} notify={notify} />
+      <LolAnleitung punkte={check?.lol} />
       <OverdriveAnleitung punkte={check?.overdrive} mac={mac} neuPruefen={laden} />
       {!standalone && <>
         <div className="sp-section-label" style={{ margin: "8px 0 10px" }}>Einstellungen</div>

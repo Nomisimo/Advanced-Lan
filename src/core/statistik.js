@@ -6,7 +6,9 @@ const neuesMatch = () => ({ runden: 0, kills: 0, headshots: 0, tode: 0, multikil
   // Rocket League
   tore: { BLUE: 0, ORANGE: 0 }, schuesse: 0, paraden: 0, demos: 0, anstoesse: 0, overtime: false, letztesTor: null,
   // Dota 2 und Valorant
-  assists: 0, tuerme: 0, roshan: 0 });
+  assists: 0, tuerme: 0, roshan: 0,
+  // League of Legends und Fortnite
+  drachen: 0, barone: 0, inhibitoren: 0, knockouts: 0, wiederbelebt: 0 });
 
 class Statistik {
   constructor() { this.reset(""); }
@@ -96,11 +98,18 @@ class Statistik {
         break;
       case "spike_planted": r.bombe = "planted"; m.bomben++; break;
       case "spike_defused": r.bombe = "defused"; break;
+      case "spike_detonated": r.bombe = "exploded"; break;
       case "kill": r.kills++; m.kills++; this.sp(ev).kills++; break;
       case "headshot": r.headshots++; m.headshots++; this.sp(ev).headshots++; break;
       case "death": r.tode++; m.tode++; this.sp(ev).tode++; break;
       case "assist": m.assists++; this.sp(ev).assists++; break;
-      case "double_kill": case "triple_kill": case "ultra_kill": m.multikills++; break;
+      case "double_kill": case "triple_kill": case "ultra_kill": case "quadra_kill": m.multikills++; break;
+      case "penta_kill": m.multikills++; m.aces++; break;
+      case "dragon_killed": case "elder_killed": m.drachen++; break;
+      case "baron_killed": m.barone++; break;
+      case "inhibitor_destroyed": m.inhibitoren++; break;
+      case "knockout": m.knockouts++; break;
+      case "revived": m.wiederbelebt++; break;
       case "rampage": m.multikills++; m.aces++; break;
       case "ace": m.aces++; break;
       case "tower_destroyed": case "barracks_destroyed": m.tuerme++; break;

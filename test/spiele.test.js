@@ -34,13 +34,13 @@ function spiele(spiel, seed = 7) {
 }
 
 test("Spiele: alle mit Datenquelle haben Events, Teams und einen Simulator", () => {
-  assert.deepEqual(QUELLEN, ["cs2", "rl", "dota2", "valorant", "finals"]);
+  assert.deepEqual(QUELLEN, ["cs2", "rl", "dota2", "valorant", "finals", "fortnite", "lol"]);
   for (const s of SPIELE.filter((x) => x.quelle)) {
     assert.ok(s.events.length >= 5, s.id);
-    if (s.id !== "finals") assert.ok(SIM_SPIELE[s.id], `Simulator für ${s.id}`);
+    if (!["finals", "fortnite", "lol"].includes(s.id)) assert.ok(SIM_SPIELE[s.id], `Simulator für ${s.id}`);
     for (const e of s.events.filter((e) => e.fest)) assert.ok(s.teams.includes(e.fest), `${s.id}/${e.id}`);
   }
-  assert.ok(SPIELE.filter((s) => s.bild).every((s) => s.quelle === "Bilderkennung"));
+  assert.ok(SPIELE.filter((s) => s.bild).every((s) => /Bilderkennung/.test(s.quelle)), "Bild-Spiele haben immer die Bilderkennung als letzte Quelle");
 });
 
 for (const spiel of ["dota2", "valorant"]) {

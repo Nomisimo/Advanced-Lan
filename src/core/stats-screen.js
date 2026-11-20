@@ -44,6 +44,23 @@ function statsDaten(spiel, statistik, stand) {
     return out;
   }
 
+  // League of Legends: Kills je Team aus den Kills der Spieler, Objekte des Matches
+  if (spiel.id === "lol") {
+    const kills = (t) => top.filter((p) => p.team === t).reduce((a, p) => a + n(p.kills), 0);
+    out.teams = [team("BLUE", kills("BLUE")), team("RED", kills("RED"))];
+    out.mitte = { gross: "Kills", klein: m.vorbei ? "Spiel vorbei" : "League of Legends" };
+    out.zahlen = [["Kills", n(m.kills)], ["Türme", n(m.tuerme)], ["Drachen", n(m.drachen)], ["Barone", n(m.barone)], ["Inhibitoren", n(m.inhibitoren)], ["Multikills", n(m.multikills)]];
+    out.spalten = [["kills", "K"], ["tode", "D"], ["assists", "A"]];
+    return out;
+  }
+  // Fortnite: Battle Royale ohne Teamstand
+  if (spiel.id === "fortnite") {
+    out.mitte = { gross: m.vorbei ? (m.sieger ? "Victory Royale" : "Match vorbei") : "Live", klein: m.sieger ? m.sieger : "Fortnite" };
+    out.zahlen = [["Eliminierungen", n(m.kills)], ["Niedergeschlagen", n(m.knockouts)], ["Ausgeschieden", n(m.tode)], ["Wiederbelebt", n(m.wiederbelebt)]];
+    out.spalten = [["kills", "Elims"], ["tode", "Raus"], ["assists", "A"]];
+    return out;
+  }
+
   const dota = spiel.id === "dota2";
   const hat = (id) => (spiel.events || []).some((e) => e.id === id);
   const mitAssists = hat("assist");

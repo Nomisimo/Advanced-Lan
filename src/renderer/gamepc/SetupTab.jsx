@@ -41,7 +41,8 @@ function ShotsFiredAnleitung({ punkte, sf, mac, notify }) {
   const nr = { flexShrink: 0, width: 20, height: 20, borderRadius: "50%", background: "#ff465533", color: "#ff4655", fontSize: 11, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center", marginTop: 1 };
   const schritte = [
     <><b>Overwolf</b> und darin <b>Shots Fired</b> (von Mike Holloway, kostenlos) installieren.</>,
-    <>In Shots Fired für Valorant je Event eine Aktion <b>„Webhook“</b> anlegen, Adresse <Kbd>{SHOTSFIRED_URL}</Kbd>. Wichtig: <b>spike_planted</b>, <b>spike_defused</b>, <b>spike_detonated</b>, <b>match_start</b>, <b>match_end</b>, <b>kill</b>, <b>death</b>, dazu die Info-Updates <b>round_phase</b> (Rundenstart und -ende) und <b>score</b> (Rundengewinner, Matchgewinner).</>,
+    <>In Shots Fired für Valorant je Event eine Aktion <b>„Webhook“</b> anlegen, Adresse <Kbd>{SHOTSFIRED_URL}</Kbd>. Wichtig: <b>spike_planted</b>, <b>spike_defused</b>, <b>spike_detonated</b>, <b>match_start</b>, <b>match_end</b>, <b>kill</b>, <b>death</b>, <b>kill_feed</b>, dazu die Info-Updates <b>round_phase</b> (Rundenstart und -ende) und <b>score</b> (Rundengewinner, Matchgewinner).</>,
+    <>Ace (5 Kills in einer Runde) und Clutch (Runde gewonnen, alle 4 Mitspieler tot, du lebst) rechnet diese App aus <b>kill</b>, <b>death</b> und <b>kill_feed</b>. Thrifty liefert Overwolf nicht: dafür im Tab „Bilderkennung“ das Banner einrichten.</>,
     <><b>Valorant spielen.</b> Rundengewinner und Matchgewinner leitet diese App aus dem Spielstand ab (13 Runden, in der Verlängerung 2 Vorsprung), auch in Custom Matches ohne match_end.</>,
     <>Unter <b>Letzte Anfragen</b> steht, was Shots Fired wirklich schickt. Kommen Anfragen, aber keine Events, das Format dort ansehen.</>,
   ];

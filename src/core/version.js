@@ -11,6 +11,8 @@ const CHANGELOG = {
     "Rundenstart aus der Rundenphase (Kaufphase), Rundenende mit Sieger aus dem Spielstand, ohne Spielstand Rundenende ohne Sieger aus der Rundenphase",
     "Rundengewinner und Matchgewinner kommen aus dem Spielstand von Overwolf (13 Runden, in der Verlängerung 2 Vorsprung), auch in Custom Matches ohne Match-Ende",
     "Game-PC → Setup: Anleitung für Shots Fired mit Prüfliste und „Letzte Anfragen“, die zeigen, was Shots Fired wirklich schickt",
+    "Shots Fired: Ace aus 5 Kills einer Runde, Clutch, wenn das eigene Team die Runde gewinnt und dieser Spieler als Letzter lebt (aus kill, death und kill_feed)",
+    "Valorant: neues Event „Thrifty“ für die Bilderkennung (Overwolf liefert es nicht)",
     "Valorant: neues Event „Spike explodiert“, auch in der Bilderkennung, in Signalen und Statistik",
   ],
   "0.1.0-beta.17": [

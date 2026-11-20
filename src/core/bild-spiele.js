@@ -24,7 +24,7 @@ const BILD_SPIELE = [
       M("match_start", "Match startet"), M("match_won", "Match gewonnen", { team: true, art: "matchende" }),
       R("round_start", "Kaufphase (Runde startet)", { art: "start" }), R("round_end", "Runde gewonnen", { team: true, art: "ende" }),
       R("spike_planted", "Spike gelegt"), R("spike_defused", "Spike entschärft"), R("spike_detonated", "Spike explodiert"),
-      P("kill", "Kill"), P("death", "Spieler stirbt"), P("ace", "Ace"), P("clutch", "Clutch"),
+      P("kill", "Kill"), P("death", "Spieler stirbt"), P("ace", "Ace"), P("clutch", "Clutch"), P("thrifty", "Thrifty"),
       // Liefert auch Shots Fired (shotsfired.js) und Automation Overdrive (overdrive.js): Match vorbei ohne Sieger, Assist, Headshot
       M("match_end", "Match vorbei", { art: "matchende" }), P("assist", "Assist"), P("headshot", "Headshot"),
       ...EIGENE,
@@ -41,6 +41,7 @@ const BILD_SPIELE = [
       ["Selbst gestorben", "death", "eigen", { x: 0.35, y: 0.78, b: 0.3, h: 0.12 }],
       ["Ace", "ace", "eigen", { x: 0.35, y: 0.62, b: 0.3, h: 0.1 }],
       ["Clutch", "clutch", "eigen", { x: 0.35, y: 0.62, b: 0.3, h: 0.1 }],
+      ["Thrifty", "thrifty", "eigen", { x: 0.3, y: 0.2, b: 0.4, h: 0.12 }],
       ["Match gewonnen", "match_won", "eigen", { x: 0.3, y: 0.35, b: 0.4, h: 0.2 }],
       ["Match verloren", "match_won", "gegner", { x: 0.3, y: 0.35, b: 0.4, h: 0.2 }],
     ],

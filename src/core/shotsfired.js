@@ -25,6 +25,8 @@ const SF_EVENTS = {
   round_start: "round_start", round_end: "round_end",
 };
 const SCORE_KEYS = ["score", "match_score"];
+// Info-Updates, die gelesen werden (kill_feed kommt je nach Version als Event oder Info-Update)
+const INFO_KEYS = [...SCORE_KEYS, "round_phase", "kill_feed"];
 const SIEG_RUNDEN = 13;
 
 const norm = (s) => String(s ?? "").trim().toLowerCase().replace(/[\s\-.]+/g, "_");
@@ -60,7 +62,7 @@ function zerlegen(body) {
     if (Array.isArray(x.events)) x.events.forEach((y) => besuche(y, tiefe + 1));
     const name = x.event ?? x.name ?? x.eventName ?? x.event_name ?? x.type ?? x.key ?? x.id;
     if (typeof name === "string") {
-      if (SCORE_KEYS.includes(norm(name)) || norm(name) === "round_phase") out.infos.push({ key: norm(name), value: x.value ?? x.data ?? x.val });
+      if (INFO_KEYS.includes(norm(name))) out.infos.push({ key: norm(name), value: x.value ?? x.data ?? x.val });
       else if (eventName(name)) out.events.push(name);
       else if (typeof x.value === "string" && eventName(x.value)) out.events.push(x.value);
     }
@@ -68,30 +70,52 @@ function zerlegen(body) {
     const info = json(x.info);
     if (info && typeof info === "object") for (const gruppe of Object.values(info)) {
       const g = json(gruppe);
-      if (g && typeof g === "object") for (const [k, v] of Object.entries(g)) if (SCORE_KEYS.includes(k) || k === "round_phase") out.infos.push({ key: k, value: v });
+      if (g && typeof g === "object") for (const [k, v] of Object.entries(g)) if (INFO_KEYS.includes(k)) out.infos.push({ key: k, value: v });
     }
-    for (const k of [...SCORE_KEYS, "round_phase"]) if (x[k] != null && k !== name) out.infos.push({ key: k, value: x[k] });
+    for (const k of INFO_KEYS) if (x[k] != null && k !== name) out.infos.push({ key: k, value: x[k] });
     for (const k of ["event", "data", "payload", "body", "message"]) if (x[k] != null && typeof json(x[k]) === "object") besuche(x[k], tiefe + 1);
   };
   besuche(body);
   return out;
 }
 
-// Zustand je Game-PC: letzter Spielstand und ob das Match schon entschieden ist
-const sfZustand = () => ({ score: null, entschieden: false, phase: "" });
+// Ace, Clutch und Thrifty gibt es bei Overwolf nicht als Event:
+// - Ace: dieser Spieler hat in einer Runde 5 Kills (gezählt aus kill)
+// - Clutch: das eigene Team gewinnt die Runde, dieser Spieler lebt noch und alle 4 Mitspieler sind tot (aus kill_feed und death)
+// - Thrifty: Sieg trotz deutlich billigerer Ausrüstung. Overwolf liefert dafür keine Werte des Gegners: nur über die Bilderkennung.
+const ACE_KILLS = 5;
+const MITSPIELER = 4;
+const neueRunde = () => ({ kills: 0, tot: false, mitspielerTot: 0, ace: false });
+
+// Zustand je Game-PC: letzter Spielstand, ob das Match schon entschieden ist, und die laufende Runde
+const sfZustand = () => ({ score: null, entschieden: false, phase: "", r: neueRunde() });
+const wahr = (v) => v === true || v === "true" || v === 1 || v === "1";
 
 // Anfrage → Nachrichten für die Valorant-Quelle: [{ event, seite }]. seite: eigen = Team dieses PCs, gegner = das andere, keins = ohne Team.
 function shotsfiredEvents(body, z = sfZustand()) {
   const { events, infos } = zerlegen(body);
   const raus = [];
   const matchSieg = (seite) => { if (!z.entschieden) { z.entschieden = true; raus.push({ event: "match_won", seite }); } };
+  z.r = z.r || neueRunde();
+  const rundeStart = () => { z.r = neueRunde(); raus.push({ event: "round_start", seite: "eigen" }); };
+  // Rundenende: bei Sieg des eigenen Teams Clutch prüfen, danach zählt die nächste Runde neu
+  const rundeEnde = (seite) => {
+    raus.push({ event: "round_end", seite });
+    if (seite === "eigen" && !z.r.tot && z.r.mitspielerTot >= MITSPIELER) raus.push({ event: "clutch", seite: "eigen" });
+    z.r = neueRunde();
+  };
   for (const { key, value } of infos) {
     if (key === "round_phase") {
       const p = norm(json(value)?.round_phase ?? value);
-      if (p === "shopping" && z.phase !== "shopping") raus.push({ event: "round_start", seite: "eigen" });
+      if (p === "shopping" && z.phase !== "shopping") rundeStart();
       // Ohne Spielstand: Rundenende ohne Sieger. Mit Spielstand kommt das Rundenende mit Sieger, wenn score steigt.
-      if (p === "end" && z.phase !== "end" && !z.score) raus.push({ event: "round_end", seite: "keins" });
+      if (p === "end" && z.phase !== "end" && !z.score) rundeEnde("keins");
       z.phase = p;
+      continue;
+    }
+    if (key === "kill_feed") {
+      const k = json(value);
+      if (k && typeof k === "object" && wahr(k.is_victim_teammate)) z.r.mitspielerTot++;
       continue;
     }
     const s = scoreVon(value);
@@ -100,24 +124,28 @@ function shotsfiredEvents(body, z = sfZustand()) {
     // Neues Match: Stand fällt zurück (oder erster Stand 0:0)
     if (!alt || s.won < alt.won || s.lost < alt.lost) { z.score = s; z.entschieden = false; if (!alt || s.won + s.lost === 0) continue; }
     else z.score = s;
-    if (alt && s.won > alt.won) raus.push({ event: "round_end", seite: "eigen" });
-    if (alt && s.lost > alt.lost) raus.push({ event: "round_end", seite: "gegner" });
+    if (alt && s.won > alt.won) rundeEnde("eigen");
+    if (alt && s.lost > alt.lost) rundeEnde("gegner");
     if (s.won >= SIEG_RUNDEN && s.won - s.lost >= 2) matchSieg("eigen");
     else if (s.lost >= SIEG_RUNDEN && s.lost - s.won >= 2) matchSieg("gegner");
   }
   for (const n of events) {
     const id = eventName(n);
-    if (id === "match_start") { z.score = null; z.entschieden = false; z.phase = ""; raus.push({ event: id, seite: "eigen" }); }
+    if (id === "match_start") { z.score = null; z.entschieden = false; z.phase = ""; z.r = neueRunde(); raus.push({ event: id, seite: "eigen" }); }
+    else if (id === "kill") {
+      raus.push({ event: id, seite: "eigen" });
+      if (++z.r.kills >= ACE_KILLS && !z.r.ace) { z.r.ace = true; raus.push({ event: "ace", seite: "eigen" }); }
+    } else if (id === "death") { z.r.tot = true; raus.push({ event: id, seite: "eigen" }); }
     else if (id === "match_end") {
       // Mit bekanntem Stand den Sieger mitliefern, sonst nur „Match vorbei“
       const s = z.score;
       if (s && s.won !== s.lost) matchSieg(s.won > s.lost ? "eigen" : "gegner");
       else raus.push({ event: id, seite: "eigen" });
-    } else if (id === "round_end") { if (!z.score) raus.push({ event: id, seite: "keins" }); } // mit Spielstand kommt das Ende mit Sieger aus score
-    else if (id === "round_start") { if (z.phase !== "shopping") raus.push({ event: id, seite: "eigen" }); z.phase = "shopping"; }
+    } else if (id === "round_end") { if (!z.score) rundeEnde("keins"); } // mit Spielstand kommt das Ende mit Sieger aus score
+    else if (id === "round_start") { if (z.phase !== "shopping") rundeStart(); z.phase = "shopping"; }
     else if (id) raus.push({ event: id, seite: "eigen" });
   }
   return raus;
 }
 
-module.exports = { SHOTSFIRED_PORT, SHOTSFIRED_URL, SHOTSFIRED_STORE_URL, SF_EVENTS, shotsfiredEvents, sfZustand, zerlegen, scoreVon, eventName };
+module.exports = { ACE_KILLS, SHOTSFIRED_PORT, SHOTSFIRED_URL, SHOTSFIRED_STORE_URL, SF_EVENTS, shotsfiredEvents, sfZustand, zerlegen, scoreVon, eventName };

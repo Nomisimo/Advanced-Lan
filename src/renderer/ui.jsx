@@ -55,7 +55,7 @@ const ALLE_ICONS = { match_start: Play, match_end: Trophy, match_won: Trophy, dr
   roshan_killed: Swords, aegis: Shield, tower_destroyed: Castle, barracks_destroyed: Castle, round_start: Timer, round_end: Flag,
   kill: Crosshair, headshot: Target, assist: Handshake, death: Skull,
   revived: HeartPulse, spike_planted: Bomb, spike_defused: ShieldOff, spike_detonated: Bomb, double_kill: Zap, triple_kill: Zap, ultra_kill: Zap, rampage: Flame,
-  ace: Zap, clutch: Flame, eliminated: UserX, team_wipe: UserX, vault_opened: Castle, cashout_started: Timer, cashout_stolen: Swords, cashout_done: Crown };
+  ace: Zap, clutch: Flame, thrifty: Medal, eliminated: UserX, team_wipe: UserX, vault_opened: Castle, cashout_started: Timer, cashout_stolen: Swords, cashout_done: Crown };
 export function EventIcon({ type, spiel = "cs2", size = 15 }) {
   if (spiel === "rl" && RL_ICONS[type]) { const Ic = RL_ICONS[type]; return <Ic size={size} />; }
   if (spiel !== "cs2" && spiel !== "rl" && ALLE_ICONS[type]) { const Ic = ALLE_ICONS[type]; return <Ic size={size} />; }

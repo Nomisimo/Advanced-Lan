@@ -78,6 +78,31 @@ test("Shots Fired: Rundenstart und Rundenende, auch ohne Spielstand", () => {
   assert.deepEqual(q.ingest({ bild: true, event: "round_end", seite: "keins" }, 1000).events.map((e) => [e.type, e.team]), [["round_end", ""]]);
 });
 
+test("Shots Fired: Ace aus 5 Kills einer Runde, Clutch als letzter Überlebender", () => {
+  const z = sfZustand();
+  const feed = (mitspieler) => ({ events: [{ name: "kill_feed", data: JSON.stringify({ attacker: "a", victim: "v", is_victim_teammate: mitspieler, is_attacker_teammate: !mitspieler }) }] });
+  ev({ name: "match_start" }, z); ev(score(0, 0), z); ev({ key: "round_phase", value: "shopping" }, z);
+  for (let i = 0; i < 4; i++) assert.deepEqual(ev({ name: "kill" }, z), ["kill"]);
+  assert.deepEqual(ev({ name: "kill" }, z), ["kill", "ace"]);
+  assert.deepEqual(ev({ name: "kill" }, z), ["kill"], "Ace nur einmal pro Runde");
+  assert.deepEqual(ev(score(1, 0), z), ["round_end"], "ohne tote Mitspieler kein Clutch");
+  // Nächste Runde: 4 Mitspieler fallen, dieser Spieler gewinnt allein
+  ev({ key: "round_phase", value: "shopping" }, z);
+  assert.deepEqual(ev({ name: "kill" }, z), ["kill"], "Kills zählen pro Runde neu");
+  for (let i = 0; i < 4; i++) assert.deepEqual(ev(feed(true), z), []);
+  ev(feed(false), z);
+  assert.deepEqual(ev(score(2, 0), z), ["round_end", "clutch"]);
+  // Runde 3: 4 Mitspieler tot, aber dieser Spieler stirbt auch
+  ev({ key: "round_phase", value: "shopping" }, z);
+  for (let i = 0; i < 4; i++) ev(feed(true), z);
+  assert.deepEqual(ev({ name: "death" }, z), ["death"]);
+  assert.deepEqual(ev(score(3, 0), z), ["round_end"], "tot: kein Clutch");
+  // Runde 4: Clutch-Lage, aber das Team verliert
+  ev({ key: "round_phase", value: "shopping" }, z);
+  for (let i = 0; i < 4; i++) ev(feed(true), z);
+  assert.deepEqual(ev(score(3, 1), z), ["round_end:gegner"]);
+});
+
 const senden = (port, { method = "POST", pfad = "/valorant", body = "" } = {}) => new Promise((resolve, reject) => {
   const req = http.request({ host: "127.0.0.1", port, method, path: pfad, headers: { "Content-Type": "application/json" } }, (res) => { res.resume(); res.on("end", () => resolve(res)); });
   req.on("error", reject);

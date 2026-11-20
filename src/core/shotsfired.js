@@ -7,7 +7,9 @@
 // GEP-Daten für Valorant (OW-Electron-Doku, supported-games/valorant):
 // - Events: match_start, match_end, kill, death, assist, headshot, spike_planted, spike_defused, spike_detonated
 // - Info-Updates: round_phase (shopping, combat, end), score / match_score ({ won, lost } aus Sicht dieses Spielers)
-// Rundengewinner und Matchgewinner gibt es nicht als Event: sie werden aus dem Spielstand abgeleitet.
+// Rundenstart, Rundenende, Rundengewinner und Matchgewinner gibt es für Valorant nicht als Event (anders als bei R6 oder OW2):
+// Rundenstart = round_phase wechselt auf „shopping“, Rundenende mit Sieger = score steigt. Ohne score zählt round_phase „end“
+// als Rundenende ohne Sieger. Kommen trotzdem round_start oder round_end als Event, werden sie übernommen.
 // match_end kommt laut Doku nicht bei Custom Matches, deshalb zählt auch der Stand (13 Runden mit 2 Vorsprung).
 // Riot-Regel: kein Spike-Timer. Gelegt, entschärft und explodiert sind einzelne Cues.
 // Reine Funktionen ohne Node-Abhängigkeiten: laufen im Hauptprozess, in der Oberfläche und in den Tests.
@@ -20,6 +22,7 @@ const SHOTSFIRED_URL = `http://localhost:${SHOTSFIRED_PORT}/valorant`;
 const SF_EVENTS = {
   match_start: "match_start", match_end: "match_end", kill: "kill", death: "death", assist: "assist", headshot: "headshot",
   spike_planted: "spike_planted", spike_defused: "spike_defused", spike_detonated: "spike_detonated", spike_exploded: "spike_detonated",
+  round_start: "round_start", round_end: "round_end",
 };
 const SCORE_KEYS = ["score", "match_score"];
 const SIEG_RUNDEN = 13;
@@ -77,7 +80,7 @@ function zerlegen(body) {
 // Zustand je Game-PC: letzter Spielstand und ob das Match schon entschieden ist
 const sfZustand = () => ({ score: null, entschieden: false, phase: "" });
 
-// Anfrage → Nachrichten für die Valorant-Quelle: [{ event, seite }]. seite: eigen = Team dieses PCs, gegner = das andere.
+// Anfrage → Nachrichten für die Valorant-Quelle: [{ event, seite }]. seite: eigen = Team dieses PCs, gegner = das andere, keins = ohne Team.
 function shotsfiredEvents(body, z = sfZustand()) {
   const { events, infos } = zerlegen(body);
   const raus = [];
@@ -86,6 +89,8 @@ function shotsfiredEvents(body, z = sfZustand()) {
     if (key === "round_phase") {
       const p = norm(json(value)?.round_phase ?? value);
       if (p === "shopping" && z.phase !== "shopping") raus.push({ event: "round_start", seite: "eigen" });
+      // Ohne Spielstand: Rundenende ohne Sieger. Mit Spielstand kommt das Rundenende mit Sieger, wenn score steigt.
+      if (p === "end" && z.phase !== "end" && !z.score) raus.push({ event: "round_end", seite: "keins" });
       z.phase = p;
       continue;
     }
@@ -108,7 +113,9 @@ function shotsfiredEvents(body, z = sfZustand()) {
       const s = z.score;
       if (s && s.won !== s.lost) matchSieg(s.won > s.lost ? "eigen" : "gegner");
       else raus.push({ event: id, seite: "eigen" });
-    } else if (id) raus.push({ event: id, seite: "eigen" });
+    } else if (id === "round_end") { if (!z.score) raus.push({ event: id, seite: "keins" }); } // mit Spielstand kommt das Ende mit Sieger aus score
+    else if (id === "round_start") { if (z.phase !== "shopping") raus.push({ event: id, seite: "eigen" }); z.phase = "shopping"; }
+    else if (id) raus.push({ event: id, seite: "eigen" });
   }
   return raus;
 }

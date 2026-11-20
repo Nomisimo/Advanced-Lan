@@ -5,7 +5,7 @@ const { shotsfiredEvents, sfZustand, eventName } = require("../src/core/shotsfir
 const { ShotsFiredServer } = require("../src/main/shotsfired-server");
 const { BildQuelle } = require("../src/core/bild-spiele");
 
-const ev = (body, z) => shotsfiredEvents(body, z).map((n) => `${n.event}${n.seite === "gegner" ? ":gegner" : ""}`);
+const ev = (body, z) => shotsfiredEvents(body, z).map((n) => `${n.event}${n.seite !== "eigen" ? ":" + n.seite : ""}`);
 const score = (won, lost) => ({ info: { match_info: { score: JSON.stringify({ won, lost }) } } });
 
 test("Shots Fired: Overwolf-Events in verschiedenen Formen", () => {
@@ -58,6 +58,24 @@ test("Shots Fired: Events laufen durch die Valorant-Quelle, Spike explodiert zä
   assert.deepEqual(typen({ key: "round_phase", value: "end" }, 4500), []);
   assert.deepEqual(typen({ key: "round_phase", value: "shopping" }, 30000), ["round_start"]);
   assert.deepEqual(typen(score(1, 1), 60000), ["round_end:TEAM B"]);
+});
+
+test("Shots Fired: Rundenstart und Rundenende, auch ohne Spielstand", () => {
+  const z = sfZustand();
+  assert.deepEqual(ev({ name: "match_start" }, z), ["match_start"]);
+  assert.deepEqual(ev({ key: "round_phase", value: "shopping" }, z), ["round_start"]);
+  assert.deepEqual(ev({ key: "round_phase", value: "combat" }, z), []);
+  assert.deepEqual(ev({ key: "round_phase", value: "end" }, z), ["round_end:keins"], "ohne score: Ende ohne Sieger");
+  assert.deepEqual(ev({ key: "round_phase", value: "end" }, z), [], "nur einmal");
+  assert.deepEqual(ev({ name: "round_start" }, z), ["round_start"], "falls als Event: übernommen");
+  assert.deepEqual(ev({ name: "round_end" }, z), ["round_end:keins"]);
+  ev(score(0, 0), z);
+  ev({ key: "round_phase", value: "shopping" }, z);
+  assert.deepEqual(ev({ key: "round_phase", value: "end" }, z), [], "mit score: Ende kommt mit Sieger");
+  assert.deepEqual(ev(score(0, 1), z), ["round_end:gegner"]);
+  const q = new BildQuelle("valorant", { team: "TEAM A" });
+  q.ingest({ bild: true, event: "round_start", seite: "eigen" }, 0);
+  assert.deepEqual(q.ingest({ bild: true, event: "round_end", seite: "keins" }, 1000).events.map((e) => [e.type, e.team]), [["round_end", ""]]);
 });
 
 const senden = (port, { method = "POST", pfad = "/valorant", body = "" } = {}) => new Promise((resolve, reject) => {

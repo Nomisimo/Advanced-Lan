@@ -8,6 +8,7 @@ const RELEASES_URL = `https://github.com/${REPO}/releases`;
 const CHANGELOG = {
   "0.1.0-beta.18": [
     "Valorant über Shots Fired (Overwolf): die App nimmt auf jedem Game-PC einen Webhook an (http://localhost:44207/valorant) und übernimmt alle Overwolf-Events für Valorant, auch Spike gelegt, entschärft und explodiert",
+    "Rundenstart aus der Rundenphase (Kaufphase), Rundenende mit Sieger aus dem Spielstand, ohne Spielstand Rundenende ohne Sieger aus der Rundenphase",
     "Rundengewinner und Matchgewinner kommen aus dem Spielstand von Overwolf (13 Runden, in der Verlängerung 2 Vorsprung), auch in Custom Matches ohne Match-Ende",
     "Game-PC → Setup: Anleitung für Shots Fired mit Prüfliste und „Letzte Anfragen“, die zeigen, was Shots Fired wirklich schickt",
     "Valorant: neues Event „Spike explodiert“, auch in der Bilderkennung, in Signalen und Statistik",

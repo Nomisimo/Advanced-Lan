@@ -239,7 +239,7 @@ class BildQuelle {
     if (m.team && this.def.teams.includes(m.team)) this.team = m.team;
     if (typeof m.name === "string" && m.name) this.name = m.name;
     const z = this.z, roh = [];
-    const team = m.seite === "gegner" ? this.gegner() : this.team;
+    const team = m.seite === "gegner" ? this.gegner() : m.seite === "keins" ? "" : this.team; // keins: Rundenende ohne bekannten Sieger
     const global = (type, extra = {}) => roh.push({ type, team: "", round: z.runde, ...extra });
     // Erste Runde nach dem Matchende (oder überhaupt): neues Match
     const matchStart = () => { if (!z.laeuft) { this.neu(); z.laeuft = true; global("match_start", { round: 0 }); } };

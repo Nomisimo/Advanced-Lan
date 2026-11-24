@@ -239,3 +239,30 @@ test("Darstellung und eigene Einstellungen für jedes Element", () => {
   const alt = migrateLayout({ elemente: [{ typ: "zahlen", x: 0, y: 0, b: 400, h: 100 }] }).elemente.find((e) => e.typ === "zahlen");
   assert.deepEqual([alt.deckkraft, alt.kachel, alt.ecken, alt.rahmen], [100, STIL.kachel, STIL.ecken, true]);
 });
+
+test("Texte je Zustand und Teile ein/aus für jede Anzeige", () => {
+  const { OPTIONEN, OPTION_TEXT_MAX } = require("../src/core/stats-layout");
+  const std = standardLayout();
+  const live = std.elemente.find((e) => e.typ === "live");
+  assert.deepEqual([live.textLive, live.textWartet, live.textAn, live.punkt], ["LIVE", "WARTET", true, true]);
+  for (const [typ, o] of Object.entries(OPTIONEN)) for (const k of Object.keys(o)) assert.ok(k in std.elemente.find((e) => e.typ === typ), `${typ}.${k}`);
+  const l = migrateLayout({ elemente: [
+    { typ: "live", textLive: "ON AIR {kurz}", textWartet: "", textAn: false, punkt: false },
+    { typ: "spielstand", textWarten: "x".repeat(200), teamnamen: false, textSieger: 5 },
+    { typ: "events", zeit: false, textLeer: "" },
+  ] });
+  const lv = l.elemente.find((e) => e.typ === "live");
+  assert.deepEqual([lv.textLive, lv.textWartet, lv.textAn, lv.punkt], ["ON AIR {kurz}", "", false, false]);
+  const sp = l.elemente.find((e) => e.typ === "spielstand");
+  assert.equal(sp.textWarten.length, OPTION_TEXT_MAX);
+  assert.equal(sp.teamnamen, false);
+  assert.equal(sp.textSieger, "Sieger", "kein Text: Standard");
+  const ev = l.elemente.find((e) => e.typ === "events");
+  assert.deepEqual([ev.zeit, ev.textLeer, ev.spieler], [false, "", true]);
+});
+
+test("Hintergrund: Verlauf über dem Bild", () => {
+  const l = migrateLayout({ hintergrund: "bild", hg: { bild: "b1", verlaufDrueber: true }, bilder: { b1: PNG }, elemente: [] });
+  assert.equal(l.hg.verlaufDrueber, true);
+  assert.equal(migrateLayout({ elemente: [] }).hg.verlaufDrueber, false);
+});

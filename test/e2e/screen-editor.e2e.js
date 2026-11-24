@@ -187,7 +187,25 @@ const BILDER = process.argv[3] || require('os').tmpdir();
   await page.waitForTimeout(400);
   assert.strictEqual((await layout()).elemente.find((x) => x.id === 'spielstand').kachel, 92, 'Rückgängig nimmt das Übertragen zurück');
 
-  // 12) Stats-Screen zeigt das gespeicherte Layout mit dem Text
+  // 12) LIVE-Anzeige: Text je Zustand ändern, Punkt aus
+  await page.getByTestId('liste-live').click();
+  await page.getByTestId('opt-textWartet').fill('GLEICH GEHT ES LOS');
+  await page.getByText('Punkt zeigen').click();
+  await page.waitForTimeout(400);
+  const lv = (await layout()).elemente.find((x) => x.id === 'live');
+  assert.deepStrictEqual([lv.textWartet, lv.punkt], ['GLEICH GEHT ES LOS', false]);
+
+  // 13) Verlauf über dem Bild: Bild darunterlegen
+  await page.mouse.click(box.x + 6, box.y + 6);
+  const [wahl2] = await Promise.all([page.waitForEvent('filechooser'), page.getByRole('button', { name: 'Bild darunterlegen' }).click()]);
+  await wahl2.setFiles(path.resolve(__dirname, '../../assets/app-icon/icon.png'));
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('advancedlan_konfig')).regie.stats.layout.hintergrund === 'bild');
+  lay = await layout();
+  assert.ok(lay.hg.verlaufDrueber && lay.hg.bild && lay.bilder[lay.hg.bild], 'Bild mit Verlauf darüber');
+  assert.ok(lay.hg.verlauf.stopps.some((x) => x.alpha < 100), 'Verlauf scheint durch');
+  await page.screenshot({ path: BILDER + '/editor-8-verlauf-bild.png' });
+
+  // 14) Stats-Screen zeigt das gespeicherte Layout mit dem Text
   const stats = await ctx.newPage();
   await stats.setViewportSize({ width: 1920, height: 1080 });
   await stats.goto(URL + '#stats');
@@ -195,8 +213,9 @@ const BILDER = process.argv[3] || require('os').tmpdir();
   const inhalt = await stats.textContent('body');
   assert.ok(inhalt.includes('Finale · LAN-Party'), 'Text mit ersetztem Platzhalter auf dem Stats-Screen');
   assert.ok(await stats.locator('img[src^="data:image/webp"]').count() > 0, 'Bild-Block auf dem Stats-Screen');
-  const hg = await stats.evaluate(() => [...document.querySelectorAll('div')].map((d) => d.style.background).find((b) => b.includes('linear-gradient(160deg')));
-  assert.ok(hg, 'eigener Verlauf auf dem Stats-Screen');
+  const hg = await stats.evaluate(() => [...document.querySelectorAll('div')].map((d) => d.style.background).find((b) => b.includes('linear-gradient(160deg') && b.includes('url(')));
+  assert.ok(hg, 'eigener Verlauf über dem Bild auf dem Stats-Screen');
+  assert.ok(inhalt.includes('GLEICH GEHT ES LOS'), 'eigener Text der LIVE-Anzeige');
   assert.ok(await stats.evaluate(() => [...document.querySelectorAll('div')].some((d) => d.style.opacity === '0.6')), 'Deckkraft auf dem Stats-Screen');
   await stats.screenshot({ path: BILDER + '/editor-4-stats.png' });
 

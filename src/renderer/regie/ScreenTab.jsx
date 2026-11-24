@@ -5,9 +5,9 @@ import { uiConfirm } from "../dialog.jsx";
 import { StatsBuehne } from "../StatsScreen.jsx";
 import StatsAusgabe from "./StatsAusgabe.jsx";
 import { SPIEL_BY_ID } from "../../core/spiele.js";
-import { B, H, MIN, MAX_TEXTE, MAX_BILDER, ZOOM_MIN, ZOOM_MAX, ANZEIGE, HINTERGRUENDE, PASSUNGEN, PLATZHALTER, standardLayout, migrateLayout, neuerText, neuesBild, einrasten, bilderAufraeumen, neueId, inhaltsSkala } from "../../core/stats-layout.js";
+import { B, H, MIN, MAX_TEXTE, MAX_BILDER, ZOOM_MIN, ZOOM_MAX, OPTIONEN, OPTION_TEXT_MAX, ANZEIGE, HINTERGRUENDE, PASSUNGEN, PLATZHALTER, standardLayout, migrateLayout, neuerText, neuesBild, einrasten, bilderAufraeumen, neueId, inhaltsSkala } from "../../core/stats-layout.js";
 import { statsBeispiel } from "../../core/stats-beispiel.js";
-import HintergrundEditor, { Regler } from "./HintergrundEditor.jsx";
+import HintergrundEditor, { Regler, durchscheinend } from "./HintergrundEditor.jsx";
 import { bildWaehlen, bildVorbereiten } from "./bild-laden.js";
 import { Type, Eye, EyeOff, Undo2, Redo2, RotateCcw, Copy, Trash2, ArrowUpToLine, ArrowDownToLine, AlignLeft, AlignCenter, AlignRight, Cast, Move, ImagePlus, Image as ImageIcon, Scaling } from "lucide-react";
 
@@ -114,11 +114,13 @@ export default function ScreenTab({ cfg, mutate, status, log }) {
     const l = layoutRef.current;
     setzen({ ...l, bilder: { ...l.bilder, [r.id]: r.url }, elemente: l.elemente.map((x) => (x.id === e.id ? { ...x, bild: r.id } : x)) }, l, true);
   };
-  const hgBild = async () => {
+  // Bild als Hintergrund; mitVerlauf: der eigene Verlauf liegt darüber
+  const hgBild = async (mitVerlauf) => {
     const r = await bildLaden(await bildWaehlen());
     if (!r) return;
     const l = layoutRef.current;
-    setzen({ ...l, hintergrund: "bild", bilder: { ...l.bilder, [r.id]: r.url }, hg: { ...l.hg, bild: r.id } }, l, true);
+    const hg = { ...l.hg, bild: r.id, ...(mitVerlauf === true ? { verlaufDrueber: true, verlauf: durchscheinend(l.hg.verlauf) } : {}) };
+    setzen({ ...l, hintergrund: "bild", bilder: { ...l.bilder, [r.id]: r.url }, hg }, l, true);
   };
   const hgArt = (k) => {
     if (k === "bild" && !layout.hg.bild) { hgBild(); return; }
@@ -303,7 +305,7 @@ export default function ScreenTab({ cfg, mutate, status, log }) {
               duplizieren={() => duplizieren(gewaehlt)} entfernen={() => entfernen(gewaehlt)} ebene={(r) => ebene(gewaehlt, r)} />
               : <>
                 <div style={{ ...S.hint, marginTop: 0, border: `1px dashed ${LINE}`, borderRadius: 8, padding: 10 }}>Ein Element anklicken, um Position, Größe und Inhalt zu bearbeiten. Ohne Auswahl: Hintergrund.</div>
-                <HintergrundEditor layout={layout} setArt={hgArt} aendern={hgAendern} fokus={fokus} bildSetzen={hgBild} />
+                <HintergrundEditor layout={layout} setArt={hgArt} aendern={hgAendern} fokus={fokus} bildSetzen={() => hgBild()} bildDarunter={() => (layout.hg.bild ? setzen({ ...layout, hintergrund: "bild", hg: { ...layout.hg, verlaufDrueber: true, verlauf: durchscheinend(layout.hg.verlauf) } }) : hgBild(true))} />
               </>}
           </div>
         </div>
@@ -333,6 +335,44 @@ function Elemente({ layout, auswahl, setAuswahl, sichtbar }) {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+// Eigene Einstellungen je Anzeige: Teile ein/aus, Texte je Zustand (mit Platzhaltern), Zahlen. Aus OPTIONEN in core/stats-layout.js
+const OPTION_INFO = {
+  icon: "Icon zeigen", kurz: "Kürzel zeigen", name: "Name zeigen",
+  textOhne: ["Text ohne Wert", "Steht da, wenn nichts da ist (kein Spiel / keine Session). Leer = nichts"],
+  punkt: "Punkt zeigen", textAn: "Text zeigen", textLive: ["Text bei LIVE", "Wenn Spieldaten kommen"], textWartet: ["Text beim Warten", "Wenn gerade keine Spieldaten kommen"],
+  teamnamen: "Teamnamen zeigen", mitteKlein: "Zeile unter Runde/Zeit (z. B. „Runde läuft“)", chips: "Hinweise unter der Mitte (Map, Bombe …)",
+  textSieger: ["Text beim Sieger", "Leer = kein Text"], textWarten: ["Text ohne Spieldaten", "Groß in der Mitte, solange kein Match läuft. Leer = nichts"], wartenKlein: "Zweite Zeile ohne Spieldaten",
+  labels: "Beschriftung unter den Zahlen",
+  zeilen: ["Zeilen", "0 = automatisch nach Höhe"], kopf: "Spaltenköpfe zeigen", textLeer: ["Text ohne Daten", "Leer = nichts"],
+  anzahl: ["Anzahl Events", "0 = automatisch nach Höhe"], spieler: "Spieler/Team zeigen", zeit: "Uhrzeit zeigen",
+};
+function Optionen({ e, aendern, tippen, fokus }) {
+  const o = OPTIONEN[e.typ];
+  const schalter = Object.keys(o).filter((k) => typeof o[k] === "boolean");
+  const texte = Object.keys(o).filter((k) => typeof o[k] === "string");
+  const zahlen = Object.keys(o).filter((k) => typeof o[k] === "number");
+  const info = (k) => (Array.isArray(OPTION_INFO[k]) ? OPTION_INFO[k] : [OPTION_INFO[k] || k, ""]);
+  // Text aus, wenn der Schalter „Text zeigen“ der Anzeige aus ist
+  const textAus = e.typ === "live" && e.textAn === false;
+  return (
+    <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }} data-testid="optionen">
+      <div style={{ fontSize: 11, fontWeight: 700, color: SUB, textTransform: "uppercase", letterSpacing: 0.5 }}>Inhalt und Texte</div>
+      {schalter.length > 0 && <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+        {schalter.map((k) => <Toggle key={k} checked={e[k] !== false} onChange={(v) => aendern({ [k]: v })} label={info(k)[0]} />)}
+      </div>}
+      {texte.map((k) => (
+        <Field key={k} label={info(k)[0]} hint={info(k)[1]}>
+          <div style={{ display: "flex", gap: 4 }}>
+            <input data-testid={`opt-${k}`} style={{ ...S.inputSm, opacity: textAus ? 0.45 : 1 }} disabled={textAus} value={e[k] ?? o[k]} maxLength={OPTION_TEXT_MAX} placeholder="(nichts)" onFocus={fokus} onChange={(ev) => tippen({ [k]: ev.target.value })} />
+            {(e[k] ?? o[k]) !== o[k] && <button style={{ ...S.smallBtn, fontSize: 10 }} title={`Standard: ${o[k] || "leer"}`} onClick={() => aendern({ [k]: o[k] })}>Standard</button>}
+          </div>
+        </Field>
+      ))}
+      {zahlen.map((k) => <Regler key={k} label={info(k)[0] + (e[k] ? "" : " (automatisch)")} wert={e[k] || 0} max={20} fokus={fokus} onChange={(v) => tippen({ [k]: v })} />)}
     </div>
   );
 }
@@ -427,14 +467,7 @@ function Eigenschaften({ e, bilder, aendern, tippen, fokus, duplizieren, entfern
         <Regler label={`Zoom (Inhalt ${Math.round(skala.f * 100)} %)`} wert={e.zoom ?? 100} min={ZOOM_MIN} max={ZOOM_MAX} einheit="%" fokus={fokus} onChange={(v) => tippen({ zoom: v })} testid="zoom" />
         {(e.zoom ?? 100) !== 100 && <button style={{ ...S.smallBtn, alignSelf: "flex-start" }} onClick={() => aendern({ zoom: 100 })}>Zoom auf 100 %</button>}
       </>}
-      {e.typ === "logo" && <Toggle checked={e.icon !== false} onChange={(v) => aendern({ icon: v })} label="Icon zeigen" />}
-      {e.typ === "spiel" && <div style={{ display: "flex", gap: 14 }}>
-        <Toggle checked={e.kurz !== false} onChange={(v) => aendern({ kurz: v })} label="Kürzel" />
-        <Toggle checked={e.name !== false} onChange={(v) => aendern({ name: v })} label="Name" />
-      </div>}
-      {e.typ === "spielstand" && <Toggle checked={e.chips !== false} onChange={(v) => aendern({ chips: v })} label="Hinweise unter der Mitte (Map, Bombe …)" />}
-      {e.typ === "bestenliste" && <Regler label={`Zeilen${e.zeilen ? "" : " (automatisch nach Höhe)"}`} wert={e.zeilen || 0} max={20} fokus={fokus} onChange={(v) => tippen({ zeilen: v })} />}
-      {e.typ === "events" && <Regler label={`Anzahl Events${e.anzahl ? "" : " (automatisch nach Höhe)"}`} wert={e.anzahl || 0} max={20} fokus={fokus} onChange={(v) => tippen({ anzahl: v })} />}
+      {OPTIONEN[e.typ] && Object.keys(OPTIONEN[e.typ]).length > 0 && <Optionen e={e} aendern={aendern} tippen={tippen} fokus={fokus} />}
       <Darstellung e={e} tippen={tippen} aendern={aendern} fokus={fokus} stilAlle={stilAlle} />
       {!text && "titel" in e && (
         <Field label="Überschrift" hint="Leer lassen für keine Überschrift. Platzhalter wie {spiel} gehen auch.">

@@ -149,3 +149,93 @@ test("Screen-Editor: Beispieldaten füllen den Screen für jedes Spiel", () => {
     assert.ok(statsEvents(log, sp.id).length > 0, sp.id);
   }
 });
+
+const { verlaufCss, farbeBei, inhaltsSkala, neuesBild, bilderAufraeumen, MAX_BILDER } = require("../src/core/stats-layout");
+const PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+
+test("Screen-Layout: eigener Hintergrund und Verlauf werden geprüft", () => {
+  const l = migrateLayout({ hintergrund: "eigen", hg: { farbe: "lila", verlauf: { art: "quatsch", winkel: 999, stopps: [{ farbe: "#FF0000", pos: 80, alpha: 50 }, { farbe: "#0000ff", pos: -5 }, null] } }, elemente: [] });
+  assert.equal(l.hintergrund, "eigen");
+  assert.equal(l.hg.farbe, "#1b1922");
+  assert.deepEqual(l.hg.verlauf.stopps, [{ farbe: "#0000ff", pos: 0, alpha: 100 }, { farbe: "#ff0000", pos: 80, alpha: 50 }]);
+  assert.equal(l.hg.verlauf.art, "linear");
+  assert.equal(l.hg.verlauf.winkel, 360);
+  // Ein Stopp reicht nicht: Standardverlauf
+  assert.equal(migrateLayout({ hg: { verlauf: { stopps: [{ farbe: "#000000", pos: 0 }] } }, elemente: [] }).hg.verlauf.stopps.length, 3);
+  // Bild-Hintergrund ohne gültiges Bild fällt auf den Standard zurück
+  assert.equal(migrateLayout({ hintergrund: "bild", hg: { bild: "b1" }, bilder: { b1: "data:image/svg+xml;base64,PHN2Zz4=" }, elemente: [] }).hintergrund, "verlauf");
+  const mitBild = migrateLayout({ hintergrund: "bild", hg: { bild: "b1", abdunkeln: 40 }, bilder: { b1: PNG, b2: PNG }, elemente: [] });
+  assert.equal(mitBild.hintergrund, "bild");
+  assert.deepEqual(Object.keys(mitBild.bilder), ["b1"], "ungenutzte Bilder fliegen raus");
+});
+
+test("Verlauf: CSS und Farbe zwischen zwei Stopps", () => {
+  const v = { art: "linear", winkel: 90, stopps: [{ farbe: "#000000", pos: 0, alpha: 100 }, { farbe: "#ffffff", pos: 100, alpha: 0 }] };
+  assert.equal(verlaufCss(v), "linear-gradient(90deg, rgba(0,0,0,1) 0%, rgba(255,255,255,0) 100%)");
+  assert.equal(verlaufCss({ ...v, art: "radial", x: 20, y: 30 }), "radial-gradient(ellipse farthest-corner at 20% 30%, rgba(0,0,0,1) 0%, rgba(255,255,255,0) 100%)");
+  assert.ok(verlaufCss({ ...v, art: "konisch" }).startsWith("conic-gradient(from 90deg at 50% 50%"));
+  assert.deepEqual(farbeBei(v, 50), { farbe: "#808080", alpha: 50 });
+  assert.deepEqual(farbeBei(v, 0), { farbe: "#000000", alpha: 100 });
+});
+
+test("Bild-Blöcke: geprüft, begrenzt, Bilder ohne Block fliegen raus", () => {
+  const b = neuesBild("b1", { b0: 1000, h0: 1000 });
+  assert.deepEqual([b.b, b.h], [480, 480]);
+  assert.deepEqual([neuesBild("b1", { b0: 1920, h0: 1080 }).b, neuesBild("b1", { b0: 1920, h0: 1080 }).h], [640, 360]);
+  const l = migrateLayout({ bilder: { b1: PNG, kaputt: "data:text/html;base64,PGI+" }, elemente: [
+    { ...b, deckkraft: 500, radius: -3, passung: "irgendwie" },
+    { ...neuesBild("kaputt"), id: "x2" },
+    { ...neuesBild("fehlt"), id: "x3" },
+  ] });
+  const bl = l.elemente.filter((e) => e.typ === "bild");
+  assert.equal(bl.length, 1);
+  assert.deepEqual([bl[0].deckkraft, bl[0].radius, bl[0].passung], [100, 0, "einpassen"]);
+  assert.deepEqual(Object.keys(l.bilder), ["b1"]);
+  const viele = migrateLayout({ bilder: { b1: PNG }, elemente: Array.from({ length: MAX_BILDER + 3 }, () => neuesBild("b1")) });
+  assert.equal(viele.elemente.filter((e) => e.typ === "bild").length, MAX_BILDER);
+  // Aufräumen nach dem Löschen
+  const ohne = bilderAufraeumen({ ...l, elemente: l.elemente.filter((e) => e.typ !== "bild") });
+  assert.deepEqual(ohne.bilder, {});
+  assert.equal(bilderAufraeumen(l), l, "nichts zu tun: gleiches Objekt");
+});
+
+test("Blöcke skalieren: Inhalt wächst mit der Blockgröße, Zoom obendrauf", () => {
+  const sp = standardLayout().elemente.find((e) => e.typ === "spielstand"); // 1832 × 330
+  assert.deepEqual(inhaltsSkala(sp), { f: 1, b: 1832, h: 330 });
+  const halb = inhaltsSkala({ ...sp, b: 916, h: 165 });
+  assert.equal(halb.f, 0.5);
+  assert.deepEqual([halb.b, halb.h], [1832, 330]);
+  // Nur schmaler: kleinere Seite zählt, der Inhalt bekommt mehr Höhe
+  const schmal = inhaltsSkala({ ...sp, b: 916 });
+  assert.equal(schmal.f, 0.5);
+  assert.deepEqual([schmal.b, schmal.h], [1832, 660]);
+  assert.equal(inhaltsSkala({ ...sp, zoom: 150 }).f, 1.5);
+  assert.equal(inhaltsSkala({ ...sp, b: 916, skalieren: false }).f, 1);
+  // Texte und Bilder skalieren selbst
+  assert.equal(inhaltsSkala({ typ: "text", b: 10, h: 10 }).f, 1);
+  // Altes Layout ohne die neuen Felder: skaliert, Zoom 100
+  const alt = migrateLayout({ elemente: [{ typ: "events", x: 0, y: 0, b: 380, h: 205 }] }).elemente.find((e) => e.typ === "events");
+  assert.deepEqual([alt.skalieren, alt.zoom, inhaltsSkala(alt).f], [true, 100, 0.5]);
+});
+
+test("Darstellung und eigene Einstellungen für jedes Element", () => {
+  const { STIL, neuerText } = require("../src/core/stats-layout");
+  const std = standardLayout();
+  assert.ok(std.elemente.every((e) => e.deckkraft === 100 && e.kachel === STIL.kachel && e.rahmen === true && e.schrift === ""));
+  const l = migrateLayout({ bilder: { b1: PNG }, elemente: [
+    { typ: "events", deckkraft: 40, kachel: -10, ecken: 500, rahmen: false, schrift: "#ABCDEF", akzent: "quatsch", anzahl: 99 },
+    { typ: "bestenliste", zeilen: 3 },
+    { typ: "logo", icon: false },
+    { ...neuerText(), deckkraft: 30, kachel: 0 },
+    { ...neuesBild("b1"), deckkraft: 55 },
+  ] });
+  const ev = l.elemente.find((e) => e.typ === "events");
+  assert.deepEqual([ev.deckkraft, ev.kachel, ev.ecken, ev.rahmen, ev.schrift, ev.akzent, ev.anzahl], [40, 0, 80, false, "#abcdef", "", 20]);
+  assert.equal(l.elemente.find((e) => e.typ === "bestenliste").zeilen, 3);
+  assert.equal(l.elemente.find((e) => e.typ === "logo").icon, false);
+  assert.deepEqual([l.elemente.find((e) => e.typ === "text").deckkraft, l.elemente.find((e) => e.typ === "text").kachel], [30, 0]);
+  assert.equal(l.elemente.find((e) => e.typ === "bild").deckkraft, 55, "Deckkraft alter Bild-Blöcke bleibt");
+  // Altes Layout ohne Darstellung: Standard
+  const alt = migrateLayout({ elemente: [{ typ: "zahlen", x: 0, y: 0, b: 400, h: 100 }] }).elemente.find((e) => e.typ === "zahlen");
+  assert.deepEqual([alt.deckkraft, alt.kachel, alt.ecken, alt.rahmen], [100, STIL.kachel, STIL.ecken, true]);
+});

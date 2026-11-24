@@ -5,7 +5,7 @@ import { APP_ICON } from "./Kopf.jsx";
 import { EventIcon, eventLabel, zeit } from "./ui.jsx";
 import { SPIEL_BY_ID } from "../core/spiele.js";
 import { statsDaten, statsEvents } from "../core/stats-screen.js";
-import { migrateLayout, textEinsetzen } from "../core/stats-layout.js";
+import { migrateLayout, textEinsetzen, verlaufCss, inhaltsSkala } from "../core/stats-layout.js";
 import { Crown, Trophy } from "lucide-react";
 
 // Game-Stats-Screen für Publikum und Stream: immer 1920×1080 gestaltet, auf die Fenstergröße skaliert.
@@ -148,6 +148,14 @@ function TextElement({ el, werte }) {
   return el.panel ? <Panel style={{ ...box, padding: "0 30px" }}>{inhalt}</Panel> : <div style={box}>{inhalt}</div>;
 }
 
+const OBJECT_FIT = { fuellen: "cover", einpassen: "contain", strecken: "fill" };
+function BildElement({ el, bilder }) {
+  const src = bilder?.[el.bild];
+  const img = src ? <img src={src} alt="" draggable={false} style={{ width: "100%", height: "100%", objectFit: OBJECT_FIT[el.passung] || "contain", display: "block", opacity: el.deckkraft / 100, borderRadius: el.panel ? 0 : el.radius }} /> : null;
+  if (el.panel) return <Panel style={{ width: "100%", height: "100%", boxSizing: "border-box", padding: 14, overflow: "hidden", borderRadius: Math.max(18, el.radius) }}><div style={{ width: "100%", height: "100%", borderRadius: Math.max(0, el.radius - 14), overflow: "hidden" }}>{img}</div></Panel>;
+  return <div style={{ width: "100%", height: "100%", borderRadius: el.radius, overflow: "hidden" }}>{img}</div>;
+}
+
 // Inhalt eines Elements des Layouts in seinem Kasten
 export function ElementInhalt({ el, ctx }) {
   const { d, spiel, live, log, cfg, werte, namen } = ctx;
@@ -193,6 +201,7 @@ export function ElementInhalt({ el, ctx }) {
     case "bestenliste": return <Bestenliste d={d} mitTeam={!!d.teams} titel={el.titel} zeilen={Math.max(1, Math.floor((el.h - (el.titel ? 140 : 100)) / 54))} />;
     case "events": return <LetzteEvents titel={el.titel} events={statsEvents(log, spiel?.id, Math.max(1, Math.min(12, Math.floor((el.h - (el.titel ? 100 : 60)) / 56))), namen)} />;
     case "text": return <TextElement el={el} werte={werte} />;
+    case "bild": return <BildElement el={el} bilder={ctx.bilder} />;
     default: return null;
   }
 }
@@ -201,27 +210,47 @@ const HINTERGRUND = {
   verlauf: (spiel) => `radial-gradient(1200px 700px at 8% -10%, rgba(157,92,255,.28), transparent 60%), radial-gradient(1000px 600px at 105% 110%, ${spiel?.farbe || ACCENT}33, transparent 60%), ${BG}`,
   schwarz: () => "#000",
   gruen: () => "#00b140",
+  farbe: (_, l) => l.hg.farbe,
+  eigen: (_, l) => verlaufCss(l.hg.verlauf),
+  bild: (_, l) => {
+    const src = l.bilder[l.hg.bild];
+    if (!src) return BG;
+    const dunkel = l.hg.abdunkeln ? `linear-gradient(rgba(0,0,0,${l.hg.abdunkeln / 100}), rgba(0,0,0,${l.hg.abdunkeln / 100})), ` : "";
+    return `${dunkel}url("${src}") center / ${l.hg.passung === "einpassen" ? "contain" : "cover"} no-repeat, #000`;
+  },
 };
+export const hintergrundCss = (l, spiel) => (HINTERGRUND[l.hintergrund] || HINTERGRUND.verlauf)(spiel, l);
+
+// Ein Element in seinem Kasten. Anzeigen werden in ihrer Gestaltungsgröße gesetzt und auf den Kasten skaliert,
+// so wachsen Schrift, Logos und Tabellen mit dem Block.
+export function ElementKasten({ e, ctx }) {
+  const { f, b, h } = inhaltsSkala(e);
+  return (
+    <div style={{ position: "absolute", left: e.x, top: e.y, width: e.b, height: e.h }}>
+      {f === 1 ? <ElementInhalt el={e} ctx={ctx} /> : (
+        <div style={{ width: b, height: h, transform: `scale(${f})`, transformOrigin: "0 0" }}>
+          <ElementInhalt el={{ ...e, b, h }} ctx={ctx} />
+        </div>
+      )}
+    </div>
+  );
+}
 
 // Daten für alle Elemente einmal ausrechnen
 export function buehnenDaten({ status, cfg, log, jetzt }) {
   const spiel = SPIEL_BY_ID[status?.aktivesSpiel || cfg?.regie?.aktivesSpiel];
   const d = statsDaten(spiel, status?.statistik, status?.stand);
   const live = !!(status?.stand?.t && jetzt - status.stand.t < FRISCH);
-  return { spiel, d, live, log, cfg, namen: status?.namen || {}, werte: textWerte({ spiel, d, cfg, jetzt }) };
+  return { spiel, d, live, log, cfg, namen: status?.namen || {}, werte: textWerte({ spiel, d, cfg, jetzt }), bilder: {} };
 }
 
 // layout: wenn nicht angegeben, das gespeicherte aus cfg.regie.stats.layout
 export function StatsBuehne({ status, cfg, log, jetzt = Date.now(), layout }) {
   const l = layout || migrateLayout(cfg?.regie?.stats?.layout);
-  const ctx = buehnenDaten({ status, cfg, log, jetzt });
+  const ctx = { ...buehnenDaten({ status, cfg, log, jetzt }), bilder: l.bilder };
   return (
-    <div style={{ width: B, height: H, position: "relative", overflow: "hidden", fontFamily: FONT, color: "#ece9f2", background: (HINTERGRUND[l.hintergrund] || HINTERGRUND.verlauf)(ctx.spiel) }}>
-      {l.elemente.filter((e) => e.sichtbar).map((e) => (
-        <div key={e.id} style={{ position: "absolute", left: e.x, top: e.y, width: e.b, height: e.h }}>
-          <ElementInhalt el={e} ctx={ctx} />
-        </div>
-      ))}
+    <div style={{ width: B, height: H, position: "relative", overflow: "hidden", fontFamily: FONT, color: "#ece9f2", background: hintergrundCss(l, ctx.spiel) }}>
+      {l.elemente.filter((e) => e.sichtbar).map((e) => <ElementKasten key={e.id} e={e} ctx={ctx} />)}
     </div>
   );
 }
@@ -239,7 +268,9 @@ export default function StatsScreen() {
     api.status().then((st) => setStatus(st?.regie || null));
     api.regieLog().then((l) => setLog(l || []));
     const ab = [api.onStatus((st) => setStatus(st?.regie || null)), api.onRegieEvent((e) => setLog((l) => logEinfuegen(l, e))), api.onStatsConfig?.(setCfg)];
-    const t = setInterval(() => { setJetzt(Date.now()); laden(); }, 2000);
+    // Einstellungen kommen per stats-config; zur Sicherheit alle 10 s neu laden (Layouts mit Bildern sind groß)
+    let n = 0;
+    const t = setInterval(() => { setJetzt(Date.now()); if (++n % 5 === 0) laden(); }, 2000);
     return () => { ab.forEach((f) => f && f()); clearInterval(t); };
   }, []);
   return (

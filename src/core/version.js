@@ -6,6 +6,13 @@ const REPO = "Nomisimo/Advanced-Lan";
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
+  "0.1.0-beta.19": [
+    "Stats-Screen-Editor: eigener Hintergrund. Eigene Farbe, eigener Verlauf oder eigenes Bild (Füllen oder Einpassen, Abdunkeln) neben Verlauf, Schwarz und Grün",
+    "Verlauf-Editor: linear, radial oder konisch, bis zu 8 Farbstopps mit Deckkraft. Klick auf die Leiste setzt einen Stopp, Stopps ziehen zum Verschieben, Winkel und Mitte per Regler, Umkehren, sechs Vorlagen",
+    "Bilder als eigene Blöcke (bis zu 12), über „Bild hinzufügen“ oder per Drag and Drop auf die Fläche: Logos, Sponsoren, Grafiken. Darstellung Einpassen, Füllen oder Strecken, Deckkraft, runde Ecken, Kachel. Bilder werden auf höchstens 1920 px verkleinert und mit dem Layout gespeichert",
+    "Alle Blöcke sind skalierbar: der Inhalt der Anzeigen (Spielstand, Zahlen, Bestenliste, Events, Logo …) wächst und schrumpft mit der Blockgröße, dazu ein Zoom je Block. Texte: an den Ecken ziehen ändert die Schriftgröße mit. Bilder behalten an den Ecken ihr Seitenverhältnis (Umschalt: frei)",
+    "Screen-Editor: der ausgewählte Block liegt mit seinen Griffen immer oben, auch wenn er unter einem anderen liegt",
+  ],
   "0.1.0-beta.18": [
     "Neue Spiele: Fortnite (Battle Royale) und League of Legends. Dazu The Finals über Shots Fired",
     "Shots Fired (Overwolf) für Valorant, Fortnite, LoL und The Finals: je Spiel eine Webhook-Adresse (http://localhost:44207/valorant, /fortnite, /lol, /finals), Format { gameId, event, data } wie Shots Fired es schickt",

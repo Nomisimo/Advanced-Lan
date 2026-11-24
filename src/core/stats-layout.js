@@ -6,7 +6,11 @@
 const B = 1920, H = 1080;
 const MIN = 40; // kleinste Breite und Höhe eines Elements
 const MAX_TEXTE = 30;
+const MAX_BILDER = 12; // Bild-Blöcke
 const TEXT_MAX = 500;
+const BILD_MAX = 4_000_000; // Zeichen einer Bild-Data-URL (die Oberfläche verkleinert Bilder vorher auf höchstens 1920 px)
+const BILD_RE = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/;
+const ZOOM_MIN = 25, ZOOM_MAX = 300;
 
 // Anzeigen des Screens; jede gibt es genau einmal. titel: Überschrift, die man im Editor ändern kann
 const ANZEIGEN = [
@@ -20,7 +24,19 @@ const ANZEIGEN = [
   { typ: "events", label: "Letzte Events", x: 1116, y: 636, b: 760, h: 410, titel: "Letzte Events" },
 ];
 const ANZEIGE = Object.fromEntries(ANZEIGEN.map((a) => [a.typ, a]));
-const HINTERGRUENDE = [["verlauf", "Verlauf (Standard)"], ["schwarz", "Schwarz"], ["gruen", "Grün (Chroma-Key)"]];
+const HINTERGRUENDE = [["verlauf", "Verlauf (Standard)"], ["schwarz", "Schwarz"], ["gruen", "Grün (Chroma-Key)"], ["farbe", "Eigene Farbe"], ["eigen", "Eigener Verlauf"], ["bild", "Eigenes Bild"]];
+const VERLAUF_ARTEN = [["linear", "Linear"], ["radial", "Radial"], ["konisch", "Konisch"]];
+const PASSUNGEN = [["fuellen", "Füllen (zuschneiden)"], ["einpassen", "Einpassen (ganz zeigen)"], ["strecken", "Strecken"]];
+const MAX_STOPPS = 8;
+// Vorlagen für den Verlauf-Editor
+const VERLAUF_VORLAGEN = [
+  ["Lila Nacht", { art: "linear", winkel: 135, x: 50, y: 50, stopps: [{ farbe: "#2a1454", pos: 0, alpha: 100 }, { farbe: "#131118", pos: 55, alpha: 100 }, { farbe: "#0c0a10", pos: 100, alpha: 100 }] }],
+  ["Neon", { art: "linear", winkel: 120, x: 50, y: 50, stopps: [{ farbe: "#9d5cff", pos: 0, alpha: 100 }, { farbe: "#ff4fd8", pos: 50, alpha: 100 }, { farbe: "#4ea1ff", pos: 100, alpha: 100 }] }],
+  ["Sonnenuntergang", { art: "linear", winkel: 180, x: 50, y: 50, stopps: [{ farbe: "#ff8a1f", pos: 0, alpha: 100 }, { farbe: "#ff5d5d", pos: 45, alpha: 100 }, { farbe: "#2a1454", pos: 100, alpha: 100 }] }],
+  ["Ozean", { art: "radial", winkel: 0, x: 50, y: 0, stopps: [{ farbe: "#1f6fd1", pos: 0, alpha: 100 }, { farbe: "#0b2a4a", pos: 60, alpha: 100 }, { farbe: "#05101c", pos: 100, alpha: 100 }] }],
+  ["Spotlight", { art: "radial", winkel: 0, x: 50, y: 40, stopps: [{ farbe: "#3a3647", pos: 0, alpha: 100 }, { farbe: "#131118", pos: 70, alpha: 100 }, { farbe: "#000000", pos: 100, alpha: 100 }] }],
+  ["Feuer", { art: "linear", winkel: 0, x: 50, y: 50, stopps: [{ farbe: "#ffcf3d", pos: 0, alpha: 100 }, { farbe: "#ff5d1f", pos: 35, alpha: 100 }, { farbe: "#1a0505", pos: 100, alpha: 100 }] }],
+];
 const AUSRICHTUNG = ["links", "mitte", "rechts"];
 // Platzhalter in Texten: {spiel} wird zu „Counter-Strike 2“ usw.
 const PLATZHALTER = [["spiel", "Name des aktiven Spiels"], ["kurz", "Kürzel des Spiels"], ["session", "Name der Session"], ["team1", "Team links"], ["team2", "Team rechts"], ["score1", "Punkte links"], ["score2", "Punkte rechts"], ["uhrzeit", "Uhrzeit"], ["datum", "Datum"]];
@@ -33,15 +49,94 @@ const neueId = (p = "t") => `${p}${Date.now().toString(36)}${(zaehler++).toStrin
 
 function anzeigeStandard(a) {
   const { typ, x, y, b, h, titel } = a;
-  return { id: typ, typ, x, y, b, h, sichtbar: true, ...(titel ? { titel } : {}) };
+  return { id: typ, typ, x, y, b, h, sichtbar: true, skalieren: true, zoom: 100, ...(titel ? { titel } : {}) };
 }
 
 function neuerText(over = {}) {
-  return { id: neueId(), typ: "text", x: 660, y: 470, b: 600, h: 120, sichtbar: true, text: "Neuer Text", groesse: 64, farbe: "#ffffff", fett: true, ausrichtung: "mitte", panel: false, ...over };
+  return { id: neueId(), typ: "text", x: 660, y: 470, b: 600, h: 120, sichtbar: true, text: "Neuer Text", groesse: 64, farbe: "#ffffff", fett: true, ausrichtung: "mitte", panel: false, skalieren: true, ...over };
+}
+
+// Bild-Block: bild ist der Schlüssel in layout.bilder. b0 × h0: Seitenverhältnis des Bildes, um den Block passend zu setzen
+function neuesBild(bild, { b0 = 16, h0 = 9, ...over } = {}) {
+  const v = b0 > 0 && h0 > 0 ? b0 / h0 : 16 / 9;
+  let b = 640, h = Math.round(640 / v);
+  if (h > 480) { h = 480; b = Math.round(480 * v); }
+  b = Math.max(MIN, Math.min(B, b)); h = Math.max(MIN, Math.min(H, h));
+  return { id: neueId("i"), typ: "bild", x: Math.round((B - b) / 2), y: Math.round((H - h) / 2), b, h, sichtbar: true, bild, passung: "einpassen", deckkraft: 100, radius: 0, panel: false, ...over };
+}
+
+function standardVerlauf() {
+  return JSON.parse(JSON.stringify(VERLAUF_VORLAGEN[0][1]));
+}
+
+function standardHg() {
+  return { farbe: "#1b1922", verlauf: standardVerlauf(), bild: "", passung: "fuellen", abdunkeln: 0 };
 }
 
 function standardLayout() {
-  return { hintergrund: "verlauf", elemente: ANZEIGEN.map(anzeigeStandard) };
+  return { hintergrund: "verlauf", hg: standardHg(), bilder: {}, elemente: ANZEIGEN.map(anzeigeStandard) };
+}
+
+const istBild = (v) => typeof v === "string" && v.length <= BILD_MAX && BILD_RE.test(v);
+const bildId = (v) => (typeof v === "string" && /^[\w-]{1,40}$/.test(v) ? v : "");
+
+function migrateVerlauf(v) {
+  const std = standardVerlauf();
+  if (!v || typeof v !== "object") return std;
+  let stopps = (Array.isArray(v.stopps) ? v.stopps : []).filter((st) => st && typeof st === "object").slice(0, MAX_STOPPS)
+    .map((st) => ({ farbe: farbe(st.farbe, "#000000"), pos: zahl(st.pos, 0, 0, 100), alpha: zahl(st.alpha, 100, 0, 100) }));
+  if (stopps.length < 2) stopps = std.stopps;
+  stopps.sort((a, b) => a.pos - b.pos);
+  return { art: VERLAUF_ARTEN.some(([k]) => k === v.art) ? v.art : "linear", winkel: zahl(v.winkel, 135, 0, 360), x: zahl(v.x, 50, 0, 100), y: zahl(v.y, 50, 0, 100), stopps };
+}
+
+function migrateHg(h) {
+  const std = standardHg();
+  if (!h || typeof h !== "object") return std;
+  return { farbe: farbe(h.farbe, std.farbe), verlauf: migrateVerlauf(h.verlauf), bild: bildId(h.bild), passung: h.passung === "einpassen" ? "einpassen" : "fuellen", abdunkeln: zahl(h.abdunkeln, 0, 0, 90) };
+}
+
+// #rrggbb und Deckkraft (0–100) → rgba(…)
+function rgba(hex, alpha = 100) {
+  const n = parseInt(farbe(hex, "#000000").slice(1), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${Math.round(alpha) / 100})`;
+}
+
+// CSS des eigenen Verlaufs
+function verlaufCss(v) {
+  const m = migrateVerlauf(v);
+  const st = m.stopps.map((s) => `${rgba(s.farbe, s.alpha)} ${s.pos}%`).join(", ");
+  if (m.art === "radial") return `radial-gradient(ellipse farthest-corner at ${m.x}% ${m.y}%, ${st})`;
+  if (m.art === "konisch") return `conic-gradient(from ${m.winkel}deg at ${m.x}% ${m.y}%, ${st})`;
+  return `linear-gradient(${m.winkel}deg, ${st})`;
+}
+
+// Farbe an einer Stelle (0–100) des Verlaufs, für neue Farbstopps
+function farbeBei(v, pos) {
+  const st = migrateVerlauf(v).stopps;
+  const hex = (c) => parseInt(c.slice(1), 16);
+  if (pos <= st[0].pos) return { farbe: st[0].farbe, alpha: st[0].alpha };
+  for (let i = 1; i < st.length; i++) {
+    if (pos <= st[i].pos) {
+      const a = st[i - 1], b = st[i], t = b.pos === a.pos ? 0 : (pos - a.pos) / (b.pos - a.pos);
+      const ca = hex(a.farbe), cb = hex(b.farbe);
+      const k = (sh) => Math.round(((ca >> sh) & 255) + (((cb >> sh) & 255) - ((ca >> sh) & 255)) * t);
+      return { farbe: "#" + ((k(16) << 16) | (k(8) << 8) | k(0)).toString(16).padStart(6, "0"), alpha: Math.round(a.alpha + (b.alpha - a.alpha) * t) };
+    }
+  }
+  const l = st[st.length - 1];
+  return { farbe: l.farbe, alpha: l.alpha };
+}
+
+// Wie stark der Inhalt eines Blocks skaliert: Anzeigen sind für ihre Standardgröße gestaltet.
+// Größer oder kleiner gezogen wächst oder schrumpft der Inhalt mit (kleinere Seite zählt, damit nichts abgeschnitten wird),
+// dazu der Zoom. → { f, b, h }: Faktor und die Größe, in der der Inhalt gesetzt wird (vor dem Skalieren)
+function inhaltsSkala(e) {
+  const a = ANZEIGE[e?.typ];
+  if (!a) return { f: 1, b: e?.b || 0, h: e?.h || 0 };
+  const auto = e.skalieren === false ? 1 : Math.min(e.b / a.b, e.h / a.h);
+  const f = Math.min(5, Math.max(0.1, auto * (zahl(e.zoom, 100, ZOOM_MIN, ZOOM_MAX) / 100)));
+  return { f, b: e.b / f, h: e.h / f };
 }
 
 // Position und Größe in die Fläche bringen
@@ -54,29 +149,60 @@ function kasten(e) {
 function migrateLayout(l) {
   const std = standardLayout();
   if (!l || typeof l !== "object" || !Array.isArray(l.elemente)) return std;
+  // Bilder: nur gültige Data-URLs, und nur solche, die ein Block oder der Hintergrund benutzt
+  const quelle = l.bilder && typeof l.bilder === "object" ? l.bilder : {};
+  const bilder = {};
+  const nimmBild = (id) => { const k = bildId(id); if (k && istBild(quelle[k])) { bilder[k] = quelle[k]; return k; } return ""; };
   const gesehen = new Set(), out = [];
-  let texte = 0;
+  let texte = 0, bloecke = 0;
+  const eigeneId = (e, p) => {
+    const id = typeof e.id === "string" && e.id && !gesehen.has(e.id) && !ANZEIGE[e.id] ? e.id.slice(0, 40) : neueId(p);
+    gesehen.add(id);
+    return id;
+  };
   for (const e of l.elemente) {
     if (!e || typeof e !== "object") continue;
     if (e.typ === "text") {
       if (texte >= MAX_TEXTE) continue;
       texte++;
-      const id = typeof e.id === "string" && e.id && !gesehen.has(e.id) && !ANZEIGE[e.id] ? e.id.slice(0, 40) : neueId();
-      gesehen.add(id);
       out.push({
-        id, typ: "text", ...kasten(e), sichtbar: e.sichtbar !== false,
+        id: eigeneId(e, "t"), typ: "text", ...kasten(e), sichtbar: e.sichtbar !== false,
         text: typeof e.text === "string" ? e.text.slice(0, TEXT_MAX) : "",
         groesse: zahl(e.groesse, 64, 10, 400), farbe: farbe(e.farbe, "#ffffff"), fett: e.fett !== false,
-        ausrichtung: AUSRICHTUNG.includes(e.ausrichtung) ? e.ausrichtung : "mitte", panel: !!e.panel,
+        ausrichtung: AUSRICHTUNG.includes(e.ausrichtung) ? e.ausrichtung : "mitte", panel: !!e.panel, skalieren: e.skalieren !== false,
+      });
+    } else if (e.typ === "bild") {
+      const bild = nimmBild(e.bild);
+      if (!bild || bloecke >= MAX_BILDER) continue;
+      bloecke++;
+      out.push({
+        id: eigeneId(e, "i"), typ: "bild", ...kasten(e), sichtbar: e.sichtbar !== false, bild,
+        passung: PASSUNGEN.some(([k]) => k === e.passung) ? e.passung : "einpassen",
+        deckkraft: zahl(e.deckkraft, 100, 0, 100), radius: zahl(e.radius, 0, 0, 540), panel: !!e.panel,
+        ...(typeof e.name === "string" && e.name ? { name: e.name.slice(0, 60) } : {}),
       });
     } else if (ANZEIGE[e.typ] && !gesehen.has(e.typ)) {
       gesehen.add(e.typ);
       const a = ANZEIGE[e.typ];
-      out.push({ id: e.typ, typ: e.typ, ...kasten(e), sichtbar: e.sichtbar !== false, ...(a.titel ? { titel: typeof e.titel === "string" ? e.titel.slice(0, 80) : a.titel } : {}) });
+      out.push({ id: e.typ, typ: e.typ, ...kasten(e), sichtbar: e.sichtbar !== false, skalieren: e.skalieren !== false, zoom: zahl(e.zoom, 100, ZOOM_MIN, ZOOM_MAX),
+        ...(a.titel ? { titel: typeof e.titel === "string" ? e.titel.slice(0, 80) : a.titel } : {}) });
     }
   }
   for (const a of ANZEIGEN) if (!gesehen.has(a.typ)) out.push({ ...anzeigeStandard(a), sichtbar: false });
-  return { hintergrund: HINTERGRUENDE.some(([k]) => k === l.hintergrund) ? l.hintergrund : "verlauf", elemente: out };
+  const hg = migrateHg(l.hg);
+  hg.bild = nimmBild(hg.bild);
+  let hintergrund = HINTERGRUENDE.some(([k]) => k === l.hintergrund) ? l.hintergrund : "verlauf";
+  if (hintergrund === "bild" && !hg.bild) hintergrund = "verlauf";
+  return { hintergrund, hg, bilder, elemente: out };
+}
+
+// Bilder entfernen, die kein Block und nicht der Hintergrund benutzt (nach Löschen oder Ersetzen)
+function bilderAufraeumen(l) {
+  const genutzt = new Set(l.elemente.filter((e) => e.typ === "bild").map((e) => e.bild));
+  if (l.hg?.bild) genutzt.add(l.hg.bild);
+  const alle = l.bilder || {};
+  if (Object.keys(alle).every((k) => genutzt.has(k))) return l;
+  return { ...l, bilder: Object.fromEntries(Object.entries(alle).filter(([k]) => genutzt.has(k))) };
 }
 
 // Platzhalter ersetzen; unbekannte bleiben stehen, damit man den Tippfehler sieht
@@ -118,4 +244,7 @@ function einrasten(k, andere, { raster = 0, abstand = 8, kanten = null } = {}) {
   return { ...r, linien };
 }
 
-module.exports = { B, H, MIN, MAX_TEXTE, ANZEIGEN, ANZEIGE, HINTERGRUENDE, AUSRICHTUNG, PLATZHALTER, standardLayout, migrateLayout, neuerText, textEinsetzen, einrasten };
+module.exports = {
+  B, H, MIN, MAX_TEXTE, MAX_BILDER, MAX_STOPPS, BILD_MAX, ZOOM_MIN, ZOOM_MAX, ANZEIGEN, ANZEIGE, HINTERGRUENDE, VERLAUF_ARTEN, VERLAUF_VORLAGEN, PASSUNGEN, AUSRICHTUNG, PLATZHALTER,
+  standardLayout, standardHg, migrateLayout, migrateVerlauf, neuerText, neuesBild, textEinsetzen, einrasten, verlaufCss, farbeBei, rgba, inhaltsSkala, istBild, bilderAufraeumen, neueId,
+};

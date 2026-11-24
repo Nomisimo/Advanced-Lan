@@ -1,12 +1,12 @@
 import React, { useRef, useState } from "react";
 import { S, ACCENT, ACCENT_HI, LINE, SUB, MUTED, FELD, GLOW } from "../theme.js";
-import { Field } from "../ui.jsx";
+import { Field, Toggle } from "../ui.jsx";
 import { HINTERGRUENDE, VERLAUF_ARTEN, VERLAUF_VORLAGEN, MAX_STOPPS, verlaufCss, farbeBei, rgba } from "../../core/stats-layout.js";
 import { Palette, ImagePlus, Trash2, ArrowLeftRight, Plus } from "lucide-react";
 
 // Hintergrund des Stats-Screens: Vorlage, eigene Farbe, eigener Verlauf (mit Verlauf-Editor) oder eigenes Bild.
 // aendern(patch, vorher): patch für layout.hg; fokus(): Stand vor einer fortlaufenden Änderung (Regler, Farbwähler) merken.
-export default function HintergrundEditor({ layout, setArt, aendern, fokus, bildSetzen }) {
+export default function HintergrundEditor({ layout, setArt, aendern, fokus, bildSetzen, bildDarunter }) {
   const hg = layout.hg;
   const art = layout.hintergrund;
   return (
@@ -26,7 +26,10 @@ export default function HintergrundEditor({ layout, setArt, aendern, fokus, bild
           </div>
         </Field>
       )}
-      {art === "eigen" && <VerlaufEditor v={hg.verlauf} aendern={(v, vorher) => aendern({ verlauf: v }, vorher)} fokus={fokus} />}
+      {art === "eigen" && <>
+        <VerlaufEditor v={hg.verlauf} aendern={(v, vorher) => aendern({ verlauf: v }, vorher)} fokus={fokus} />
+        <button style={S.secondaryBtn} onClick={bildDarunter} title="Bild als Hintergrund, dieser Verlauf liegt darüber"><ImagePlus size={13} /> Bild darunterlegen</button>
+      </>}
       {art === "bild" && (
         <>
           {layout.bilder[hg.bild] ? <img src={layout.bilder[hg.bild]} alt="" style={{ width: "100%", aspectRatio: "16 / 9", objectFit: "cover", borderRadius: 6, border: `1px solid ${LINE}` }} />
@@ -40,11 +43,19 @@ export default function HintergrundEditor({ layout, setArt, aendern, fokus, bild
             </div>
           </Field>
           <Regler label="Abdunkeln" wert={hg.abdunkeln} max={90} einheit="%" fokus={fokus} onChange={(v) => aendern({ abdunkeln: v }, null)} />
+          <Toggle checked={hg.verlaufDrueber} onChange={(v) => aendern({ verlaufDrueber: v, ...(v ? { verlauf: durchscheinend(hg.verlauf) } : {}) })} label="Eigenen Verlauf darüberlegen" />
+          {hg.verlaufDrueber && <>
+            <div style={{ fontSize: 10, color: MUTED }}>Tipp: Farbstopps mit weniger Deckkraft lassen das Bild durchscheinen.</div>
+            <VerlaufEditor v={hg.verlauf} aendern={(v, vorher) => aendern({ verlauf: v }, vorher)} fokus={fokus} />
+          </>}
         </>
       )}
     </div>
   );
 }
+
+// Ganz deckender Verlauf über einem Bild verdeckt es: dann alle Stopps auf 55 % Deckkraft
+export const durchscheinend = (v) => (v.stopps.every((s) => s.alpha >= 100) ? { ...v, stopps: v.stopps.map((s) => ({ ...s, alpha: 55 })) } : v);
 
 export function Regler({ label, wert, min = 0, max = 100, einheit = "", fokus, onChange, testid }) {
   return (

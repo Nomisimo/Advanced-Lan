@@ -52,17 +52,23 @@ function migrateStil(e) {
   return { deckkraft: zahl(e.deckkraft, 100, 0, 100), kachel: zahl(e.kachel, STIL.kachel, 0, 100), ecken: zahl(e.ecken, STIL.ecken, 0, 80), rahmen: e.rahmen !== false, schrift: f(e.schrift), akzent: f(e.akzent) };
 }
 // Eigene Einstellungen einzelner Anzeigen (0 bei Zeilen/Anzahl: automatisch nach Höhe)
+// Texte (Zeichenketten) können Platzhalter wie {spiel} enthalten, leer = nichts anzeigen
 const OPTIONEN = {
   logo: { icon: true },
-  spiel: { kurz: true, name: true },
-  spielstand: { chips: true },
-  bestenliste: { zeilen: 0 },
-  events: { anzahl: 0 },
+  spiel: { kurz: true, name: true, textOhne: "" },
+  session: { textOhne: "" },
+  live: { punkt: true, textAn: true, textLive: "LIVE", textWartet: "WARTET" },
+  spielstand: { teamnamen: true, mitteKlein: true, chips: true, textSieger: "Sieger", textWarten: "Warten auf Spieldaten …", wartenKlein: true },
+  zahlen: { labels: true },
+  bestenliste: { zeilen: 0, kopf: true, textLeer: "Noch keine Spielerdaten." },
+  events: { anzahl: 0, spieler: true, zeit: true, textLeer: "Noch keine Events." },
 };
+const OPTION_TEXT_MAX = 80;
 function migrateOptionen(typ, e) {
   const o = OPTIONEN[typ];
   if (!o) return {};
-  return Object.fromEntries(Object.entries(o).map(([k, std]) => [k, typeof std === "boolean" ? e[k] !== false : zahl(e[k], std, 0, 20)]));
+  return Object.fromEntries(Object.entries(o).map(([k, std]) => [k,
+    typeof std === "boolean" ? e[k] !== false : typeof std === "string" ? (typeof e[k] === "string" ? e[k].slice(0, OPTION_TEXT_MAX) : std) : zahl(e[k], std, 0, 20)]));
 }
 
 let zaehler = 0;
@@ -91,7 +97,7 @@ function standardVerlauf() {
 }
 
 function standardHg() {
-  return { farbe: "#1b1922", verlauf: standardVerlauf(), bild: "", passung: "fuellen", abdunkeln: 0 };
+  return { farbe: "#1b1922", verlauf: standardVerlauf(), bild: "", passung: "fuellen", abdunkeln: 0, verlaufDrueber: false };
 }
 
 function standardLayout() {
@@ -114,7 +120,7 @@ function migrateVerlauf(v) {
 function migrateHg(h) {
   const std = standardHg();
   if (!h || typeof h !== "object") return std;
-  return { farbe: farbe(h.farbe, std.farbe), verlauf: migrateVerlauf(h.verlauf), bild: bildId(h.bild), passung: h.passung === "einpassen" ? "einpassen" : "fuellen", abdunkeln: zahl(h.abdunkeln, 0, 0, 90) };
+  return { farbe: farbe(h.farbe, std.farbe), verlauf: migrateVerlauf(h.verlauf), bild: bildId(h.bild), passung: h.passung === "einpassen" ? "einpassen" : "fuellen", abdunkeln: zahl(h.abdunkeln, 0, 0, 90), verlaufDrueber: !!h.verlaufDrueber };
 }
 
 // #rrggbb und Deckkraft (0–100) → rgba(…)
@@ -266,6 +272,6 @@ function einrasten(k, andere, { raster = 0, abstand = 8, kanten = null } = {}) {
 }
 
 module.exports = {
-  STIL, OPTIONEN, migrateStil, B, H, MIN, MAX_TEXTE, MAX_BILDER, MAX_STOPPS, BILD_MAX, ZOOM_MIN, ZOOM_MAX, ANZEIGEN, ANZEIGE, HINTERGRUENDE, VERLAUF_ARTEN, VERLAUF_VORLAGEN, PASSUNGEN, AUSRICHTUNG, PLATZHALTER,
+  STIL, OPTIONEN, OPTION_TEXT_MAX, migrateStil, B, H, MIN, MAX_TEXTE, MAX_BILDER, MAX_STOPPS, BILD_MAX, ZOOM_MIN, ZOOM_MAX, ANZEIGEN, ANZEIGE, HINTERGRUENDE, VERLAUF_ARTEN, VERLAUF_VORLAGEN, PASSUNGEN, AUSRICHTUNG, PLATZHALTER,
   standardLayout, standardHg, migrateLayout, migrateVerlauf, neuerText, neuesBild, textEinsetzen, einrasten, verlaufCss, farbeBei, rgba, inhaltsSkala, istBild, bilderAufraeumen, neueId,
 };

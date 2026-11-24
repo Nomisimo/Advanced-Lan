@@ -40,25 +40,29 @@ const Panel = ({ children, style }) => {
 };
 const Titel = ({ children }) => <div style={{ fontSize: 22, fontWeight: 700, color: SUB, textTransform: "uppercase", letterSpacing: 2, marginBottom: 14 }}>{children}</div>;
 
-function TeamBlock({ t, rechts, h = 330 }) {
+// Zeichenkette der Anzeige (Option) oder ihr Standard; leer = nichts anzeigen
+const opt = (el, k, std) => (typeof el?.[k] === "string" ? el[k] : std);
+
+function TeamBlock({ t, rechts, h = 330, o, tx }) {
   const f = teamFarbe(t.name);
   return (
     <Panel style={{ flex: 1, display: "flex", flexDirection: rechts ? "row-reverse" : "row", alignItems: "center", gap: 36, padding: "0 46px", borderColor: t.sieger ? f : LINE, boxShadow: t.sieger ? `0 0 40px ${f}66` : undefined, position: "relative", overflow: "hidden" }}>
       <div style={{ position: "absolute", [rechts ? "right" : "left"]: 0, top: 0, bottom: 0, width: 10, background: f, boxShadow: `0 0 24px ${f}` }} />
       <div style={{ flex: 1, textAlign: rechts ? "right" : "left" }}>
-        <div style={{ fontSize: 56, fontWeight: 800, color: f, letterSpacing: 3, textShadow: `0 0 18px ${f}88` }}>{t.name}</div>
-        {t.sieger && <div style={{ fontSize: 26, fontWeight: 700, color: TXT, display: "inline-flex", alignItems: "center", gap: 10, marginTop: 6 }}><Trophy size={28} color={f} /> Sieger</div>}
+        {o.teamnamen !== false && <div style={{ fontSize: 56, fontWeight: 800, color: f, letterSpacing: 3, textShadow: `0 0 18px ${f}88` }}>{t.name}</div>}
+        {t.sieger && tx(opt(o, "textSieger", "Sieger")) && <div style={{ fontSize: 26, fontWeight: 700, color: TXT, display: "inline-flex", alignItems: "center", gap: 10, marginTop: 6 }}><Trophy size={28} color={f} /> {tx(opt(o, "textSieger", "Sieger"))}</div>}
       </div>
       <div style={{ fontSize: Math.min(190, h * 0.58), fontWeight: 800, lineHeight: 1, color: TXT, fontVariantNumeric: "tabular-nums", textShadow: `0 0 34px ${f}aa` }}>{t.score}</div>
     </Panel>
   );
 }
 
-function Mitte({ d, chips = true }) {
+function Mitte({ d, o }) {
+  const chips = o.chips !== false;
   return (
     <div style={{ width: 380, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, textAlign: "center" }}>
       {d.mitte && <div style={{ fontSize: d.mitte.gross.length > 6 ? 64 : 84, fontWeight: 800, color: TXT, fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{d.mitte.gross}</div>}
-      {d.mitte?.klein && <div style={{ fontSize: 28, color: AKZ, fontWeight: 600, textShadow: "0 0 12px rgba(157,92,255,.7)" }}>{d.mitte.klein}</div>}
+      {d.mitte?.klein && o.mitteKlein !== false && <div style={{ fontSize: 28, color: AKZ, fontWeight: 600, textShadow: "0 0 12px rgba(157,92,255,.7)" }}>{d.mitte.klein}</div>}
       <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 10 }}>
         {d.vorbei && <Chip farbe={WARN}>Match vorbei</Chip>}
         {chips && d.chips.map((c) => <Chip key={c}>{c}</Chip>)}
@@ -71,19 +75,19 @@ const Chip = ({ children, farbe }) => (
   <span style={{ fontSize: 22, padding: "6px 16px", borderRadius: 30, border: `1px solid ${farbe || LINE}`, color: farbe || "#d4d0de", background: "rgba(26,24,32,.8)", whiteSpace: "nowrap" }}>{children}</span>
 );
 
-function Bestenliste({ d, mitTeam, titel, zeilen }) {
+function Bestenliste({ d, mitTeam, titel, zeilen, o, tx }) {
   const zelle = { padding: "8px 14px", fontSize: 28, borderBottom: `1px solid ${LINE}` };
   const kopf = { ...zelle, fontSize: 20, color: SUB, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", borderBottom: `2px solid ${LINE}` };
   return (
     <Panel style={{ height: "100%", boxSizing: "border-box", padding: "26px 32px", minWidth: 0, overflow: "hidden" }}>
       {titel && <Titel>{titel}</Titel>}
-      {d.top.length === 0 ? <div style={{ fontSize: 26, color: MUTED, fontStyle: "italic" }}>Noch keine Spielerdaten.</div> : (
+      {d.top.length === 0 ? <div style={{ fontSize: 26, color: MUTED, fontStyle: "italic" }}>{tx(opt(o, "textLeer", "Noch keine Spielerdaten."))}</div> : (
         <table style={{ width: "100%", borderCollapse: "collapse", fontVariantNumeric: "tabular-nums" }}>
-          <thead><tr>
+          {o.kopf !== false && <thead><tr>
             <th style={{ ...kopf, textAlign: "left", width: 50 }}>#</th>
             <th style={{ ...kopf, textAlign: "left" }}>Spieler</th>
             {d.spalten.map(([k, l]) => <th key={k} style={{ ...kopf, textAlign: "right" }}>{l}</th>)}
-          </tr></thead>
+          </tr></thead>}
           <tbody>{d.top.slice(0, zeilen).map((p, i) => {
             const f = mitTeam && p.team ? teamFarbe(p.team) : ACCENT;
             return (
@@ -100,19 +104,19 @@ function Bestenliste({ d, mitTeam, titel, zeilen }) {
   );
 }
 
-function LetzteEvents({ events, titel }) {
+function LetzteEvents({ events, titel, o, tx }) {
   const neueste = events[0]?.id;
   return (
     <Panel style={{ height: "100%", boxSizing: "border-box", padding: "26px 32px", overflow: "hidden" }}>
       {titel && <Titel>{titel}</Titel>}
-      {events.length === 0 ? <div style={{ fontSize: 26, color: MUTED, fontStyle: "italic" }}>Noch keine Events.</div> : events.map((e) => {
+      {events.length === 0 ? <div style={{ fontSize: 26, color: MUTED, fontStyle: "italic" }}>{tx(opt(o, "textLeer", "Noch keine Events."))}</div> : events.map((e) => {
         const f = e.ev.team ? teamFarbe(e.ev.team) : AKZ;
         return (
           <div key={e.id} className={e.id === neueste ? "neu" : ""} style={{ display: "flex", alignItems: "center", gap: 18, padding: "7px 12px", borderBottom: `1px solid ${LINE}`, borderRadius: 8 }}>
             <span style={{ color: f, display: "inline-flex", filter: `drop-shadow(0 0 6px ${f})` }}><EventIcon type={e.ev.type} spiel={e.ev.spiel} size={34} /></span>
             <span style={{ fontSize: 28, fontWeight: 700, whiteSpace: "nowrap" }}>{eventLabel(e.ev.type, e.ev.spiel)}</span>
-            <span style={{ fontSize: 26, color: f, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.ev.player || e.ev.team || ""}</span>
-            <span style={{ fontSize: 20, color: MUTED, fontVariantNumeric: "tabular-nums" }}>{zeit(e.t)}</span>
+            <span style={{ fontSize: 26, color: f, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.spieler !== false ? e.ev.player || e.ev.team || "" : ""}</span>
+            {o.zeit !== false && <span style={{ fontSize: 20, color: MUTED, fontVariantNumeric: "tabular-nums" }}>{zeit(e.t)}</span>}
           </div>
         );
       })}
@@ -120,17 +124,17 @@ function LetzteEvents({ events, titel }) {
   );
 }
 
-function Spielstand({ d, spiel, h, chips }) {
+function Spielstand({ d, spiel, h, o, tx }) {
   return (
     <div style={{ display: "flex", gap: 26, height: "100%" }}>
       {d.leer ? (
         <Panel style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, textAlign: "center" }}>
-          <div style={{ fontSize: 64, fontWeight: 800, color: TXT }}>Warten auf Spieldaten …</div>
-          <div style={{ fontSize: 28, color: SUB }}>{spiel ? `${spiel.name}: der Screen füllt sich, sobald das Match läuft` : "Kein aktives Spiel"}</div>
+          {tx(opt(o, "textWarten", "Warten auf Spieldaten …")) && <div style={{ fontSize: 64, fontWeight: 800, color: TXT }}>{tx(opt(o, "textWarten", "Warten auf Spieldaten …"))}</div>}
+          {o.wartenKlein !== false && <div style={{ fontSize: 28, color: SUB }}>{spiel ? `${spiel.name}: der Screen füllt sich, sobald das Match läuft` : "Kein aktives Spiel"}</div>}
         </Panel>
       ) : d.teams ? (
-        <><TeamBlock t={d.teams[0]} h={h} /><Mitte d={d} chips={chips} /><TeamBlock t={d.teams[1]} rechts h={h} /></>
-      ) : <Panel style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}><Mitte d={d} chips={chips} /></Panel>}
+        <><TeamBlock t={d.teams[0]} h={h} o={o} tx={tx} /><Mitte d={d} o={o} /><TeamBlock t={d.teams[1]} rechts h={h} o={o} tx={tx} /></>
+      ) : <Panel style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}><Mitte d={d} o={o} /></Panel>}
     </div>
   );
 }
@@ -168,6 +172,7 @@ function BildElement({ el, bilder }) {
 // Inhalt eines Elements des Layouts in seinem Kasten
 export function ElementInhalt({ el, ctx }) {
   const { d, spiel, live, log, cfg, werte, namen } = ctx;
+  const tx = (t) => textEinsetzen(t, werte);
   switch (el.typ) {
     case "logo": {
       const g = Math.min(70, el.h - 8);
@@ -184,31 +189,32 @@ export function ElementInhalt({ el, ctx }) {
           {el.kurz !== false && <span style={{ fontSize: 30, fontWeight: 800, letterSpacing: 2, padding: "8px 22px", borderRadius: 10, background: spiel.farbe, color: "#14121a", boxShadow: `0 0 24px ${spiel.farbe}aa` }}>{spiel.kurz}</span>}
           {el.name !== false && <span style={{ fontSize: 36, fontWeight: 700 }}>{spiel.name}</span>}
         </div>
-      ) : null;
+      ) : tx(opt(el, "textOhne", "")) ? <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", fontSize: 30, color: SUB, whiteSpace: "nowrap", overflow: "hidden" }}>{tx(el.textOhne)}</div> : null;
     case "session":
-      return <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", height: "100%", fontSize: 26, color: SUB, whiteSpace: "nowrap", overflow: "hidden" }}>{cfg?.regie?.session?.name || ""}</div>;
+      return <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", height: "100%", fontSize: 26, color: SUB, whiteSpace: "nowrap", overflow: "hidden" }}>{cfg?.regie?.session?.name || tx(opt(el, "textOhne", ""))}</div>;
     case "live":
       return (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", height: "100%" }}>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 10, fontSize: 24, fontWeight: 800, letterSpacing: 2, color: live ? OK : MUTED }}>
-            <span style={{ width: 18, height: 18, borderRadius: "50%", background: live ? OK : MUTED, boxShadow: live ? `0 0 14px ${OK}` : "none", animation: live ? "pulsGruen 1.6s ease-in-out infinite" : "none" }} />{live ? "LIVE" : "WARTET"}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", height: "100%", overflow: "hidden" }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 10, fontSize: 24, fontWeight: 800, letterSpacing: 2, color: live ? OK : MUTED, whiteSpace: "nowrap", minWidth: 0 }}>
+            {el.punkt !== false && <span style={{ width: 18, height: 18, borderRadius: "50%", background: live ? OK : MUTED, boxShadow: live ? `0 0 14px ${OK}` : "none", animation: live ? "pulsGruen 1.6s ease-in-out infinite" : "none" }} />}
+            {el.textAn !== false && tx(live ? opt(el, "textLive", "LIVE") : opt(el, "textWartet", "WARTET"))}
           </span>
         </div>
       );
-    case "spielstand": return <Spielstand d={d} spiel={spiel} h={el.h} chips={el.chips !== false} />;
+    case "spielstand": return <Spielstand d={d} spiel={spiel} h={el.h} o={el} tx={tx} />;
     case "zahlen":
       return d.zahlen.length > 0 ? (
         <div style={{ display: "grid", gridTemplateColumns: `repeat(${d.zahlen.length}, 1fr)`, gap: 18, height: "100%" }}>
           {d.zahlen.map(([label, w]) => (
             <Panel key={label} style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
               <div style={{ fontSize: Math.min(54, el.h * 0.46), fontWeight: 800, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{w}</div>
-              <div style={{ fontSize: 20, color: SUB, textTransform: "uppercase", letterSpacing: 1.5, marginTop: 8 }}>{label}</div>
+              {el.labels !== false && <div style={{ fontSize: 20, color: SUB, textTransform: "uppercase", letterSpacing: 1.5, marginTop: 8 }}>{label}</div>}
             </Panel>
           ))}
         </div>
       ) : null;
-    case "bestenliste": return <Bestenliste d={d} mitTeam={!!d.teams} titel={el.titel} zeilen={el.zeilen || Math.max(1, Math.floor((el.h - (el.titel ? 140 : 100)) / 54))} />;
-    case "events": return <LetzteEvents titel={el.titel} events={statsEvents(log, spiel?.id, el.anzahl || Math.max(1, Math.min(12, Math.floor((el.h - (el.titel ? 100 : 60)) / 56))), namen)} />;
+    case "bestenliste": return <Bestenliste d={d} mitTeam={!!d.teams} titel={tx(el.titel || "")} o={el} tx={tx} zeilen={el.zeilen || Math.max(1, Math.floor((el.h - (el.titel ? 140 : 100)) / 54))} />;
+    case "events": return <LetzteEvents titel={tx(el.titel || "")} o={el} tx={tx} events={statsEvents(log, spiel?.id, el.anzahl || Math.max(1, Math.min(12, Math.floor((el.h - (el.titel ? 100 : 60)) / 56))), namen)} />;
     case "text": return <TextElement el={el} werte={werte} />;
     case "bild": return <BildElement el={el} bilder={ctx.bilder} />;
     default: return null;
@@ -224,8 +230,10 @@ const HINTERGRUND = {
   bild: (_, l) => {
     const src = l.bilder[l.hg.bild];
     if (!src) return BG;
+    // Ebenen von oben: eigener Verlauf (wenn darübergelegt), Abdunkeln, Bild
+    const verlauf = l.hg.verlaufDrueber ? `${verlaufCss(l.hg.verlauf)}, ` : "";
     const dunkel = l.hg.abdunkeln ? `linear-gradient(rgba(0,0,0,${l.hg.abdunkeln / 100}), rgba(0,0,0,${l.hg.abdunkeln / 100})), ` : "";
-    return `${dunkel}url("${src}") center / ${l.hg.passung === "einpassen" ? "contain" : "cover"} no-repeat, #000`;
+    return `${verlauf}${dunkel}url("${src}") center / ${l.hg.passung === "einpassen" ? "contain" : "cover"} no-repeat, #000`;
   },
 };
 export const hintergrundCss = (l, spiel) => (HINTERGRUND[l.hintergrund] || HINTERGRUND.verlauf)(spiel, l);

@@ -6,6 +6,11 @@ const REPO = "Nomisimo/Advanced-Lan";
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
+  "1.0.1": [
+    "Stats-Screen-Hintergrund: Verlauf und Bild zusammen. Beim eigenen Bild „Eigenen Verlauf darüberlegen“, beim eigenen Verlauf „Bild darunterlegen“. Ein ganz deckender Verlauf wird dabei auf 55 % Deckkraft gesetzt, damit das Bild durchscheint",
+    "LIVE-Anzeige: Texte je Zustand selbst festlegen (bei LIVE und beim Warten, mit Platzhaltern wie {kurz}), Text oder Punkt ausschalten",
+    "Alle Anzeigen haben „Inhalt und Texte“: Spielstand (Teamnamen, Zeile unter der Runde, Hinweise, Text beim Sieger und ohne Spieldaten), Zahlen (Beschriftung), Bestenliste (Spaltenköpfe, Text ohne Daten, Zeilen), Events (Spieler, Uhrzeit, Text ohne Events, Anzahl), Spiel und Session (Text, wenn nichts da ist). Leerer Text = nichts anzeigen",
+  ],
   "1.0.0": [
     "Erste stabile Version (keine Beta mehr)",
     "Stats-Screen-Editor: eigener Hintergrund. Eigene Farbe, eigener Verlauf oder eigenes Bild (Füllen oder Einpassen, Abdunkeln) neben Verlauf, Schwarz und Grün",

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { S, SUB } from "../theme.js";
+import { S, SUB, WARN } from "../theme.js";
 import { api } from "../api.js";
 import { Field, Toggle } from "../ui.jsx";
 import { LEERLAUF_STUFEN } from "../../core/namen.js";
 import { SPIELER_MAX } from "../../core/protokoll.js";
+import { RANDLOS_HINWEIS } from "../../core/vollbild.js";
 import { MessageSquareText } from "lucide-react";
 
 // Spielername für den Game-Stats-Screen und wann das Namens-Popup fragt. Ohne Namen zeigt der Screen die PC-ID.
@@ -32,7 +33,16 @@ export default function SpielerName({ cfg, mutate, g, notify, pcId }) {
           </select>
         </span>
       </div>
-      <p style={S.hint}>Das Popup lässt sich wegklicken und blendet sich ohne Eingabe nach 30 s aus. Nach dem Leerlauf gilt der alte Name nicht mehr, das Popup schlägt ihn nur vor. Über einem Spiel im exklusiven Vollbild ist es nicht zu sehen, nur im randlosen Fenstermodus.</p>
+      {(g.vollbild === "exklusiv" || g.nameWartet) && (
+        <div style={{ marginTop: 12, padding: "10px 12px", borderRadius: 6, border: `1px solid ${WARN}`, background: "#2a2416", fontSize: 13, lineHeight: 1.5 }}>
+          <b style={{ color: WARN }}>{g.vollbild === "exklusiv" ? "Ein Spiel läuft im exklusiven Vollbild." : "Das Namens-Popup wartet."}</b>{" "}
+          Darüber zeichnet Windows keine anderen Fenster: Namens-Popup und Mini-Overlay sind nicht zu sehen.
+          {g.nameWartet && " Das Popup erscheint, sobald das Spiel das Vollbild verlässt (Alt+Tab oder Spiel beendet). Die Regie kann den Namen auch im Tab „Session“ eintragen."}
+          <div style={{ marginTop: 6, color: SUB }}>Dauerhaft lösen: im Spiel randloses Vollbild einstellen.</div>
+          <ul style={{ margin: "4px 0 0", paddingLeft: 18, color: SUB }}>{Object.values(RANDLOS_HINWEIS).map((t) => <li key={t}>{t}</li>)}</ul>
+        </div>
+      )}
+      <p style={S.hint}>Das Popup lässt sich wegklicken und blendet sich ohne Eingabe nach 30 s aus. Nach dem Leerlauf gilt der alte Name nicht mehr, das Popup schlägt ihn nur vor. Über einem Spiel im exklusiven Vollbild zeichnet Windows keine Fenster: Die App merkt das, hebt die Frage auf, bis das Spiel das Vollbild verlässt, und zeigt der Regie „Name offen“. Im randlosen Vollbild erscheint das Popup sofort.</p>
     </div>
   );
 }

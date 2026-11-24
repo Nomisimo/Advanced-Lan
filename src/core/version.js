@@ -6,7 +6,8 @@ const REPO = "Nomisimo/Advanced-Lan";
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
-  "0.1.0-beta.19": [
+  "1.0.0": [
+    "Erste stabile Version (keine Beta mehr)",
     "Stats-Screen-Editor: eigener Hintergrund. Eigene Farbe, eigener Verlauf oder eigenes Bild (Füllen oder Einpassen, Abdunkeln) neben Verlauf, Schwarz und Grün",
     "Verlauf-Editor: linear, radial oder konisch, bis zu 8 Farbstopps mit Deckkraft. Klick auf die Leiste setzt einen Stopp, Stopps ziehen zum Verschieben, Winkel und Mitte per Regler, Umkehren, sechs Vorlagen",
     "Bilder als eigene Blöcke (bis zu 12), über „Bild hinzufügen“ oder per Drag and Drop auf die Fläche: Logos, Sponsoren, Grafiken. Darstellung Einpassen, Füllen oder Strecken, Deckkraft, runde Ecken, Kachel. Bilder werden auf höchstens 1920 px verkleinert und mit dem Layout gespeichert",

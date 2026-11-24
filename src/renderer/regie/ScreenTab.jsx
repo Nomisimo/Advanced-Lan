@@ -136,6 +136,12 @@ export default function ScreenTab({ cfg, mutate, status, log }) {
     setzen({ ...layout, elemente: [...layout.elemente, t] });
     setAuswahl(t.id);
   };
+  // Darstellung eines Elements auf alle übertragen (Schrift- und Akzentfarbe nur auf Anzeigen)
+  const stilAlle = (q) => {
+    const st = { deckkraft: q.deckkraft ?? 100, kachel: q.kachel ?? 92, ecken: q.ecken ?? 18, rahmen: q.rahmen !== false };
+    const farben = ANZEIGE[q.typ] ? { schrift: q.schrift || "", akzent: q.akzent || "" } : {};
+    setzen({ ...layout, elemente: layout.elemente.map((x) => ({ ...x, ...st, ...(ANZEIGE[x.typ] ? farben : {}) })) });
+  };
   const entfernen = (e) => {
     if (!e) return;
     if (eigen(e)) { setzen({ ...layout, elemente: layout.elemente.filter((x) => x.id !== e.id) }); setAuswahl(null); }
@@ -293,7 +299,7 @@ export default function ScreenTab({ cfg, mutate, status, log }) {
             {gewaehlt ? <Eigenschaften e={gewaehlt} bilder={layout.bilder} aendern={(patch) => elAendern(gewaehlt.id, patch)} tippen={(patch) => {
               // Tippen: ein Rückgängig-Schritt pro Feldbesuch, nicht pro Taste
               elAendern(gewaehlt.id, patch, punktNehmen(null));
-            }} fokus={fokus} bildErsetzen={() => bildErsetzen(gewaehlt)} originalFormat={() => originalFormat(gewaehlt)}
+            }} fokus={fokus} stilAlle={stilAlle} bildErsetzen={() => bildErsetzen(gewaehlt)} originalFormat={() => originalFormat(gewaehlt)}
               duplizieren={() => duplizieren(gewaehlt)} entfernen={() => entfernen(gewaehlt)} ebene={(r) => ebene(gewaehlt, r)} />
               : <>
                 <div style={{ ...S.hint, marginTop: 0, border: `1px dashed ${LINE}`, borderRadius: 8, padding: 10 }}>Ein Element anklicken, um Position, Größe und Inhalt zu bearbeiten. Ohne Auswahl: Hintergrund.</div>
@@ -331,7 +337,37 @@ function Elemente({ layout, auswahl, setAuswahl, sichtbar }) {
   );
 }
 
-function Eigenschaften({ e, bilder, aendern, tippen, fokus, duplizieren, entfernen, ebene, bildErsetzen, originalFormat }) {
+// Darstellung, die jedes Element hat: Deckkraft, Kachel-Transparenz, Ecken, Rahmen, Farben
+const MIT_KACHEL = new Set(["spielstand", "zahlen", "bestenliste", "events"]);
+function Darstellung({ e, tippen, aendern, fokus, stilAlle }) {
+  const kachel = MIT_KACHEL.has(e.typ) || ((e.typ === "text" || e.typ === "bild") && e.panel);
+  const farbFeld = (k, label, std) => (
+    <Field label={label}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <input type="color" data-testid={`stil-${k}`} value={e[k] || std} onFocus={fokus} onPointerDown={fokus} onChange={(ev) => tippen({ [k]: ev.target.value })} style={{ width: 30, height: 22, border: "none", background: "transparent", padding: 0, cursor: "pointer" }} />
+        {e[k] ? <button style={{ ...S.smallBtn, fontSize: 10, padding: "2px 6px" }} onClick={() => aendern({ [k]: "" })}>Standard</button> : <span style={{ fontSize: 10, color: MUTED }}>Standard</span>}
+      </div>
+    </Field>
+  );
+  return (
+    <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }} data-testid="darstellung">
+      <div style={{ fontSize: 11, fontWeight: 700, color: SUB, textTransform: "uppercase", letterSpacing: 0.5 }}>Darstellung</div>
+      <Regler label="Deckkraft (ganzes Element)" wert={e.deckkraft ?? 100} einheit="%" fokus={fokus} onChange={(v) => tippen({ deckkraft: v })} testid="stil-deckkraft" />
+      {kachel && <>
+        <Regler label="Kachel-Hintergrund (0 = durchsichtig)" wert={e.kachel ?? 92} einheit="%" fokus={fokus} onChange={(v) => tippen({ kachel: v })} testid="stil-kachel" />
+        <Regler label="Ecken der Kachel" wert={e.ecken ?? 18} max={80} einheit=" px" fokus={fokus} onChange={(v) => tippen({ ecken: v })} />
+        <Toggle checked={e.rahmen !== false} onChange={(v) => aendern({ rahmen: v })} label="Rahmen und Leuchten" />
+      </>}
+      {ANZEIGE[e.typ] && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        {farbFeld("schrift", "Schriftfarbe", "#ffffff")}
+        {farbFeld("akzent", "Akzentfarbe", "#c39bff")}
+      </div>}
+      <button style={{ ...S.smallBtn, alignSelf: "flex-start" }} onClick={() => stilAlle(e)} title="Deckkraft, Kachel, Ecken, Rahmen und Farben dieses Elements für alle Elemente übernehmen">Darstellung auf alle Elemente übertragen</button>
+    </div>
+  );
+}
+
+function Eigenschaften({ e, bilder, aendern, tippen, fokus, duplizieren, entfernen, ebene, bildErsetzen, originalFormat, stilAlle }) {
   const ta = useRef(null);
   const text = e.typ === "text", bild = e.typ === "bild", anzeige = !!ANZEIGE[e.typ];
   const skala = inhaltsSkala(e);
@@ -383,7 +419,6 @@ function Eigenschaften({ e, bilder, aendern, tippen, fokus, duplizieren, entfern
         <Field label="Darstellung im Block">
           <select style={S.selectSm} value={e.passung} onChange={(ev) => aendern({ passung: ev.target.value })}>{PASSUNGEN.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
         </Field>
-        <Regler label="Deckkraft" wert={e.deckkraft} einheit="%" fokus={fokus} onChange={(v) => tippen({ deckkraft: v })} />
         <Regler label="Ecken abrunden" wert={e.radius} max={200} einheit=" px" fokus={fokus} onChange={(v) => tippen({ radius: v })} />
         <Toggle checked={e.panel} onChange={(v) => aendern({ panel: v })} label="Mit Hintergrund-Kachel" />
       </>}
@@ -392,6 +427,15 @@ function Eigenschaften({ e, bilder, aendern, tippen, fokus, duplizieren, entfern
         <Regler label={`Zoom (Inhalt ${Math.round(skala.f * 100)} %)`} wert={e.zoom ?? 100} min={ZOOM_MIN} max={ZOOM_MAX} einheit="%" fokus={fokus} onChange={(v) => tippen({ zoom: v })} testid="zoom" />
         {(e.zoom ?? 100) !== 100 && <button style={{ ...S.smallBtn, alignSelf: "flex-start" }} onClick={() => aendern({ zoom: 100 })}>Zoom auf 100 %</button>}
       </>}
+      {e.typ === "logo" && <Toggle checked={e.icon !== false} onChange={(v) => aendern({ icon: v })} label="Icon zeigen" />}
+      {e.typ === "spiel" && <div style={{ display: "flex", gap: 14 }}>
+        <Toggle checked={e.kurz !== false} onChange={(v) => aendern({ kurz: v })} label="Kürzel" />
+        <Toggle checked={e.name !== false} onChange={(v) => aendern({ name: v })} label="Name" />
+      </div>}
+      {e.typ === "spielstand" && <Toggle checked={e.chips !== false} onChange={(v) => aendern({ chips: v })} label="Hinweise unter der Mitte (Map, Bombe …)" />}
+      {e.typ === "bestenliste" && <Regler label={`Zeilen${e.zeilen ? "" : " (automatisch nach Höhe)"}`} wert={e.zeilen || 0} max={20} fokus={fokus} onChange={(v) => tippen({ zeilen: v })} />}
+      {e.typ === "events" && <Regler label={`Anzahl Events${e.anzahl ? "" : " (automatisch nach Höhe)"}`} wert={e.anzahl || 0} max={20} fokus={fokus} onChange={(v) => tippen({ anzahl: v })} />}
+      <Darstellung e={e} tippen={tippen} aendern={aendern} fokus={fokus} stilAlle={stilAlle} />
       {!text && "titel" in e && (
         <Field label="Überschrift" hint="Leer lassen für keine Überschrift. Platzhalter wie {spiel} gehen auch.">
           <input style={S.inputSm} value={e.titel} maxLength={80} onFocus={fokus} onChange={(ev) => tippen({ titel: ev.target.value })} />

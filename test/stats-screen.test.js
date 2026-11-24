@@ -217,3 +217,25 @@ test("Blöcke skalieren: Inhalt wächst mit der Blockgröße, Zoom obendrauf", (
   const alt = migrateLayout({ elemente: [{ typ: "events", x: 0, y: 0, b: 380, h: 205 }] }).elemente.find((e) => e.typ === "events");
   assert.deepEqual([alt.skalieren, alt.zoom, inhaltsSkala(alt).f], [true, 100, 0.5]);
 });
+
+test("Darstellung und eigene Einstellungen für jedes Element", () => {
+  const { STIL, neuerText } = require("../src/core/stats-layout");
+  const std = standardLayout();
+  assert.ok(std.elemente.every((e) => e.deckkraft === 100 && e.kachel === STIL.kachel && e.rahmen === true && e.schrift === ""));
+  const l = migrateLayout({ bilder: { b1: PNG }, elemente: [
+    { typ: "events", deckkraft: 40, kachel: -10, ecken: 500, rahmen: false, schrift: "#ABCDEF", akzent: "quatsch", anzahl: 99 },
+    { typ: "bestenliste", zeilen: 3 },
+    { typ: "logo", icon: false },
+    { ...neuerText(), deckkraft: 30, kachel: 0 },
+    { ...neuesBild("b1"), deckkraft: 55 },
+  ] });
+  const ev = l.elemente.find((e) => e.typ === "events");
+  assert.deepEqual([ev.deckkraft, ev.kachel, ev.ecken, ev.rahmen, ev.schrift, ev.akzent, ev.anzahl], [40, 0, 80, false, "#abcdef", "", 20]);
+  assert.equal(l.elemente.find((e) => e.typ === "bestenliste").zeilen, 3);
+  assert.equal(l.elemente.find((e) => e.typ === "logo").icon, false);
+  assert.deepEqual([l.elemente.find((e) => e.typ === "text").deckkraft, l.elemente.find((e) => e.typ === "text").kachel], [30, 0]);
+  assert.equal(l.elemente.find((e) => e.typ === "bild").deckkraft, 55, "Deckkraft alter Bild-Blöcke bleibt");
+  // Altes Layout ohne Darstellung: Standard
+  const alt = migrateLayout({ elemente: [{ typ: "zahlen", x: 0, y: 0, b: 400, h: 100 }] }).elemente.find((e) => e.typ === "zahlen");
+  assert.deepEqual([alt.deckkraft, alt.kachel, alt.ecken, alt.rahmen], [100, STIL.kachel, STIL.ecken, true]);
+});

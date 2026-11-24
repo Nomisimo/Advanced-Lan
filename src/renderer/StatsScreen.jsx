@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, createContext, useContext } from "react";
 import { ACCENT, ACCENT_HI, LINE, SUB, MUTED, OK, WARN, BG, teamFarbe } from "./theme.js";
 import { api } from "./api.js";
 import { APP_ICON } from "./Kopf.jsx";
@@ -26,9 +26,18 @@ function logEinfuegen(l, e) {
   return neu.slice(0, 200);
 }
 
-const Panel = ({ children, style }) => (
-  <div style={{ background: "linear-gradient(180deg, rgba(35,33,44,.92), rgba(27,25,34,.92))", border: `1px solid ${LINE}`, borderRadius: 18, boxShadow: "0 0 30px rgba(157,92,255,.12), inset 0 1px 0 rgba(255,255,255,.04)", ...style }}>{children}</div>
-);
+// Darstellung des Elements (Kachel-Transparenz, Ecken, Rahmen), gesetzt in ElementKasten
+const StilKontext = createContext({ kachel: 92, ecken: 18, rahmen: true });
+// Schrift- und Akzentfarbe des Elements kommen als CSS-Variablen
+const TXT = "var(--txt, #fff)", AKZ = `var(--akz, ${ACCENT_HI})`;
+const Panel = ({ children, style }) => {
+  const { kachel, ecken, rahmen } = useContext(StilKontext);
+  const k = kachel / 100;
+  return (
+    <div style={{ background: `linear-gradient(180deg, rgba(35,33,44,${k}), rgba(27,25,34,${k}))`, border: `1px solid ${rahmen ? LINE : "transparent"}`, borderRadius: ecken,
+      boxShadow: k > 0 || rahmen ? `0 0 30px rgba(157,92,255,${0.12 * k}), inset 0 1px 0 rgba(255,255,255,${0.04 * k})` : "none", ...style, ...(rahmen ? {} : { borderColor: "transparent" }) }}>{children}</div>
+  );
+};
 const Titel = ({ children }) => <div style={{ fontSize: 22, fontWeight: 700, color: SUB, textTransform: "uppercase", letterSpacing: 2, marginBottom: 14 }}>{children}</div>;
 
 function TeamBlock({ t, rechts, h = 330 }) {
@@ -38,21 +47,21 @@ function TeamBlock({ t, rechts, h = 330 }) {
       <div style={{ position: "absolute", [rechts ? "right" : "left"]: 0, top: 0, bottom: 0, width: 10, background: f, boxShadow: `0 0 24px ${f}` }} />
       <div style={{ flex: 1, textAlign: rechts ? "right" : "left" }}>
         <div style={{ fontSize: 56, fontWeight: 800, color: f, letterSpacing: 3, textShadow: `0 0 18px ${f}88` }}>{t.name}</div>
-        {t.sieger && <div style={{ fontSize: 26, fontWeight: 700, color: "#fff", display: "inline-flex", alignItems: "center", gap: 10, marginTop: 6 }}><Trophy size={28} color={f} /> Sieger</div>}
+        {t.sieger && <div style={{ fontSize: 26, fontWeight: 700, color: TXT, display: "inline-flex", alignItems: "center", gap: 10, marginTop: 6 }}><Trophy size={28} color={f} /> Sieger</div>}
       </div>
-      <div style={{ fontSize: Math.min(190, h * 0.58), fontWeight: 800, lineHeight: 1, color: "#fff", fontVariantNumeric: "tabular-nums", textShadow: `0 0 34px ${f}aa` }}>{t.score}</div>
+      <div style={{ fontSize: Math.min(190, h * 0.58), fontWeight: 800, lineHeight: 1, color: TXT, fontVariantNumeric: "tabular-nums", textShadow: `0 0 34px ${f}aa` }}>{t.score}</div>
     </Panel>
   );
 }
 
-function Mitte({ d }) {
+function Mitte({ d, chips = true }) {
   return (
     <div style={{ width: 380, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, textAlign: "center" }}>
-      {d.mitte && <div style={{ fontSize: d.mitte.gross.length > 6 ? 64 : 84, fontWeight: 800, color: "#fff", fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{d.mitte.gross}</div>}
-      {d.mitte?.klein && <div style={{ fontSize: 28, color: ACCENT_HI, fontWeight: 600, textShadow: "0 0 12px rgba(157,92,255,.7)" }}>{d.mitte.klein}</div>}
+      {d.mitte && <div style={{ fontSize: d.mitte.gross.length > 6 ? 64 : 84, fontWeight: 800, color: TXT, fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{d.mitte.gross}</div>}
+      {d.mitte?.klein && <div style={{ fontSize: 28, color: AKZ, fontWeight: 600, textShadow: "0 0 12px rgba(157,92,255,.7)" }}>{d.mitte.klein}</div>}
       <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 10 }}>
         {d.vorbei && <Chip farbe={WARN}>Match vorbei</Chip>}
-        {d.chips.map((c) => <Chip key={c}>{c}</Chip>)}
+        {chips && d.chips.map((c) => <Chip key={c}>{c}</Chip>)}
       </div>
     </div>
   );
@@ -79,9 +88,9 @@ function Bestenliste({ d, mitTeam, titel, zeilen }) {
             const f = mitTeam && p.team ? teamFarbe(p.team) : ACCENT;
             return (
               <tr key={p.name} style={{ background: i === 0 ? "rgba(157,92,255,.12)" : "transparent" }}>
-                <td style={{ ...zelle, color: i === 0 ? ACCENT_HI : MUTED, fontWeight: 800 }}>{i === 0 ? <Crown size={28} style={{ verticalAlign: -4 }} /> : i + 1}</td>
+                <td style={{ ...zelle, color: i === 0 ? AKZ : MUTED, fontWeight: 800 }}>{i === 0 ? <Crown size={28} style={{ verticalAlign: -4 }} /> : i + 1}</td>
                 <td style={{ ...zelle, fontWeight: i === 0 ? 800 : 600, borderLeft: `5px solid ${f}`, maxWidth: 420, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</td>
-                {d.spalten.map(([k], j) => <td key={k} style={{ ...zelle, textAlign: "right", fontWeight: j === 0 ? 800 : 400, color: j === 0 ? "#fff" : SUB }}>{p[k] ?? 0}</td>)}
+                {d.spalten.map(([k], j) => <td key={k} style={{ ...zelle, textAlign: "right", fontWeight: j === 0 ? 800 : 400, color: j === 0 ? TXT : SUB }}>{p[k] ?? 0}</td>)}
               </tr>
             );
           })}</tbody>
@@ -97,7 +106,7 @@ function LetzteEvents({ events, titel }) {
     <Panel style={{ height: "100%", boxSizing: "border-box", padding: "26px 32px", overflow: "hidden" }}>
       {titel && <Titel>{titel}</Titel>}
       {events.length === 0 ? <div style={{ fontSize: 26, color: MUTED, fontStyle: "italic" }}>Noch keine Events.</div> : events.map((e) => {
-        const f = e.ev.team ? teamFarbe(e.ev.team) : ACCENT_HI;
+        const f = e.ev.team ? teamFarbe(e.ev.team) : AKZ;
         return (
           <div key={e.id} className={e.id === neueste ? "neu" : ""} style={{ display: "flex", alignItems: "center", gap: 18, padding: "7px 12px", borderBottom: `1px solid ${LINE}`, borderRadius: 8 }}>
             <span style={{ color: f, display: "inline-flex", filter: `drop-shadow(0 0 6px ${f})` }}><EventIcon type={e.ev.type} spiel={e.ev.spiel} size={34} /></span>
@@ -111,17 +120,17 @@ function LetzteEvents({ events, titel }) {
   );
 }
 
-function Spielstand({ d, spiel, h }) {
+function Spielstand({ d, spiel, h, chips }) {
   return (
     <div style={{ display: "flex", gap: 26, height: "100%" }}>
       {d.leer ? (
         <Panel style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, textAlign: "center" }}>
-          <div style={{ fontSize: 64, fontWeight: 800, color: "#fff" }}>Warten auf Spieldaten …</div>
+          <div style={{ fontSize: 64, fontWeight: 800, color: TXT }}>Warten auf Spieldaten …</div>
           <div style={{ fontSize: 28, color: SUB }}>{spiel ? `${spiel.name}: der Screen füllt sich, sobald das Match läuft` : "Kein aktives Spiel"}</div>
         </Panel>
       ) : d.teams ? (
-        <><TeamBlock t={d.teams[0]} h={h} /><Mitte d={d} /><TeamBlock t={d.teams[1]} rechts h={h} /></>
-      ) : <Panel style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}><Mitte d={d} /></Panel>}
+        <><TeamBlock t={d.teams[0]} h={h} /><Mitte d={d} chips={chips} /><TeamBlock t={d.teams[1]} rechts h={h} /></>
+      ) : <Panel style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}><Mitte d={d} chips={chips} /></Panel>}
     </div>
   );
 }
@@ -151,8 +160,8 @@ function TextElement({ el, werte }) {
 const OBJECT_FIT = { fuellen: "cover", einpassen: "contain", strecken: "fill" };
 function BildElement({ el, bilder }) {
   const src = bilder?.[el.bild];
-  const img = src ? <img src={src} alt="" draggable={false} style={{ width: "100%", height: "100%", objectFit: OBJECT_FIT[el.passung] || "contain", display: "block", opacity: el.deckkraft / 100, borderRadius: el.panel ? 0 : el.radius }} /> : null;
-  if (el.panel) return <Panel style={{ width: "100%", height: "100%", boxSizing: "border-box", padding: 14, overflow: "hidden", borderRadius: Math.max(18, el.radius) }}><div style={{ width: "100%", height: "100%", borderRadius: Math.max(0, el.radius - 14), overflow: "hidden" }}>{img}</div></Panel>;
+  const img = src ? <img src={src} alt="" draggable={false} style={{ width: "100%", height: "100%", objectFit: OBJECT_FIT[el.passung] || "contain", display: "block", borderRadius: el.panel ? 0 : el.radius }} /> : null;
+  if (el.panel) return <Panel style={{ width: "100%", height: "100%", boxSizing: "border-box", padding: 14, overflow: "hidden", borderRadius: Math.max(el.ecken ?? 18, el.radius) }}><div style={{ width: "100%", height: "100%", borderRadius: Math.max(0, el.radius - 14), overflow: "hidden" }}>{img}</div></Panel>;
   return <div style={{ width: "100%", height: "100%", borderRadius: el.radius, overflow: "hidden" }}>{img}</div>;
 }
 
@@ -164,16 +173,16 @@ export function ElementInhalt({ el, ctx }) {
       const g = Math.min(70, el.h - 8);
       return (
         <div style={{ display: "flex", alignItems: "center", gap: 22, height: "100%", overflow: "hidden" }}>
-          <img src={APP_ICON} alt="" style={{ width: g, height: g, flexShrink: 0, filter: "drop-shadow(0 0 14px rgba(157,92,255,.85))" }} />
-          {el.titel && <div style={{ fontWeight: 800, fontSize: 40, letterSpacing: 3, color: ACCENT_HI, textShadow: "0 0 16px rgba(157,92,255,.8)", whiteSpace: "nowrap" }}>{textEinsetzen(el.titel, werte)}</div>}
+          {el.icon !== false && <img src={APP_ICON} alt="" style={{ width: g, height: g, flexShrink: 0, filter: "drop-shadow(0 0 14px rgba(157,92,255,.85))" }} />}
+          {el.titel && <div style={{ fontWeight: 800, fontSize: 40, letterSpacing: 3, color: AKZ, textShadow: "0 0 16px rgba(157,92,255,.8)", whiteSpace: "nowrap" }}>{textEinsetzen(el.titel, werte)}</div>}
         </div>
       );
     }
     case "spiel":
       return spiel ? (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 22, height: "100%", whiteSpace: "nowrap", overflow: "hidden" }}>
-          <span style={{ fontSize: 30, fontWeight: 800, letterSpacing: 2, padding: "8px 22px", borderRadius: 10, background: spiel.farbe, color: "#14121a", boxShadow: `0 0 24px ${spiel.farbe}aa` }}>{spiel.kurz}</span>
-          <span style={{ fontSize: 36, fontWeight: 700 }}>{spiel.name}</span>
+          {el.kurz !== false && <span style={{ fontSize: 30, fontWeight: 800, letterSpacing: 2, padding: "8px 22px", borderRadius: 10, background: spiel.farbe, color: "#14121a", boxShadow: `0 0 24px ${spiel.farbe}aa` }}>{spiel.kurz}</span>}
+          {el.name !== false && <span style={{ fontSize: 36, fontWeight: 700 }}>{spiel.name}</span>}
         </div>
       ) : null;
     case "session":
@@ -186,7 +195,7 @@ export function ElementInhalt({ el, ctx }) {
           </span>
         </div>
       );
-    case "spielstand": return <Spielstand d={d} spiel={spiel} h={el.h} />;
+    case "spielstand": return <Spielstand d={d} spiel={spiel} h={el.h} chips={el.chips !== false} />;
     case "zahlen":
       return d.zahlen.length > 0 ? (
         <div style={{ display: "grid", gridTemplateColumns: `repeat(${d.zahlen.length}, 1fr)`, gap: 18, height: "100%" }}>
@@ -198,8 +207,8 @@ export function ElementInhalt({ el, ctx }) {
           ))}
         </div>
       ) : null;
-    case "bestenliste": return <Bestenliste d={d} mitTeam={!!d.teams} titel={el.titel} zeilen={Math.max(1, Math.floor((el.h - (el.titel ? 140 : 100)) / 54))} />;
-    case "events": return <LetzteEvents titel={el.titel} events={statsEvents(log, spiel?.id, Math.max(1, Math.min(12, Math.floor((el.h - (el.titel ? 100 : 60)) / 56))), namen)} />;
+    case "bestenliste": return <Bestenliste d={d} mitTeam={!!d.teams} titel={el.titel} zeilen={el.zeilen || Math.max(1, Math.floor((el.h - (el.titel ? 140 : 100)) / 54))} />;
+    case "events": return <LetzteEvents titel={el.titel} events={statsEvents(log, spiel?.id, el.anzahl || Math.max(1, Math.min(12, Math.floor((el.h - (el.titel ? 100 : 60)) / 56))), namen)} />;
     case "text": return <TextElement el={el} werte={werte} />;
     case "bild": return <BildElement el={el} bilder={ctx.bilder} />;
     default: return null;
@@ -225,14 +234,18 @@ export const hintergrundCss = (l, spiel) => (HINTERGRUND[l.hintergrund] || HINTE
 // so wachsen Schrift, Logos und Tabellen mit dem Block.
 export function ElementKasten({ e, ctx }) {
   const { f, b, h } = inhaltsSkala(e);
+  const stil = { kachel: e.kachel ?? 92, ecken: e.ecken ?? 18, rahmen: e.rahmen !== false };
   return (
-    <div style={{ position: "absolute", left: e.x, top: e.y, width: e.b, height: e.h }}>
+    <StilKontext.Provider value={stil}>
+    <div style={{ position: "absolute", left: e.x, top: e.y, width: e.b, height: e.h, opacity: (e.deckkraft ?? 100) / 100,
+      ...(e.schrift ? { "--txt": e.schrift, color: e.schrift } : {}), ...(e.akzent ? { "--akz": e.akzent } : {}) }}>
       {f === 1 ? <ElementInhalt el={e} ctx={ctx} /> : (
         <div style={{ width: b, height: h, transform: `scale(${f})`, transformOrigin: "0 0" }}>
           <ElementInhalt el={{ ...e, b, h }} ctx={ctx} />
         </div>
       )}
     </div>
+    </StilKontext.Provider>
   );
 }
 

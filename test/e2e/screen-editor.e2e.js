@@ -171,7 +171,23 @@ const BILDER = process.argv[3] || require('os').tmpdir();
   await page.keyboard.press('Control+y');
   await page.waitForTimeout(150);
 
-  // 11) Stats-Screen zeigt das gespeicherte Layout mit dem Text
+  // 11) Darstellung: Letzte Events halb durchsichtig, Kachel ohne Hintergrund
+  await page.getByTestId('liste-events').click();
+  await page.getByTestId('stil-deckkraft').fill('60');
+  await page.getByTestId('stil-kachel').fill('0');
+  await page.waitForTimeout(400);
+  const evS = (await layout()).elemente.find((x) => x.id === 'events');
+  assert.deepStrictEqual([evS.deckkraft, evS.kachel], [60, 0]);
+  await page.getByRole('button', { name: 'Darstellung auf alle Elemente übertragen' }).click();
+  await page.waitForTimeout(400);
+  assert.ok((await layout()).elemente.every((x) => x.kachel === 0 && x.deckkraft === 60), 'Darstellung auf alle übertragen');
+  await page.keyboard.press('Control+z');
+  await flaeche.focus();
+  await page.keyboard.press('Control+z');
+  await page.waitForTimeout(400);
+  assert.strictEqual((await layout()).elemente.find((x) => x.id === 'spielstand').kachel, 92, 'Rückgängig nimmt das Übertragen zurück');
+
+  // 12) Stats-Screen zeigt das gespeicherte Layout mit dem Text
   const stats = await ctx.newPage();
   await stats.setViewportSize({ width: 1920, height: 1080 });
   await stats.goto(URL + '#stats');
@@ -181,6 +197,7 @@ const BILDER = process.argv[3] || require('os').tmpdir();
   assert.ok(await stats.locator('img[src^="data:image/webp"]').count() > 0, 'Bild-Block auf dem Stats-Screen');
   const hg = await stats.evaluate(() => [...document.querySelectorAll('div')].map((d) => d.style.background).find((b) => b.includes('linear-gradient(160deg')));
   assert.ok(hg, 'eigener Verlauf auf dem Stats-Screen');
+  assert.ok(await stats.evaluate(() => [...document.querySelectorAll('div')].some((d) => d.style.opacity === '0.6')), 'Deckkraft auf dem Stats-Screen');
   await stats.screenshot({ path: BILDER + '/editor-4-stats.png' });
 
   assert.deepStrictEqual(fehler, [], 'keine Fehler auf der Seite');

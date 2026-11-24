@@ -44,16 +44,37 @@ const PLATZHALTER = [["spiel", "Name des aktiven Spiels"], ["kurz", "Kürzel des
 const zahl = (v, std, min, max) => { const n = Math.round(Number(v)); return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : std; };
 const farbe = (v, std) => (typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v) ? v.toLowerCase() : std);
 
+// Darstellung, die jedes Element hat: Deckkraft des ganzen Elements, Transparenz und Ecken der Kacheln, Rahmen,
+// Schrift- und Akzentfarbe ("" = Standard der Anzeige)
+const STIL = { deckkraft: 100, kachel: 92, ecken: 18, rahmen: true, schrift: "", akzent: "" };
+function migrateStil(e) {
+  const f = (v) => (v === "" || v == null ? "" : farbe(v, ""));
+  return { deckkraft: zahl(e.deckkraft, 100, 0, 100), kachel: zahl(e.kachel, STIL.kachel, 0, 100), ecken: zahl(e.ecken, STIL.ecken, 0, 80), rahmen: e.rahmen !== false, schrift: f(e.schrift), akzent: f(e.akzent) };
+}
+// Eigene Einstellungen einzelner Anzeigen (0 bei Zeilen/Anzahl: automatisch nach Höhe)
+const OPTIONEN = {
+  logo: { icon: true },
+  spiel: { kurz: true, name: true },
+  spielstand: { chips: true },
+  bestenliste: { zeilen: 0 },
+  events: { anzahl: 0 },
+};
+function migrateOptionen(typ, e) {
+  const o = OPTIONEN[typ];
+  if (!o) return {};
+  return Object.fromEntries(Object.entries(o).map(([k, std]) => [k, typeof std === "boolean" ? e[k] !== false : zahl(e[k], std, 0, 20)]));
+}
+
 let zaehler = 0;
 const neueId = (p = "t") => `${p}${Date.now().toString(36)}${(zaehler++).toString(36)}`;
 
 function anzeigeStandard(a) {
   const { typ, x, y, b, h, titel } = a;
-  return { id: typ, typ, x, y, b, h, sichtbar: true, skalieren: true, zoom: 100, ...(titel ? { titel } : {}) };
+  return { id: typ, typ, x, y, b, h, sichtbar: true, skalieren: true, zoom: 100, ...(titel ? { titel } : {}), ...STIL, ...(OPTIONEN[typ] || {}) };
 }
 
 function neuerText(over = {}) {
-  return { id: neueId(), typ: "text", x: 660, y: 470, b: 600, h: 120, sichtbar: true, text: "Neuer Text", groesse: 64, farbe: "#ffffff", fett: true, ausrichtung: "mitte", panel: false, skalieren: true, ...over };
+  return { id: neueId(), typ: "text", x: 660, y: 470, b: 600, h: 120, sichtbar: true, text: "Neuer Text", groesse: 64, farbe: "#ffffff", fett: true, ausrichtung: "mitte", panel: false, skalieren: true, ...STIL, ...over };
 }
 
 // Bild-Block: bild ist der Schlüssel in layout.bilder. b0 × h0: Seitenverhältnis des Bildes, um den Block passend zu setzen
@@ -62,7 +83,7 @@ function neuesBild(bild, { b0 = 16, h0 = 9, ...over } = {}) {
   let b = 640, h = Math.round(640 / v);
   if (h > 480) { h = 480; b = Math.round(480 * v); }
   b = Math.max(MIN, Math.min(B, b)); h = Math.max(MIN, Math.min(H, h));
-  return { id: neueId("i"), typ: "bild", x: Math.round((B - b) / 2), y: Math.round((H - h) / 2), b, h, sichtbar: true, bild, passung: "einpassen", deckkraft: 100, radius: 0, panel: false, ...over };
+  return { id: neueId("i"), typ: "bild", x: Math.round((B - b) / 2), y: Math.round((H - h) / 2), b, h, sichtbar: true, bild, passung: "einpassen", radius: 0, panel: false, ...STIL, ...over };
 }
 
 function standardVerlauf() {
@@ -169,7 +190,7 @@ function migrateLayout(l) {
         id: eigeneId(e, "t"), typ: "text", ...kasten(e), sichtbar: e.sichtbar !== false,
         text: typeof e.text === "string" ? e.text.slice(0, TEXT_MAX) : "",
         groesse: zahl(e.groesse, 64, 10, 400), farbe: farbe(e.farbe, "#ffffff"), fett: e.fett !== false,
-        ausrichtung: AUSRICHTUNG.includes(e.ausrichtung) ? e.ausrichtung : "mitte", panel: !!e.panel, skalieren: e.skalieren !== false,
+        ausrichtung: AUSRICHTUNG.includes(e.ausrichtung) ? e.ausrichtung : "mitte", panel: !!e.panel, skalieren: e.skalieren !== false, ...migrateStil(e),
       });
     } else if (e.typ === "bild") {
       const bild = nimmBild(e.bild);
@@ -178,14 +199,14 @@ function migrateLayout(l) {
       out.push({
         id: eigeneId(e, "i"), typ: "bild", ...kasten(e), sichtbar: e.sichtbar !== false, bild,
         passung: PASSUNGEN.some(([k]) => k === e.passung) ? e.passung : "einpassen",
-        deckkraft: zahl(e.deckkraft, 100, 0, 100), radius: zahl(e.radius, 0, 0, 540), panel: !!e.panel,
+        radius: zahl(e.radius, 0, 0, 540), panel: !!e.panel, ...migrateStil(e),
         ...(typeof e.name === "string" && e.name ? { name: e.name.slice(0, 60) } : {}),
       });
     } else if (ANZEIGE[e.typ] && !gesehen.has(e.typ)) {
       gesehen.add(e.typ);
       const a = ANZEIGE[e.typ];
       out.push({ id: e.typ, typ: e.typ, ...kasten(e), sichtbar: e.sichtbar !== false, skalieren: e.skalieren !== false, zoom: zahl(e.zoom, 100, ZOOM_MIN, ZOOM_MAX),
-        ...(a.titel ? { titel: typeof e.titel === "string" ? e.titel.slice(0, 80) : a.titel } : {}) });
+        ...(a.titel ? { titel: typeof e.titel === "string" ? e.titel.slice(0, 80) : a.titel } : {}), ...migrateStil(e), ...migrateOptionen(e.typ, e) });
     }
   }
   for (const a of ANZEIGEN) if (!gesehen.has(a.typ)) out.push({ ...anzeigeStandard(a), sichtbar: false });
@@ -245,6 +266,6 @@ function einrasten(k, andere, { raster = 0, abstand = 8, kanten = null } = {}) {
 }
 
 module.exports = {
-  B, H, MIN, MAX_TEXTE, MAX_BILDER, MAX_STOPPS, BILD_MAX, ZOOM_MIN, ZOOM_MAX, ANZEIGEN, ANZEIGE, HINTERGRUENDE, VERLAUF_ARTEN, VERLAUF_VORLAGEN, PASSUNGEN, AUSRICHTUNG, PLATZHALTER,
+  STIL, OPTIONEN, migrateStil, B, H, MIN, MAX_TEXTE, MAX_BILDER, MAX_STOPPS, BILD_MAX, ZOOM_MIN, ZOOM_MAX, ANZEIGEN, ANZEIGE, HINTERGRUENDE, VERLAUF_ARTEN, VERLAUF_VORLAGEN, PASSUNGEN, AUSRICHTUNG, PLATZHALTER,
   standardLayout, standardHg, migrateLayout, migrateVerlauf, neuerText, neuesBild, textEinsetzen, einrasten, verlaufCss, farbeBei, rgba, inhaltsSkala, istBild, bilderAufraeumen, neueId,
 };

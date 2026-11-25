@@ -126,6 +126,7 @@ const stats = new StatsAusgabe({
   root, preload: path.join(root, 'src', 'preload', 'preload.js'), icon: APP_ICON,
   getStats: () => cfg.regie.stats, aktiv: () => istRegie(), onChange: statusMelden,
   onFensterZu: () => restoreFocus(mainWin),
+  ndiKarte: () => cfg.regie.netz?.ndi || '', ndiOrdner: () => path.join(app.getPath('userData'), 'ndi'),
 });
 
 // Auf dem Regie-PC darf kein Spiel laufen (Windows: Prozessliste prüfen)

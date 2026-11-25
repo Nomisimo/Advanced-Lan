@@ -28,7 +28,7 @@ function standardRegie() {
     match: { auto: true, wahl: "" },
     spiele: { cs2: true, rl: true, dota2: false, valorant: false, finals: false, fortnite: false, lol: false }, // Tab „Setup“: nur genutzte Spiele erscheinen in Control und Signale
     session: { name: "LAN-Party", passwort: "", port: PORTS.session, offen: false },
-    netz: { empfang: "", senden: "" }, // Netzwerkkarten (Name, leer = automatisch): Empfang der Game-PCs, Senden der OSC-Befehle
+    netz: { empfang: "", senden: "", ndi: "" }, // Netzwerkkarten (Name, leer = automatisch): Empfang der Game-PCs, Senden der OSC-Befehle, NDI-Ausgabe
     // Tab „Ziele“: angelegt aus der Ziel-Datenbank (ziel-typen.js)
     targets: [], // [{ id, typ, name, host, port, optionen: {}, netz }]  netz: eigene Netzwerkkarte, leer = wie „Senden“
     // Tab „Signale“: welches Event welchen Befehl an welches Ziel sendet

@@ -101,6 +101,11 @@ const BILDER = process.argv[3] || require('os').tmpdir();
   assert.ok(await page.getByTestId('ausgabe-haupt').isVisible());
   assert.ok(await page.getByTestId(`ausgabe-${k.id}`).isVisible());
 
+  // 4b) Netzwerkkarte für NDI wählen
+  await page.locator('[data-testid=ndi-karte] select').selectOption('Ethernet 2 (Licht)');
+  await page.waitForTimeout(300);
+  assert.strictEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('advancedlan_konfig')).regie.netz.ndi), 'Ethernet 2 (Licht)');
+
   // 5) #stats=<id> zeigt genau den kleinen Screen
   const p2 = await ctx.newPage();
   await p2.setViewportSize({ width: 800, height: 200 });

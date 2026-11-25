@@ -1,7 +1,7 @@
 // Oberflächentest: Sound-Player in der Browser-Vorschau der gebauten App.
-// Prüft: Abschnitt „Sound“ im Tab Stats-Screen zeigt die Sounds nach Event, einzeln an/aus, und ein ausgelöstes Event
 // Prüft: Abschnitt „Sound“ im Tab Stats-Screen zeigt die Sounds nach Event, einzeln an/aus, ein ausgelöstes Event (Simulator)
 // spielt bei scharfer Ausgabe genau die eingeschaltete Datei, und im Tab Signale spielt der Test-Knopf den Sound mit (Checkbox).
+// Aufruf: npm run build:dev && node test/e2e/sound.e2e.js [dist-app/index.html] [Ordner für Screenshots]
 // Braucht Playwright mit Chromium (nicht in den Abhängigkeiten), z. B. global: npm i -g playwright, dann mit NODE_PATH=$(npm root -g)
 const { chromium } = require('playwright');
 const path = require('path');

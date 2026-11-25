@@ -77,6 +77,20 @@ const BILDER = process.argv[3] || require('os').tmpdir();
   await page.waitForTimeout(300);
   assert.strictEqual((await stats()).screens[1].layout.elemente.find((e) => e.typ === 'spielstand').b, 400);
 
+  // 3b) Eigener Verlauf je Element: dahinter, dann davor
+  await page.getByTestId('el-verlauf-lage-hinter').click();
+  await page.waitForTimeout(300);
+  let el = (await stats()).screens[1].layout.elemente.find((e) => e.typ === 'spielstand');
+  assert.ok(el.verlaufLage === 'hinter' && el.verlauf?.stopps?.length >= 2, 'Verlauf hinter dem Spielstand');
+  assert.ok(await page.getByTestId('verlauf-editor').isVisible(), 'Verlauf-Editor am Element');
+  assert.strictEqual(await page.locator('[data-testid=screen-flaeche] [data-verlauf=hinter]').count(), 1, 'Ebene hinter dem Inhalt');
+  await page.getByTestId('el-verlauf-lage-vor').click();
+  await page.waitForTimeout(300);
+  el = (await stats()).screens[1].layout.elemente.find((e) => e.typ === 'spielstand');
+  assert.strictEqual(el.verlaufLage, 'vor');
+  assert.strictEqual(await page.locator('[data-testid=screen-flaeche] [data-verlauf=vor]').count(), 1, 'Ebene vor dem Inhalt');
+  await page.screenshot({ path: BILDER + '/screens-1b-verlauf-element.png' });
+
   // 4) Zurück zum Haupt-Screen: 1920×1080, Layout unverändert
   await page.getByTestId('screen-haupt').click();
   await page.waitForTimeout(300);
@@ -95,6 +109,7 @@ const BILDER = process.argv[3] || require('os').tmpdir();
   const buehne = await p2.evaluate(() => { const d = [...document.querySelectorAll('div')].find((x) => x.style.width === '400px' && x.style.height === '100px' && x.style.position === 'relative'); return d ? d.style.background : null; });
   assert.strictEqual(buehne, 'transparent', 'Bühne 400×100, transparent');
   assert.strictEqual(await p2.title(), 'Advanced LAN · Score-Leiste');
+  assert.strictEqual(await p2.locator('[data-verlauf=vor]').count(), 1, 'Verlauf vor dem Spielstand auch auf dem Stats-Screen');
   await p2.screenshot({ path: BILDER + '/screens-2-stats-klein.png' });
   await p2.close();
 

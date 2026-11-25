@@ -372,28 +372,33 @@ const HINTERGRUND = {
   bild: (_, l) => {
     const src = l.bilder[l.hg.bild];
     if (!src) return BG;
-    // Ebenen von oben: eigener Verlauf (wenn darübergelegt), Abdunkeln, Bild
-    const verlauf = l.hg.verlaufDrueber ? `${verlaufCss(l.hg.verlauf)}, ` : "";
+    // Ebenen von oben: eigener Verlauf (davor), Abdunkeln, Bild, eigener Verlauf (dahinter), Schwarz
+    const vor = l.hg.verlaufLage === "vor" ? `${verlaufCss(l.hg.verlauf)}, ` : "";
+    const hinter = l.hg.verlaufLage === "hinter" ? `${verlaufCss(l.hg.verlauf)}, ` : "";
     const dunkel = l.hg.abdunkeln ? `linear-gradient(rgba(0,0,0,${l.hg.abdunkeln / 100}), rgba(0,0,0,${l.hg.abdunkeln / 100})), ` : "";
-    return `${verlauf}${dunkel}url("${src}") center / ${l.hg.passung === "einpassen" ? "contain" : "cover"} no-repeat, #000`;
+    return `${vor}${dunkel}url("${src}") center / ${l.hg.passung === "einpassen" ? "contain" : "cover"} no-repeat, ${hinter}#000`;
   },
 };
 export const hintergrundCss = (l, spiel) => (HINTERGRUND[l.hintergrund] || HINTERGRUND.verlauf)(spiel, l);
 
 // Ein Element in seinem Kasten. Anzeigen werden in ihrer Gestaltungsgröße gesetzt und auf den Kasten skaliert,
-// so wachsen Schrift, Logos und Tabellen mit dem Block.
+// so wachsen Schrift, Logos und Tabellen mit dem Block. Ein eigener Verlauf liegt hinter oder vor dem Inhalt.
 export function ElementKasten({ e, ctx }) {
   const { f, b, h } = inhaltsSkala(e);
   const stil = { kachel: e.kachel ?? 92, ecken: e.ecken ?? 18, rahmen: e.rahmen !== false };
+  const lage = e.verlauf && (e.verlaufLage === "hinter" || e.verlaufLage === "vor") ? e.verlaufLage : "";
+  const verlauf = lage && <div data-verlauf={lage} style={{ position: "absolute", inset: 0, borderRadius: stil.ecken, background: verlaufCss(e.verlauf), pointerEvents: "none", zIndex: lage === "vor" ? 1 : -1 }} />;
   return (
     <StilKontext.Provider value={stil}>
-    <div style={{ position: "absolute", left: e.x, top: e.y, width: e.b, height: e.h, opacity: (e.deckkraft ?? 100) / 100,
+    <div style={{ position: "absolute", left: e.x, top: e.y, width: e.b, height: e.h, opacity: (e.deckkraft ?? 100) / 100, isolation: "isolate",
       ...(e.schrift ? { "--txt": e.schrift, color: e.schrift } : {}), ...(e.akzent ? { "--akz": e.akzent } : {}) }}>
+      {lage === "hinter" && verlauf}
       {f === 1 ? <ElementInhalt el={e} ctx={ctx} /> : (
         <div style={{ width: b, height: h, transform: `scale(${f})`, transformOrigin: "0 0" }}>
           <ElementInhalt el={{ ...e, b, h }} ctx={ctx} />
         </div>
       )}
+      {lage === "vor" && verlauf}
     </div>
     </StilKontext.Provider>
   );

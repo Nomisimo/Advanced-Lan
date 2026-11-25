@@ -201,9 +201,16 @@ const BILDER = process.argv[3] || require('os').tmpdir();
   await wahl2.setFiles(path.resolve(__dirname, '../../assets/app-icon/icon.png'));
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('advancedlan_konfig')).regie.stats.screens[0].layout.hintergrund === 'bild');
   lay = await layout();
-  assert.ok(lay.hg.verlaufDrueber && lay.hg.bild && lay.bilder[lay.hg.bild], 'Bild mit Verlauf darüber');
+  assert.ok(lay.hg.verlaufLage === 'vor' && lay.hg.bild && lay.bilder[lay.hg.bild], 'Bild mit Verlauf darüber');
   assert.ok(lay.hg.verlauf.stopps.some((x) => x.alpha < 100), 'Verlauf scheint durch');
   await page.screenshot({ path: BILDER + '/editor-8-verlauf-bild.png' });
+  // Verlauf hinter das Bild legen
+  await page.getByTestId('hg-verlauf-lage-hinter').click();
+  await page.waitForTimeout(300);
+  assert.strictEqual((await layout()).hg.verlaufLage, 'hinter', 'Verlauf hinter dem Bild');
+  await page.getByTestId('hg-verlauf-lage-vor').click();
+  await page.waitForTimeout(300);
+  assert.strictEqual((await layout()).hg.verlaufLage, 'vor');
 
   // 14) Stats-Screen zeigt das gespeicherte Layout mit dem Text
   const stats = await ctx.newPage();

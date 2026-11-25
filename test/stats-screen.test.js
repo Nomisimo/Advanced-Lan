@@ -321,10 +321,34 @@ test("Texte je Zustand und Teile ein/aus für jede Anzeige", () => {
   assert.deepEqual([ev.zeit, ev.textLeer, ev.spieler], [false, "", true]);
 });
 
-test("Hintergrund: Verlauf über dem Bild", () => {
-  const l = migrateLayout({ hintergrund: "bild", hg: { bild: "b1", verlaufDrueber: true }, bilder: { b1: PNG }, elemente: [] });
-  assert.equal(l.hg.verlaufDrueber, true);
-  assert.equal(migrateLayout({ elemente: [] }).hg.verlaufDrueber, false);
+test("Hintergrund: eigener Verlauf hinter oder vor dem Bild", () => {
+  // ältere Versionen: verlaufDrueber
+  const alt = migrateLayout({ hintergrund: "bild", hg: { bild: "b1", verlaufDrueber: true }, bilder: { b1: PNG }, elemente: [] });
+  assert.equal(alt.hg.verlaufLage, "vor");
+  assert.equal(migrateLayout({ elemente: [] }).hg.verlaufLage, "aus");
+  assert.equal(migrateLayout({ hg: { verlaufLage: "hinter", verlaufDrueber: true }, elemente: [] }).hg.verlaufLage, "hinter");
+  assert.equal(migrateLayout({ hg: { verlaufLage: "quer" }, elemente: [] }).hg.verlaufLage, "aus");
+});
+
+test("Elemente: eigener Verlauf hinter oder vor dem Inhalt", () => {
+  const { STIL, elementVerlauf } = require("../src/core/stats-layout");
+  assert.equal(STIL.verlaufLage, "aus");
+  const std = standardLayout();
+  assert.ok(std.elemente.every((e) => e.verlaufLage === "aus" && !e.verlauf), "Standard: kein Verlauf");
+  const l = migrateLayout({ elemente: [
+    { id: "spielstand", typ: "spielstand", x: 0, y: 0, b: 800, h: 200, verlaufLage: "vor", verlauf: { art: "radial", stopps: [{ farbe: "#FF0000", pos: 0, alpha: 40 }, { farbe: "#00ff00", pos: 100 }] } },
+    { id: "logo", typ: "logo", x: 0, y: 0, b: 200, h: 200, verlaufLage: "hinter" },
+    { id: "live", typ: "live", x: 0, y: 0, b: 200, h: 200, verlaufLage: "irgendwo", verlauf: "kaputt" },
+  ] });
+  const sp = l.elemente.find((e) => e.id === "spielstand");
+  assert.equal(sp.verlaufLage, "vor");
+  assert.deepEqual([sp.verlauf.art, sp.verlauf.stopps[0].farbe, sp.verlauf.stopps[0].alpha, sp.verlauf.stopps[1].alpha], ["radial", "#ff0000", 40, 100]);
+  const lo = l.elemente.find((e) => e.id === "logo");
+  assert.equal(lo.verlaufLage, "hinter");
+  assert.deepEqual(lo.verlauf, elementVerlauf(), "ohne Verlauf: Standard für Elemente");
+  const lv = l.elemente.find((e) => e.id === "live");
+  assert.equal(lv.verlaufLage, "aus");
+  assert.deepEqual(lv.verlauf, elementVerlauf(), "kaputter Verlauf: Standard");
 });
 
 test("Neue Elemente: Spieler-Karte und Wert werden geprüft und begrenzt", () => {

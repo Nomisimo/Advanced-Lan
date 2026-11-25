@@ -1,7 +1,7 @@
 import React, { useRef, useState } from "react";
 import { S, ACCENT, ACCENT_HI, LINE, SUB, MUTED, FELD, GLOW } from "../theme.js";
 import { Field, Toggle } from "../ui.jsx";
-import { HINTERGRUENDE, VERLAUF_ARTEN, VERLAUF_VORLAGEN, MAX_STOPPS, verlaufCss, farbeBei, rgba } from "../../core/stats-layout.js";
+import { HINTERGRUENDE, VERLAUF_LAGEN, VERLAUF_ARTEN, VERLAUF_VORLAGEN, MAX_STOPPS, verlaufCss, farbeBei, rgba } from "../../core/stats-layout.js";
 import { Palette, ImagePlus, Trash2, ArrowLeftRight, Plus } from "lucide-react";
 
 // Hintergrund des Stats-Screens: Vorlage, eigene Farbe, eigener Verlauf (mit Verlauf-Editor) oder eigenes Bild.
@@ -43,14 +43,29 @@ export default function HintergrundEditor({ layout, setArt, aendern, fokus, bild
             </div>
           </Field>
           <Regler label="Abdunkeln" wert={hg.abdunkeln} max={90} einheit="%" fokus={fokus} onChange={(v) => aendern({ abdunkeln: v }, null)} />
-          <Toggle checked={hg.verlaufDrueber} onChange={(v) => aendern({ verlaufDrueber: v, ...(v ? { verlauf: durchscheinend(hg.verlauf) } : {}) })} label="Eigenen Verlauf darüberlegen" />
-          {hg.verlaufDrueber && <>
-            <div style={{ fontSize: 10, color: MUTED }}>Tipp: Farbstopps mit weniger Deckkraft lassen das Bild durchscheinen.</div>
+          <VerlaufLage label="Eigener Verlauf" wert={hg.verlaufLage} testid="hg-verlauf-lage" titel={{ hinter: "Verlauf hinter dem Bild", vor: "Verlauf vor dem Bild, als Überlagerung" }}
+            onChange={(k) => aendern({ verlaufLage: k, ...(k === "vor" ? { verlauf: durchscheinend(hg.verlauf) } : {}) })} />
+          {hg.verlaufLage !== "aus" && <>
+            <div style={{ fontSize: 10, color: MUTED }}>{hg.verlaufLage === "vor" ? "Tipp: Farbstopps mit weniger Deckkraft lassen das Bild durchscheinen." : "Hinter dem Bild sieht man den Verlauf bei „Einpassen“ (Ränder) und durch durchsichtige Stellen im Bild (PNG)."}</div>
             <VerlaufEditor v={hg.verlauf} aendern={(v, vorher) => aendern({ verlauf: v }, vorher)} fokus={fokus} />
           </>}
         </>
       )}
     </div>
+  );
+}
+
+// Wahl, wo ein eigener Verlauf liegt: aus, dahinter, davor
+export function VerlaufLage({ label, wert, onChange, titel = {}, testid }) {
+  return (
+    <Field label={label}>
+      <div style={{ display: "flex", gap: 3 }} data-testid={testid}>
+        {VERLAUF_LAGEN.map(([k, l]) => (
+          <button key={k} onClick={() => onChange(k)} title={titel[k] || l} data-testid={`${testid}-${k}`}
+            style={{ ...S.smallBtn, flex: 1, justifyContent: "center", ...(wert === k ? { background: ACCENT, borderColor: ACCENT } : {}) }}>{l}</button>
+        ))}
+      </div>
+    </Field>
   );
 }
 
@@ -66,7 +81,7 @@ export function Regler({ label, wert, min = 0, max = 100, einheit = "", fokus, o
 }
 
 // Verlauf-Editor: Farbstopps auf der Leiste ziehen, Klick auf die Leiste setzt einen neuen Stopp
-function VerlaufEditor({ v, aendern, fokus }) {
+export function VerlaufEditor({ v, aendern, fokus }) {
   const [aktiv, setAktiv] = useState(0);
   const leiste = useRef(null);
   const zug = useRef(null);

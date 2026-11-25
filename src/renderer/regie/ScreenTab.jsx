@@ -9,9 +9,9 @@ import SoundEinstellungen from "./SoundEinstellungen.jsx";
 import { screenVon } from "../../core/stats-screens.js";
 import { SPIEL_BY_ID } from "../../core/spiele.js";
 import { WERTE } from "../../core/stats-screen.js";
-import { MIN, MAX_TEXTE, MAX_BILDER, MAX_SPIELER, MAX_WERTE, SPIELER_OPTIONEN, neuerSpieler, neuerWert, ZOOM_MIN, ZOOM_MAX, OPTIONEN, OPTION_TEXT_MAX, ANZEIGE, HINTERGRUENDE, PASSUNGEN, PLATZHALTER, standardLayout, migrateLayout, neuerText, neuesBild, einrasten, bilderAufraeumen, neueId, inhaltsSkala } from "../../core/stats-layout.js";
+import { MIN, MAX_TEXTE, MAX_BILDER, MAX_SPIELER, MAX_WERTE, SPIELER_OPTIONEN, neuerSpieler, neuerWert, ZOOM_MIN, ZOOM_MAX, OPTIONEN, OPTION_TEXT_MAX, ANZEIGE, HINTERGRUENDE, PASSUNGEN, elementVerlauf, PLATZHALTER, standardLayout, migrateLayout, neuerText, neuesBild, einrasten, bilderAufraeumen, neueId, inhaltsSkala } from "../../core/stats-layout.js";
 import { statsBeispiel } from "../../core/stats-beispiel.js";
-import HintergrundEditor, { Regler, durchscheinend } from "./HintergrundEditor.jsx";
+import HintergrundEditor, { Regler, durchscheinend, VerlaufLage, VerlaufEditor } from "./HintergrundEditor.jsx";
 import { bildWaehlen, bildVorbereiten } from "./bild-laden.js";
 import { Type, UserSquare, Hash, Eye, EyeOff, Undo2, Redo2, RotateCcw, Copy, Trash2, ArrowUpToLine, ArrowDownToLine, AlignLeft, AlignCenter, AlignRight, Cast, Move, ImagePlus, Image as ImageIcon, Scaling } from "lucide-react";
 
@@ -158,7 +158,7 @@ function Editor({ cfg, mutate, status, log, screen }) {
     const r = await bildLaden(await bildWaehlen());
     if (!r) return;
     const l = layoutRef.current;
-    const hg = { ...l.hg, bild: r.id, ...(mitVerlauf === true ? { verlaufDrueber: true, verlauf: durchscheinend(l.hg.verlauf) } : {}) };
+    const hg = { ...l.hg, bild: r.id, ...(mitVerlauf === true ? { verlaufLage: "vor", verlauf: durchscheinend(l.hg.verlauf) } : {}) };
     setzen({ ...l, hintergrund: "bild", bilder: { ...l.bilder, [r.id]: r.url }, hg }, l, true);
   };
   const hgArt = (k) => {
@@ -179,7 +179,7 @@ function Editor({ cfg, mutate, status, log, screen }) {
   };
   // Darstellung eines Elements auf alle übertragen (Schrift- und Akzentfarbe nur auf Anzeigen)
   const stilAlle = (q) => {
-    const st = { deckkraft: q.deckkraft ?? 100, kachel: q.kachel ?? 92, ecken: q.ecken ?? 18, rahmen: q.rahmen !== false };
+    const st = { deckkraft: q.deckkraft ?? 100, kachel: q.kachel ?? 92, ecken: q.ecken ?? 18, rahmen: q.rahmen !== false, verlaufLage: q.verlaufLage || "aus", ...(q.verlauf ? { verlauf: JSON.parse(JSON.stringify(q.verlauf)) } : {}) };
     const farben = ANZEIGE[q.typ] ? { schrift: q.schrift || "", akzent: q.akzent || "" } : {};
     setzen({ ...layout, elemente: layout.elemente.map((x) => ({ ...x, ...st, ...(ANZEIGE[x.typ] ? farben : {}) })) });
   };
@@ -355,7 +355,7 @@ function Editor({ cfg, mutate, status, log, screen }) {
               duplizieren={() => duplizieren(gewaehlt)} entfernen={() => entfernen(gewaehlt)} ebene={(r) => ebene(gewaehlt, r)} />
               : <>
                 <div style={{ ...S.hint, marginTop: 0, border: `1px dashed ${LINE}`, borderRadius: 8, padding: 10 }}>Ein Element anklicken, um Position, Größe und Inhalt zu bearbeiten. Ohne Auswahl: Hintergrund.</div>
-                <HintergrundEditor layout={layout} setArt={hgArt} aendern={hgAendern} fokus={fokus} bildSetzen={() => hgBild()} bildDarunter={() => (layout.hg.bild ? setzen({ ...layout, hintergrund: "bild", hg: { ...layout.hg, verlaufDrueber: true, verlauf: durchscheinend(layout.hg.verlauf) } }) : hgBild(true))} />
+                <HintergrundEditor layout={layout} setArt={hgArt} aendern={hgAendern} fokus={fokus} bildSetzen={() => hgBild()} bildDarunter={() => (layout.hg.bild ? setzen({ ...layout, hintergrund: "bild", hg: { ...layout.hg, verlaufLage: "vor", verlauf: durchscheinend(layout.hg.verlauf) } }) : hgBild(true))} />
               </>}
           </div>
         </div>
@@ -453,7 +453,13 @@ function Darstellung({ e, tippen, aendern, fokus, stilAlle }) {
         {farbFeld("schrift", "Schriftfarbe", "#ffffff")}
         {farbFeld("akzent", "Akzentfarbe", "#c39bff")}
       </div>}
-      <button style={{ ...S.smallBtn, alignSelf: "flex-start" }} onClick={() => stilAlle(e)} title="Deckkraft, Kachel, Ecken, Rahmen und Farben dieses Elements für alle Elemente übernehmen">Darstellung auf alle Elemente übertragen</button>
+      <VerlaufLage label="Eigener Verlauf" wert={e.verlaufLage || "aus"} testid="el-verlauf-lage" titel={{ hinter: "Verlauf hinter dem Inhalt (wie ein eigener Hintergrund des Elements)", vor: "Verlauf vor dem Inhalt, als Überlagerung" }}
+        onChange={(k) => aendern({ verlaufLage: k, ...(k !== "aus" && !e.verlauf ? { verlauf: elementVerlauf() } : {}) })} />
+      {e.verlaufLage && e.verlaufLage !== "aus" && e.verlauf && <>
+        <div style={{ fontSize: 10, color: MUTED }}>{e.verlaufLage === "vor" ? "Liegt über dem Inhalt: Farbstopps mit wenig Deckkraft lassen ihn durchscheinen." : "Liegt hinter dem Inhalt. Bei Kacheln den Kachel-Hintergrund senken, damit er durchscheint."}</div>
+        <VerlaufEditor v={e.verlauf} aendern={(v, vorher) => (vorher === null ? tippen({ verlauf: v }) : aendern({ verlauf: v }))} fokus={fokus} />
+      </>}
+      <button style={{ ...S.smallBtn, alignSelf: "flex-start" }} onClick={() => stilAlle(e)} title="Deckkraft, Kachel, Ecken, Rahmen, Farben und Verlauf dieses Elements für alle Elemente übernehmen">Darstellung auf alle Elemente übertragen</button>
     </div>
   );
 }

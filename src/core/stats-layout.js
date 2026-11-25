@@ -54,11 +54,17 @@ const flaecheVon = (f) => ({ b: zahl(f?.b, B, MIN, 8192), h: zahl(f?.h, H, MIN, 
 const farbe = (v, std) => (typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v) ? v.toLowerCase() : std);
 
 // Darstellung, die jedes Element hat: Deckkraft des ganzen Elements, Transparenz und Ecken der Kacheln, Rahmen,
-// Schrift- und Akzentfarbe ("" = Standard der Anzeige)
-const STIL = { deckkraft: 100, kachel: 92, ecken: 18, rahmen: true, schrift: "", akzent: "" };
+// Schrift- und Akzentfarbe ("" = Standard der Anzeige), eigener Verlauf hinter oder vor dem Inhalt (verlaufLage, verlauf)
+const STIL = { deckkraft: 100, kachel: 92, ecken: 18, rahmen: true, schrift: "", akzent: "", verlaufLage: "aus" };
+// Lage eines eigenen Verlaufs: aus, hinter dem Inhalt/Bild, vor dem Inhalt/Bild (als Überlagerung)
+const VERLAUF_LAGEN = [["aus", "Kein Verlauf"], ["hinter", "Dahinter"], ["vor", "Davor"]];
+const verlaufLage = (v) => (VERLAUF_LAGEN.some(([k]) => k === v) ? v : "aus");
+// Verlauf für ein Element, wenn noch keiner gesetzt ist: Lila nach durchsichtig
+const elementVerlauf = () => ({ art: "linear", winkel: 90, x: 50, y: 50, stopps: [{ farbe: "#9d5cff", pos: 0, alpha: 60 }, { farbe: "#9d5cff", pos: 100, alpha: 0 }] });
 function migrateStil(e) {
   const f = (v) => (v === "" || v == null ? "" : farbe(v, ""));
-  return { deckkraft: zahl(e.deckkraft, 100, 0, 100), kachel: zahl(e.kachel, STIL.kachel, 0, 100), ecken: zahl(e.ecken, STIL.ecken, 0, 80), rahmen: e.rahmen !== false, schrift: f(e.schrift), akzent: f(e.akzent) };
+  return { deckkraft: zahl(e.deckkraft, 100, 0, 100), kachel: zahl(e.kachel, STIL.kachel, 0, 100), ecken: zahl(e.ecken, STIL.ecken, 0, 80), rahmen: e.rahmen !== false, schrift: f(e.schrift), akzent: f(e.akzent),
+    verlaufLage: verlaufLage(e.verlaufLage), ...(e.verlauf || verlaufLage(e.verlaufLage) !== "aus" ? { verlauf: migrateVerlauf(e.verlauf, elementVerlauf()) } : {}) };
 }
 // Eigene Einstellungen einzelner Anzeigen (0 bei Zeilen/Anzahl: automatisch nach Höhe)
 // Texte (Zeichenketten) können Platzhalter wie {spiel} enthalten, leer = nichts anzeigen
@@ -134,7 +140,7 @@ function neuerWert(over = {}, flaeche) {
 }
 
 function standardHg() {
-  return { farbe: "#1b1922", verlauf: standardVerlauf(), bild: "", passung: "fuellen", abdunkeln: 0, verlaufDrueber: false };
+  return { farbe: "#1b1922", verlauf: standardVerlauf(), bild: "", passung: "fuellen", abdunkeln: 0, verlaufLage: "aus" };
 }
 
 // Standard-Layout; auf einer anderen Fläche werden die Anzeigen anteilig gesetzt
@@ -160,8 +166,7 @@ function einzelLayout(typ, flaeche) {
 const istBild = (v) => typeof v === "string" && v.length <= BILD_MAX && BILD_RE.test(v);
 const bildId = (v) => (typeof v === "string" && /^[\w-]{1,40}$/.test(v) ? v : "");
 
-function migrateVerlauf(v) {
-  const std = standardVerlauf();
+function migrateVerlauf(v, std = standardVerlauf()) {
   if (!v || typeof v !== "object") return std;
   let stopps = (Array.isArray(v.stopps) ? v.stopps : []).filter((st) => st && typeof st === "object").slice(0, MAX_STOPPS)
     .map((st) => ({ farbe: farbe(st.farbe, "#000000"), pos: zahl(st.pos, 0, 0, 100), alpha: zahl(st.alpha, 100, 0, 100) }));
@@ -173,7 +178,9 @@ function migrateVerlauf(v) {
 function migrateHg(h) {
   const std = standardHg();
   if (!h || typeof h !== "object") return std;
-  return { farbe: farbe(h.farbe, std.farbe), verlauf: migrateVerlauf(h.verlauf), bild: bildId(h.bild), passung: h.passung === "einpassen" ? "einpassen" : "fuellen", abdunkeln: zahl(h.abdunkeln, 0, 0, 90), verlaufDrueber: !!h.verlaufDrueber };
+  return { farbe: farbe(h.farbe, std.farbe), verlauf: migrateVerlauf(h.verlauf), bild: bildId(h.bild), passung: h.passung === "einpassen" ? "einpassen" : "fuellen", abdunkeln: zahl(h.abdunkeln, 0, 0, 90),
+    // ältere Versionen: verlaufDrueber (true = Verlauf über dem Bild)
+    verlaufLage: h.verlaufLage != null ? verlaufLage(h.verlaufLage) : h.verlaufDrueber ? "vor" : "aus" };
 }
 
 // #rrggbb und Deckkraft (0–100) → rgba(…)
@@ -340,6 +347,6 @@ function einrasten(k, andere, { raster = 0, abstand = 8, kanten = null, flaeche 
 }
 
 module.exports = {
-  STIL, OPTIONEN, OPTION_TEXT_MAX, migrateStil, B, H, MIN, MAX_TEXTE, MAX_BILDER, MAX_SPIELER, MAX_WERTE, SPIELER_OPTIONEN, WERT_KEYS, neuerSpieler, neuerWert, MAX_STOPPS, BILD_MAX, ZOOM_MIN, ZOOM_MAX, ANZEIGEN, ANZEIGE, HINTERGRUENDE, VERLAUF_ARTEN, VERLAUF_VORLAGEN, PASSUNGEN, AUSRICHTUNG, PLATZHALTER,
+  STIL, VERLAUF_LAGEN, elementVerlauf, OPTIONEN, OPTION_TEXT_MAX, migrateStil, B, H, MIN, MAX_TEXTE, MAX_BILDER, MAX_SPIELER, MAX_WERTE, SPIELER_OPTIONEN, WERT_KEYS, neuerSpieler, neuerWert, MAX_STOPPS, BILD_MAX, ZOOM_MIN, ZOOM_MAX, ANZEIGEN, ANZEIGE, HINTERGRUENDE, VERLAUF_ARTEN, VERLAUF_VORLAGEN, PASSUNGEN, AUSRICHTUNG, PLATZHALTER,
   standardLayout, einzelLayout, flaecheVon, standardHg, migrateLayout, migrateVerlauf, neuerText, neuesBild, textEinsetzen, einrasten, verlaufCss, farbeBei, rgba, inhaltsSkala, istBild, bilderAufraeumen, neueId,
 };

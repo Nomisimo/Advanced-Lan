@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { migrateSound, eventVonOrdner, dateienAufnehmen, nachEvent, soundFuer, istSound } = require("../src/core/sound");
+const { migrateSound, eventVonOrdner, dateienAufnehmen, nachEvent, soundFuer, soundZumTest, istSound } = require("../src/core/sound");
 const { migrateKonfig } = require("../src/core/defaults");
 
 const datei = (ordner, name) => ({ pfad: `/s/valorant/${ordner}/${name}`, url: `file:///s/valorant/${ordner}/${name}`, name, ordner });
@@ -48,11 +48,23 @@ test("Sound: welches Event welche Datei spielt", () => {
 });
 
 test("Sound: Migration und Standard in der Konfiguration", () => {
-  assert.deepEqual(migrateSound(null), { an: false, nurScharf: true, geraet: "", geraetName: "", lautstaerke: 1, abbrechen: true, dateien: [] });
+  assert.deepEqual(migrateSound(null), { an: false, nurScharf: true, geraet: "", geraetName: "", lautstaerke: 1, abbrechen: true, beimTest: true, dateien: [] });
   const m = migrateSound({ an: true, lautstaerke: 3, dateien: [{ pfad: "/a.wav", spiel: "valorant", event: "kill", an: true }, { kaputt: 1 }] });
   assert.equal(m.lautstaerke, 1);
   assert.equal(m.dateien.length, 1);
   assert.equal(m.dateien[0].name, "a.wav");
   assert.ok(m.dateien[0].id);
   assert.equal(migrateKonfig(null).regie.sound.an, false);
+});
+
+test("Sound: Test im Tab Signale spielt den Sound des Events, auch ohne „Sounds an“", () => {
+  const s = migrateSound({ an: false, dateien: [
+    { pfad: "/k1", url: "file:///k1", spiel: "valorant", event: "kill", an: true },
+    { pfad: "/k2", url: "file:///k2", spiel: "valorant", event: "kill", an: false },
+  ] });
+  assert.equal(s.beimTest, true, "Standard: an");
+  assert.equal(soundZumTest(s, "valorant", "kill", 0.9).pfad, "/k1", "nur eingeschaltete");
+  assert.equal(soundZumTest(s, "valorant", "ace"), null);
+  assert.equal(soundZumTest({ ...s, beimTest: false }, "valorant", "kill"), null, "Checkbox aus");
+  assert.equal(migrateSound({ beimTest: false }).beimTest, false);
 });

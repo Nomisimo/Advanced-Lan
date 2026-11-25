@@ -91,4 +91,115 @@ function statsEvents(log, spiel, max = 8, namen = {}) {
     .map((e) => (e.ev.player && namen[e.ev.player] ? { ...e, ev: { ...e.ev, player: namen[e.ev.player] } } : e));
 }
 
-module.exports = { statsDaten, statsEvents };
+// Spieler des aktiven Spiels für Spieler-Karten, Teams und Einzelwerte. Quellen, in dieser Reihenfolge:
+// Statistik der Regie (aus den Events), was Shots Fired meldet (stand.sf: Zähler, Team, Seite) und der Status des Game-PCs.
+// status: regie.snapshot() → [{ id, pcId, name, team, seite, kills, tode, headshots, assists, verbunden }], beste zuerst
+function spielerDaten(status, spielId) {
+  if (!spielId) return [];
+  const namen = status?.namen || {};
+  const st = status?.statistik?.spiel === spielId ? status.statistik : null;
+  const alle = st?.alle || st?.top || [];
+  const statVon = new Map();
+  for (const p of alle) { statVon.set(p.id || p.name, p); statVon.set(p.name, p); }
+  const out = [], gesehen = new Set();
+  for (const pc of status?.pcs || []) {
+    if (pc.spiel !== spielId || pc.sim) continue;
+    const name = namen[pc.pcId] || pc.spieler || pc.pcId;
+    const s = statVon.get(pc.pcId) || statVon.get(name);
+    if (s) gesehen.add(s);
+    const sf = pc.stand?.sf || {}, ps = pc.status || {};
+    const z = (a, b, c) => (a != null ? n(a) : b != null ? n(b) : c != null ? n(c) : 0);
+    out.push({
+      id: pc.pcId, pcId: pc.pcId, name, team: sf.team || ps.team || s?.team || "", seite: sf.seite || "",
+      kills: z(s?.kills, sf.kills, ps.kills), tode: z(s?.tode, sf.deaths, ps.deaths), headshots: z(s?.headshots, sf.headshots, null), assists: z(s?.assists, null, null),
+      verbunden: pc.verbunden !== false,
+    });
+  }
+  // Spieler ohne eigenen PC (z. B. CS2: ein PC meldet alle Spieler, Beispieldaten)
+  for (const s of alle) if (!gesehen.has(s) && !out.some((o) => o.name === s.name)) out.push({ id: s.id || s.name, pcId: "", name: s.name, team: s.team || "", seite: "", kills: n(s.kills), tode: n(s.tode), headshots: n(s.headshots), assists: n(s.assists), verbunden: true });
+  return out.sort((a, b) => b.kills - a.kills || a.tode - b.tode || a.name.localeCompare(b.name));
+}
+
+// Spieler nach Wahl eines Blocks: quelle "rang" (1 = bester) oder eine PC-ID / ein Name
+function spielerWahl(liste, quelle, rang = 1) {
+  if (quelle && quelle !== "rang") return liste.find((p) => p.pcId === quelle || p.id === quelle || p.name === quelle) || null;
+  return liste[Math.max(0, (Number(rang) || 1) - 1)] || null;
+}
+
+// Beide Teams mit ihren Spielern. Valorant mit Shots Fired: Namen aus ui_team_order (Verbündete = Team des PCs, Gegner = das andere),
+// sonst aus den Spielern nach Team. → [{ name, spieler: [{ name, kills, tode, headshots }] }]
+function teamListen(status, spiel) {
+  const liste = spielerDaten(status, spiel?.id);
+  const [t1, t2] = spiel?.teams?.length >= 2 ? spiel.teams : ["TEAM A", "TEAM B"];
+  const andere = (t) => (t === t1 ? t2 : t === t2 ? t1 : "");
+  const zahlen = (name) => liste.find((p) => p.name === name || p.pcId === name) || { name, kills: null, tode: null, headshots: null };
+  // Shots Fired: Listen der PCs zusammenführen
+  const sf = { [t1]: [], [t2]: [] };
+  let ohneTeam = null;
+  for (const pc of status?.pcs || []) {
+    const i = pc.spiel === spiel?.id && pc.stand?.sf;
+    if (!i || (!i.verbuendete?.length && !i.gegner?.length)) continue;
+    if (i.team && sf[i.team]) {
+      for (const nm of i.verbuendete || []) if (!sf[i.team].includes(nm)) sf[i.team].push(nm);
+      for (const nm of i.gegner || []) if (!sf[andere(i.team)].includes(nm)) sf[andere(i.team)].push(nm);
+    } else if (!ohneTeam) ohneTeam = i;
+  }
+  if (sf[t1].length || sf[t2].length) return [{ name: t1, spieler: sf[t1].slice(0, 10).map(zahlen) }, { name: t2, spieler: sf[t2].slice(0, 10).map(zahlen) }];
+  if (ohneTeam) return [{ name: "Verbündete", spieler: (ohneTeam.verbuendete || []).map(zahlen) }, { name: "Gegner", spieler: (ohneTeam.gegner || []).map(zahlen) }];
+  // Ohne Shots-Fired-Listen: Spieler nach Team
+  const teams = [t1, t2, ...new Set(liste.map((p) => p.team).filter((t) => t && t !== t1 && t !== t2))];
+  const out = teams.map((t) => ({ name: t, spieler: liste.filter((p) => p.team === t) })).filter((t, i) => i < 2 || t.spieler.length);
+  const rest = liste.filter((p) => !p.team);
+  if (rest.length) out.push({ name: "Ohne Team", spieler: rest });
+  return out;
+}
+
+// Ranking für den MVP-Endscreen: Punkte = Kills × 100 + Headshots × 30 + Assists × 40 + MVPs × 150 − Tode × 50 (nicht unter 0),
+// bei Gleichstand mehr Kills, dann weniger Tode. Rocket League: Tore, Vorlagen, Paraden, Schüsse (wie die Bestenliste).
+// → [{ ...spieler, punkte, kd, hsQuote }], MVP zuerst
+function ranking(status, spiel) {
+  const liste = spielerDaten(status, spiel?.id);
+  const st = status?.statistik?.spiel === spiel?.id ? status.statistik : null;
+  const extra = new Map((st?.alle || []).map((p) => [p.name, p]));
+  const rl = spiel?.id === "rl";
+  return liste.map((p) => {
+    const e = extra.get(p.name) || {};
+    const punkte = rl ? n(e.tore) * 100 + n(e.vorlagen) * 50 + n(e.paraden) * 50 + n(e.schuesse) * 20 + n(e.demos) * 10 + n(e.mvps) * 150
+      : Math.max(0, p.kills * 100 + p.headshots * 30 + p.assists * 40 + n(e.mvps) * 150 - p.tode * 50);
+    return { ...p, mvps: n(e.mvps), tore: n(e.tore), vorlagen: n(e.vorlagen), paraden: n(e.paraden), punkte, kd: kd(p), hsQuote: p.kills ? Math.round((p.headshots / p.kills) * 100) : 0 };
+  }).sort((a, b) => b.punkte - a.punkte || b.kills - a.kills || a.tode - b.tode || a.name.localeCompare(b.name));
+}
+
+// Einzelwerte für den Block „Wert“: [key, Bezeichnung, für einen Spieler?]
+const WERTE = [
+  ["score1", "Punkte links"], ["score2", "Punkte rechts"], ["team1", "Team links"], ["team2", "Team rechts"], ["runde", "Runde"],
+  ["kills", "Kills (Match)"], ["tode", "Tode (Match)"], ["headshots", "Headshots (Match)"], ["aces", "Aces (Match)"],
+  ["sp.name", "Name", true], ["sp.kills", "Kills", true], ["sp.tode", "Tode", true], ["sp.headshots", "Headshots", true], ["sp.kd", "K/D", true],
+  ["sp.team", "Team", true], ["sp.seite", "Seite (Angriff/Verteidigung)", true],
+];
+const WERT = Object.fromEntries(WERTE.map(([k, l, sp]) => [k, { label: l, spieler: !!sp }]));
+// Kurze Beschriftung unter dem Wert
+const WERT_KURZ = { score1: "", score2: "", team1: "", team2: "", runde: "Runde", kills: "Kills", tode: "Tode", headshots: "Headshots", aces: "Aces", "sp.name": "", "sp.kills": "Kills", "sp.tode": "Tode", "sp.headshots": "Headshots", "sp.kd": "K/D", "sp.team": "Team", "sp.seite": "Seite" };
+
+const kd = (p) => (p.tode ? (p.kills / p.tode).toFixed(2) : String(p.kills));
+// Wert eines Blocks: d = statsDaten, statistik, sp = gewählter Spieler → Text ("–" ohne Wert)
+function wertVon(key, { d, statistik, stand, sp }) {
+  const m = statistik?.match || {};
+  if (key.startsWith("sp.")) {
+    if (!sp) return "–";
+    const k = key.slice(3);
+    if (k === "kd") return kd(sp);
+    const v = sp[k];
+    return v == null || v === "" ? "–" : String(v);
+  }
+  switch (key) {
+    case "score1": return d?.teams?.[0] ? String(d.teams[0].score) : "–";
+    case "score2": return d?.teams?.[1] ? String(d.teams[1].score) : "–";
+    case "team1": return d?.teams?.[0]?.name || "–";
+    case "team2": return d?.teams?.[1]?.name || "–";
+    case "runde": { const r = statistik?.runde?.nr ?? stand?.runde; return r != null && r !== "" ? String(r) : "–"; }
+    default: return m[key] != null ? String(n(m[key])) : "–";
+  }
+}
+
+module.exports = { ranking, statsDaten, statsEvents, spielerDaten, spielerWahl, teamListen, WERTE, WERT, WERT_KURZ, wertVon, kd };

@@ -147,10 +147,11 @@ test("NDI mit Alpha: vormultiplizierte Pixel werden gerade", () => {
   assert.deepEqual([...b], [10, 20, 30, 255, 0, 0, 0, 0, 100, 128, 0, 128]);
 });
 
-test("Screen-Layout: Standard hat jede Anzeige einmal, sichtbar", () => {
+test("Screen-Layout: Standard hat jede Anzeige einmal, sichtbar bis auf die optionalen", () => {
   const l = standardLayout();
   assert.deepEqual(l.elemente.map((e) => e.typ), ANZEIGEN.map((a) => a.typ));
-  assert.ok(l.elemente.every((e) => e.sichtbar && e.x + e.b <= B && e.y + e.h <= H));
+  assert.ok(l.elemente.every((e) => e.sichtbar === !ANZEIGEN.find((a) => a.typ === e.typ).aus && e.x + e.b <= B && e.y + e.h <= H));
+  assert.deepEqual(l.elemente.filter((e) => !e.sichtbar).map((e) => e.typ), ["teams", "mvp"]);
   assert.deepEqual(migrateLayout(l), l);
   assert.deepEqual(migrateLayout(null), l);
 });
@@ -324,4 +325,62 @@ test("Hintergrund: Verlauf über dem Bild", () => {
   const l = migrateLayout({ hintergrund: "bild", hg: { bild: "b1", verlaufDrueber: true }, bilder: { b1: PNG }, elemente: [] });
   assert.equal(l.hg.verlaufDrueber, true);
   assert.equal(migrateLayout({ elemente: [] }).hg.verlaufDrueber, false);
+});
+
+test("Neue Elemente: Spieler-Karte und Wert werden geprüft und begrenzt", () => {
+  const { neuerSpieler, neuerWert, MAX_SPIELER } = require("../src/core/stats-layout");
+  const l = migrateLayout({ elemente: [
+    neuerSpieler({ quelle: "PC 03", kills: false }), { ...neuerWert(), wert: "quatsch", rang: 99, farbe: "rot" },
+    ...Array.from({ length: 14 }, () => neuerSpieler()),
+  ] });
+  const sp = l.elemente.filter((e) => e.typ === "spieler");
+  assert.equal(sp.length, MAX_SPIELER);
+  assert.deepEqual([sp[0].quelle, sp[0].kills, sp[0].tode], ["PC 03", false, true]);
+  const w = l.elemente.find((e) => e.typ === "wert");
+  assert.deepEqual([w.wert, w.rang, w.farbe], ["score1", 20, "#ffffff"]);
+});
+
+test("Stats-Screen: Spieler aus Statistik, Shots Fired und PC-Status; Teams aus ui_team_order", () => {
+  const { spielerDaten, spielerWahl, teamListen, wertVon } = require("../src/core/stats-screen");
+  const { SPIEL_BY_ID } = require("../src/core/spiele");
+  const val = SPIEL_BY_ID.valorant;
+  const [t1, t2] = val.teams;
+  const status = {
+    namen: { "PC 01": "Momo" },
+    statistik: { spiel: "valorant", alle: [{ id: "PC 01", name: "Momo", team: t1, kills: 7, tode: 2, headshots: 3, assists: 1 }], match: { kills: 9, tode: 5 }, runde: { nr: 8 } },
+    pcs: [
+      { pcId: "PC 01", spiel: "valorant", verbunden: true, stand: { sf: { team: t1, seite: "Angriff", verbuendete: ["Momo", "Kira"], gegner: ["Rex", "Juno"], kills: 6 } } },
+      { pcId: "PC 02", spiel: "valorant", verbunden: true, status: { team: t2, kills: 2, deaths: 4 }, stand: { sf: { kills: 3, deaths: 1, headshots: 2 } } },
+      { pcId: "PC 03", spiel: "cs2", verbunden: true },
+    ],
+  };
+  const l = spielerDaten(status, "valorant");
+  assert.deepEqual(l.map((p) => [p.name, p.team, p.seite, p.kills, p.tode, p.headshots]), [["Momo", t1, "Angriff", 7, 2, 3], ["PC 02", t2, "", 3, 1, 2]]);
+  assert.equal(spielerWahl(l, "rang", 2).name, "PC 02");
+  assert.equal(spielerWahl(l, "PC 01").name, "Momo");
+  assert.equal(spielerWahl(l, "rang", 5), null);
+  const teams = teamListen(status, val);
+  assert.deepEqual(teams.map((t) => [t.name, t.spieler.map((p) => p.name)]), [[t1, ["Momo", "Kira"]], [t2, ["Rex", "Juno"]]]);
+  assert.equal(teams[0].spieler[0].kills, 7);
+  // Ohne Listen: nach Team
+  const ohne = { ...status, pcs: status.pcs.map((p) => ({ ...p, stand: { sf: { ...p.stand?.sf, verbuendete: [], gegner: [] } } })) };
+  assert.deepEqual(teamListen(ohne, val).map((t) => [t.name, t.spieler.map((p) => p.name)]), [[t1, ["Momo"]], [t2, ["PC 02"]]]);
+  assert.equal(wertVon("runde", { statistik: status.statistik }), "8");
+  assert.equal(wertVon("kills", { statistik: status.statistik }), "9");
+  assert.equal(wertVon("sp.kd", { sp: l[0] }), "3.50");
+  assert.equal(wertVon("sp.seite", { sp: l[1] }), "–");
+  assert.equal(wertVon("score1", { d: { teams: [{ name: "A", score: 4 }] } }), "4");
+});
+
+test("MVP-Endscreen: Ranking nach Punkten (Kills, Headshots, Assists, MVPs, Tode)", () => {
+  const { ranking } = require("../src/core/stats-screen");
+  const { SPIEL_BY_ID } = require("../src/core/spiele");
+  const status = { statistik: { spiel: "cs2", alle: [
+    { name: "A", team: "CT", kills: 10, tode: 8, headshots: 2, assists: 0, mvps: 0 },
+    { name: "B", team: "T", kills: 9, tode: 2, headshots: 6, assists: 0, mvps: 2 },
+    { name: "C", team: "T", kills: 0, tode: 0, headshots: 0, assists: 0, mvps: 0 },
+  ] } };
+  const r = ranking(status, SPIEL_BY_ID.cs2);
+  assert.deepEqual(r.map((p) => [p.name, p.punkte, p.kd, p.hsQuote]), [["B", 9*100 + 6*30 + 2*150 - 2*50, "4.50", 67], ["A", 10*100 + 2*30 - 8*50, "1.25", 20], ["C", 0, "0", 0]]);
+  assert.deepEqual(ranking({}, SPIEL_BY_ID.cs2), []);
 });

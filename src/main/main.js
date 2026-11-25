@@ -188,6 +188,8 @@ const overdrive = new OverdriveServer({ onEvent: (event) => bildNachricht('valor
 const shotsfired = new ShotsFiredServer({
   onEvent: ({ spiel, event, seite }) => bildNachricht(spiel, { bild: true, event, seite, aktion: 'Shots Fired', quelle: 'shotsfired' }),
   onTeam: (team) => { sfTeam = team; if (quellen.valorant) quellen.valorant.team = teamVon('valorant'); statusMelden(); },
+  // Neue Infos (Spieler, Seite, Zähler) gleich an die Regie, auch wenn kein Event dabei war
+  onInfo: () => { if (hatSpiele() && quellen.valorant) statusAnRegie('valorant', quellen.valorant.status(), quellen.valorant.stand()); },
   onChange: statusMelden,
 });
 // League of Legends über Riots Live Client Data API (https://127.0.0.1:2999): beste Quelle für LoL, Team kommt aus dem Spiel
@@ -249,6 +251,8 @@ function statusAnRegie(spiel, status, stand) {
   // Valorant: MatchID vom Riot Client, damit die Regie die PCs nach Match trennt (core/match-check.js)
   const match = spiel === 'valorant' ? riot.status().match : '';
   if (match) stand = { ...(stand || {}), match };
+  // Valorant: was Shots Fired weiß (Seite, Team, Spieler beider Teams, Zähler) für den Stats-Screen der Regie
+  if (spiel === 'valorant') { const sf = shotsfired.valorantInfo(); if (sf.seite || sf.verbuendete.length || sf.gegner.length || sf.kills != null || sf.runde != null) stand = { ...(stand || {}), sf }; }
   if (cfg.modus === 'standalone') regie.pcStatus(lokalId(), { spiel, status, stand });
   else client.status(spiel, status, stand);
 }

@@ -5,6 +5,16 @@ const { Statistik } = require("./statistik");
 
 const NAMEN = ["Momo", "Kira", "Flux", "Nova", "Rex", "Juno", "Blitz", "Echo"];
 
+// Acht Game-PCs mit Spielernamen (PC 01 = Momo …). Valorant: was Shots Fired meldet (Seite, Spieler beider Teams)
+function pcsVon(spiel, teams) {
+  const pcs = NAMEN.map((name, i) => {
+    const pcId = `PC 0${i + 1}`, team = teams[i % 2];
+    const sf = spiel.id === "valorant" ? { team, seite: i % 2 ? "Verteidigung" : "Angriff", verbuendete: NAMEN.filter((_, k) => k % 2 === i % 2), gegner: NAMEN.filter((_, k) => k % 2 !== i % 2) } : null;
+    return { pcId, spiel: spiel.id, verbunden: true, status: { team }, stand: sf ? { sf } : null };
+  });
+  return { pcs, namen: Object.fromEntries(pcs.map((p, i) => [p.pcId, NAMEN[i]])) };
+}
+
 // spiel: Eintrag aus SPIELE → { regie: { aktivesSpiel, statistik, stand }, log }
 function statsBeispiel(spiel, jetzt = Date.now()) {
   if (!spiel) return { regie: null, log: [] };
@@ -41,9 +51,9 @@ function statsBeispiel(spiel, jetzt = Date.now()) {
       : { spiel: spiel.id, runde: 12, map: "Ascent", score: {}, laeuft: true, t: jetzt };
     const st = s.json();
     st.match.siege = { [teams[0]]: 7, [teams[1]]: 4 };
-    return { regie: { aktivesSpiel: spiel.id, statistik: st, stand }, log };
+    return { regie: { aktivesSpiel: spiel.id, statistik: st, stand, ...pcsVon(spiel, teams) }, log };
   }
-  return { regie: { aktivesSpiel: spiel.id, statistik: s.json(), stand }, log };
+  return { regie: { aktivesSpiel: spiel.id, statistik: s.json(), stand, ...pcsVon(spiel, teams) }, log };
 }
 
 module.exports = { statsBeispiel };

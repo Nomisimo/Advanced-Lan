@@ -9,6 +9,8 @@ const F0 = { b: B, h: H };
 const MIN = 40; // kleinste Breite und Höhe eines Elements
 const MAX_TEXTE = 30;
 const MAX_BILDER = 12; // Bild-Blöcke
+const MAX_SPIELER = 12; // Spieler-Karten
+const MAX_WERTE = 30; // Einzelwerte
 const TEXT_MAX = 500;
 const BILD_MAX = 4_000_000; // Zeichen einer Bild-Data-URL (die Oberfläche verkleinert Bilder vorher auf höchstens 1920 px)
 const BILD_RE = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/;
@@ -24,6 +26,9 @@ const ANZEIGEN = [
   { typ: "zahlen", label: "Zahlen des Matches", x: 44, y: 494, b: 1832, h: 116 },
   { typ: "bestenliste", label: "Beste Spieler", x: 44, y: 636, b: 1046, h: 410, titel: "Beste Spieler" },
   { typ: "events", label: "Letzte Events", x: 1116, y: 636, b: 760, h: 410, titel: "Letzte Events" },
+  // Optionale Anzeigen: im Standard-Layout ausgeblendet
+  { typ: "teams", label: "Teams und Spieler", x: 44, y: 636, b: 1046, h: 410, titel: "Teams", aus: true },
+  { typ: "mvp", label: "MVP und Ranking (Endscreen)", x: 44, y: 138, b: 1832, h: 908, titel: "MVP", aus: true },
 ];
 const ANZEIGE = Object.fromEntries(ANZEIGEN.map((a) => [a.typ, a]));
 const HINTERGRUENDE = [["verlauf", "Verlauf (Standard)"], ["schwarz", "Schwarz"], ["gruen", "Grün (Chroma-Key)"], ["transparent", "Transparent (Alpha)"], ["farbe", "Eigene Farbe"], ["eigen", "Eigener Verlauf"], ["bild", "Eigenes Bild"]];
@@ -41,7 +46,7 @@ const VERLAUF_VORLAGEN = [
 ];
 const AUSRICHTUNG = ["links", "mitte", "rechts"];
 // Platzhalter in Texten: {spiel} wird zu „Counter-Strike 2“ usw.
-const PLATZHALTER = [["spiel", "Name des aktiven Spiels"], ["kurz", "Kürzel des Spiels"], ["session", "Name der Session"], ["team1", "Team links"], ["team2", "Team rechts"], ["score1", "Punkte links"], ["score2", "Punkte rechts"], ["uhrzeit", "Uhrzeit"], ["datum", "Datum"]];
+const PLATZHALTER = [["spiel", "Name des aktiven Spiels"], ["kurz", "Kürzel des Spiels"], ["session", "Name der Session"], ["team1", "Team links"], ["team2", "Team rechts"], ["score1", "Punkte links"], ["score2", "Punkte rechts"], ["runde", "Runde"], ["kills", "Kills im Match"], ["tode", "Tode im Match"], ["headshots", "Headshots im Match"], ["uhrzeit", "Uhrzeit"], ["datum", "Datum"]];
 
 const zahl = (v, std, min, max) => { const n = Math.round(Number(v)); return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : std; };
 // Größe der Fläche: ohne Angabe 1920×1080, nie kleiner als ein Element
@@ -66,7 +71,14 @@ const OPTIONEN = {
   zahlen: { labels: true },
   bestenliste: { zeilen: 0, kopf: true, textLeer: "Noch keine Spielerdaten." },
   events: { anzahl: 0, spieler: true, zeit: true, textLeer: "Noch keine Events." },
+  teams: { kopf: true, zahlen: true, textLeer: "Noch keine Spieler." },
+  mvp: { nurEnde: false, punkte: true, kd: true, headshots: true, team: true, zeilen: 0, textLeer: "Noch keine Spielerdaten.", textMvp: "MVP des Matches" },
 };
+// Spieler-Karte: welcher Spieler (quelle "rang" + rang oder PC-ID) und welche Zahlen
+const SPIELER_OPTIONEN = { team: true, seite: true, kills: true, tode: true, headshots: true, kd: true };
+// Einzelwert: welcher Wert (core/stats-screen.js WERTE), für Spielerwerte welcher Spieler, Beschriftung
+const WERT_KEYS = ["score1", "score2", "team1", "team2", "runde", "kills", "tode", "headshots", "aces", "sp.name", "sp.kills", "sp.tode", "sp.headshots", "sp.kd", "sp.team", "sp.seite"];
+const quelleVon = (v) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 60) : "rang");
 const OPTION_TEXT_MAX = 80;
 function migrateOptionen(typ, e) {
   const o = OPTIONEN[typ];
@@ -79,8 +91,8 @@ let zaehler = 0;
 const neueId = (p = "t") => `${p}${Date.now().toString(36)}${(zaehler++).toString(36)}`;
 
 function anzeigeStandard(a) {
-  const { typ, x, y, b, h, titel } = a;
-  return { id: typ, typ, x, y, b, h, sichtbar: true, skalieren: true, zoom: 100, ...(titel ? { titel } : {}), ...STIL, ...(OPTIONEN[typ] || {}) };
+  const { typ, x, y, b, h, titel, aus } = a;
+  return { id: typ, typ, x, y, b, h, sichtbar: !aus, skalieren: true, zoom: 100, ...(titel ? { titel } : {}), ...STIL, ...(OPTIONEN[typ] || {}) };
 }
 
 function neuerText(over = {}, flaeche) {
@@ -106,6 +118,21 @@ function standardVerlauf() {
   return JSON.parse(JSON.stringify(VERLAUF_VORLAGEN[0][1]));
 }
 
+// Spieler-Karte: Name, Team und Zahlen eines Spielers (bester, zweitbester … oder ein fester PC)
+function neuerSpieler(over = {}, flaeche) {
+  const F = flaecheVon(flaeche);
+  const b = Math.min(680, F.b), h = Math.min(170, F.h);
+  return { id: neueId("p"), typ: "spieler", x: Math.round((F.b - b) / 2), y: Math.round((F.h - h) / 2), b, h, sichtbar: true, quelle: "rang", rang: 1, ...SPIELER_OPTIONEN, ...STIL, ...over };
+}
+
+// Einzelwert: eine Zahl oder ein Name groß, z. B. Punkte links, Runde oder Kills eines Spielers
+function neuerWert(over = {}, flaeche) {
+  const F = flaecheVon(flaeche);
+  const b = Math.min(320, F.b), h = Math.min(180, F.h);
+  return { id: neueId("w"), typ: "wert", x: Math.round((F.b - b) / 2), y: Math.round((F.h - h) / 2), b, h, sichtbar: true, wert: "score1", quelle: "rang", rang: 1,
+    beschriftung: true, text: "", farbe: "#ffffff", ausrichtung: "mitte", panel: false, ...STIL, ...over };
+}
+
 function standardHg() {
   return { farbe: "#1b1922", verlauf: standardVerlauf(), bild: "", passung: "fuellen", abdunkeln: 0, verlaufDrueber: false };
 }
@@ -125,6 +152,8 @@ function einzelLayout(typ, flaeche) {
   const voll = { x: 0, y: 0, b: F.b, h: F.h };
   const elemente = ANZEIGEN.map(anzeigeStandard).map((e) => (e.typ === typ ? { ...e, ...voll } : { ...e, ...kasten(e, F), sichtbar: false }));
   if (typ === "text") elemente.push(neuerText({ ...voll, text: "{score1} : {score2}", groesse: Math.max(10, Math.min(400, Math.round(F.h * 0.6))) }, F));
+  if (typ === "spieler") elemente.push(neuerSpieler(voll, F));
+  if (typ === "wert") elemente.push(neuerWert(voll, F));
   return { hintergrund: "transparent", hg: standardHg(), bilder: {}, elemente };
 }
 
@@ -182,8 +211,10 @@ function farbeBei(v, pos) {
 // Wie stark der Inhalt eines Blocks skaliert: Anzeigen sind für ihre Standardgröße gestaltet.
 // Größer oder kleiner gezogen wächst oder schrumpft der Inhalt mit (kleinere Seite zählt, damit nichts abgeschnitten wird),
 // dazu der Zoom. → { f, b, h }: Faktor und die Größe, in der der Inhalt gesetzt wird (vor dem Skalieren)
+// Blöcke, die wie Anzeigen mit der Blockgröße skalieren: Gestaltungsgröße
+const BLOCK_BASIS = { spieler: { b: 680, h: 170 } };
 function inhaltsSkala(e) {
-  const a = ANZEIGE[e?.typ];
+  const a = ANZEIGE[e?.typ] || BLOCK_BASIS[e?.typ];
   if (!a) return { f: 1, b: e?.b || 0, h: e?.h || 0 };
   const auto = e.skalieren === false ? 1 : Math.min(e.b / a.b, e.h / a.h);
   const f = Math.min(5, Math.max(0.1, auto * (zahl(e.zoom, 100, ZOOM_MIN, ZOOM_MAX) / 100)));
@@ -206,7 +237,7 @@ function migrateLayout(l, flaeche) {
   const bilder = {};
   const nimmBild = (id) => { const k = bildId(id); if (k && istBild(quelle[k])) { bilder[k] = quelle[k]; return k; } return ""; };
   const gesehen = new Set(), out = [];
-  let texte = 0, bloecke = 0;
+  let texte = 0, bloecke = 0, karten = 0, werte = 0;
   const eigeneId = (e, p) => {
     const id = typeof e.id === "string" && e.id && !gesehen.has(e.id) && !ANZEIGE[e.id] ? e.id.slice(0, 40) : neueId(p);
     gesehen.add(id);
@@ -233,6 +264,17 @@ function migrateLayout(l, flaeche) {
         radius: zahl(e.radius, 0, 0, 540), panel: !!e.panel, ...migrateStil(e),
         ...(typeof e.name === "string" && e.name ? { name: e.name.slice(0, 60) } : {}),
       });
+    } else if (e.typ === "spieler") {
+      if (karten >= MAX_SPIELER) continue;
+      karten++;
+      out.push({ id: eigeneId(e, "p"), typ: "spieler", ...kasten(e, F), sichtbar: e.sichtbar !== false, quelle: quelleVon(e.quelle), rang: zahl(e.rang, 1, 1, 20),
+        ...Object.fromEntries(Object.keys(SPIELER_OPTIONEN).map((k) => [k, e[k] !== false])), ...migrateStil(e) });
+    } else if (e.typ === "wert") {
+      if (werte >= MAX_WERTE) continue;
+      werte++;
+      out.push({ id: eigeneId(e, "w"), typ: "wert", ...kasten(e, F), sichtbar: e.sichtbar !== false, wert: WERT_KEYS.includes(e.wert) ? e.wert : "score1",
+        quelle: quelleVon(e.quelle), rang: zahl(e.rang, 1, 1, 20), beschriftung: e.beschriftung !== false, text: typeof e.text === "string" ? e.text.slice(0, OPTION_TEXT_MAX) : "",
+        farbe: farbe(e.farbe, "#ffffff"), ausrichtung: AUSRICHTUNG.includes(e.ausrichtung) ? e.ausrichtung : "mitte", panel: !!e.panel, ...migrateStil(e) });
     } else if (ANZEIGE[e.typ] && !gesehen.has(e.typ)) {
       gesehen.add(e.typ);
       const a = ANZEIGE[e.typ];
@@ -298,6 +340,6 @@ function einrasten(k, andere, { raster = 0, abstand = 8, kanten = null, flaeche 
 }
 
 module.exports = {
-  STIL, OPTIONEN, OPTION_TEXT_MAX, migrateStil, B, H, MIN, MAX_TEXTE, MAX_BILDER, MAX_STOPPS, BILD_MAX, ZOOM_MIN, ZOOM_MAX, ANZEIGEN, ANZEIGE, HINTERGRUENDE, VERLAUF_ARTEN, VERLAUF_VORLAGEN, PASSUNGEN, AUSRICHTUNG, PLATZHALTER,
+  STIL, OPTIONEN, OPTION_TEXT_MAX, migrateStil, B, H, MIN, MAX_TEXTE, MAX_BILDER, MAX_SPIELER, MAX_WERTE, SPIELER_OPTIONEN, WERT_KEYS, neuerSpieler, neuerWert, MAX_STOPPS, BILD_MAX, ZOOM_MIN, ZOOM_MAX, ANZEIGEN, ANZEIGE, HINTERGRUENDE, VERLAUF_ARTEN, VERLAUF_VORLAGEN, PASSUNGEN, AUSRICHTUNG, PLATZHALTER,
   standardLayout, einzelLayout, flaecheVon, standardHg, migrateLayout, migrateVerlauf, neuerText, neuesBild, textEinsetzen, einrasten, verlaufCss, farbeBei, rgba, inhaltsSkala, istBild, bilderAufraeumen, neueId,
 };

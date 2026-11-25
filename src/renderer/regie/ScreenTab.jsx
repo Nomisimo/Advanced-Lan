@@ -7,11 +7,12 @@ import StatsAusgabe from "./StatsAusgabe.jsx";
 import ScreenLeiste from "./ScreenLeiste.jsx";
 import { screenVon } from "../../core/stats-screens.js";
 import { SPIEL_BY_ID } from "../../core/spiele.js";
-import { MIN, MAX_TEXTE, MAX_BILDER, ZOOM_MIN, ZOOM_MAX, OPTIONEN, OPTION_TEXT_MAX, ANZEIGE, HINTERGRUENDE, PASSUNGEN, PLATZHALTER, standardLayout, migrateLayout, neuerText, neuesBild, einrasten, bilderAufraeumen, neueId, inhaltsSkala } from "../../core/stats-layout.js";
+import { WERTE } from "../../core/stats-screen.js";
+import { MIN, MAX_TEXTE, MAX_BILDER, MAX_SPIELER, MAX_WERTE, SPIELER_OPTIONEN, neuerSpieler, neuerWert, ZOOM_MIN, ZOOM_MAX, OPTIONEN, OPTION_TEXT_MAX, ANZEIGE, HINTERGRUENDE, PASSUNGEN, PLATZHALTER, standardLayout, migrateLayout, neuerText, neuesBild, einrasten, bilderAufraeumen, neueId, inhaltsSkala } from "../../core/stats-layout.js";
 import { statsBeispiel } from "../../core/stats-beispiel.js";
 import HintergrundEditor, { Regler, durchscheinend } from "./HintergrundEditor.jsx";
 import { bildWaehlen, bildVorbereiten } from "./bild-laden.js";
-import { Type, Eye, EyeOff, Undo2, Redo2, RotateCcw, Copy, Trash2, ArrowUpToLine, ArrowDownToLine, AlignLeft, AlignCenter, AlignRight, Cast, Move, ImagePlus, Image as ImageIcon, Scaling } from "lucide-react";
+import { Type, UserSquare, Hash, Eye, EyeOff, Undo2, Redo2, RotateCcw, Copy, Trash2, ArrowUpToLine, ArrowDownToLine, AlignLeft, AlignCenter, AlignRight, Cast, Move, ImagePlus, Image as ImageIcon, Scaling } from "lucide-react";
 
 // Editor der Game-Stats-Screens: mehrere Screens, jeder mit eigener Größe in Pixeln (Standard 1920×1080) und eigener NDI-Quelle.
 // Anzeigen und Texte per Drag and Drop auf der Fläche anordnen, Größe an den Griffen ändern, Texte schreiben.
@@ -25,8 +26,12 @@ const MAX_HOEHE = 620; // höchste Höhe der Arbeitsfläche in Bildschirm-Pixeln
 const MAX_ZOOM = 4; // kleine Screens werden höchstens vierfach vergrößert gezeigt
 const KARO = "repeating-conic-gradient(#3a3647 0% 25%, #23212c 0% 50%) 0 0 / 16px 16px"; // durchsichtiger Hintergrund
 
-const elLabel = (e) => (e.typ === "text" ? (e.text || "").split("\n")[0].slice(0, 28) || "Leerer Text" : e.typ === "bild" ? e.name || "Bild" : ANZEIGE[e.typ]?.label || e.typ);
-const eigen = (e) => e?.typ === "text" || e?.typ === "bild"; // eigene Blöcke: löschen statt ausblenden
+const quelleText = (e) => (e.quelle && e.quelle !== "rang" ? e.quelle : `Platz ${e.rang || 1}`);
+const WERT_LABEL = Object.fromEntries(WERTE.map(([k, l]) => [k, l]));
+const elLabel = (e) => (e.typ === "text" ? (e.text || "").split("\n")[0].slice(0, 28) || "Leerer Text" : e.typ === "bild" ? e.name || "Bild"
+  : e.typ === "spieler" ? `Spieler: ${quelleText(e)}` : e.typ === "wert" ? `Wert: ${WERT_LABEL[e.wert] || e.wert}${String(e.wert).startsWith("sp.") ? ` (${quelleText(e)})` : ""}` : ANZEIGE[e.typ]?.label || e.typ);
+const EIGEN = new Set(["text", "bild", "spieler", "wert"]);
+const eigen = (e) => EIGEN.has(e?.typ); // eigene Blöcke: löschen statt ausblenden
 const gleich = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 function useBreite(ref) {
@@ -116,6 +121,10 @@ function Editor({ cfg, mutate, status, log, screen }) {
   const gewaehlt = layout.elemente.find((e) => e.id === auswahl) || null;
   const texte = layout.elemente.filter((e) => e.typ === "text").length;
   const bildBloecke = layout.elemente.filter((e) => e.typ === "bild").length;
+  const karten = layout.elemente.filter((e) => e.typ === "spieler").length;
+  const wertBloecke = layout.elemente.filter((e) => e.typ === "wert").length;
+  // Neuer Block (Spieler-Karte oder Wert)
+  const blockNeu = (el) => { setzen({ ...layoutRef.current, elemente: [...layoutRef.current.elemente, el] }); setAuswahl(el.id); };
   const [bildFehler, setBildFehler] = useState("");
   // Bild laden (verkleinert) → { id, url, b, h } oder null
   const bildLaden = async (file) => {
@@ -181,6 +190,9 @@ function Editor({ cfg, mutate, status, log, screen }) {
     const pos = { x: Math.min(B - e.b, e.x + 30), y: Math.min(H - e.h, e.y + 30) };
     if (e?.typ === "text") textNeu({ ...e, id: undefined, ...pos });
     if (e?.typ === "bild" && bildBloecke < MAX_BILDER) { const n = { ...e, ...pos, id: neueId("i") }; setzen({ ...layout, elemente: [...layout.elemente, n] }); setAuswahl(n.id); }
+    // Spieler-Karte: gleich der nächste Platz
+    if (e?.typ === "spieler" && karten < MAX_SPIELER) blockNeu({ ...e, ...pos, id: neueId("p"), ...(e.quelle === "rang" ? { rang: Math.min(20, (e.rang || 1) + 1) } : {}) });
+    if (e?.typ === "wert" && wertBloecke < MAX_WERTE) blockNeu({ ...e, ...pos, id: neueId("w") });
   };
   const ebene = (e, richtung) => {
     const l = layout.elemente.filter((x) => x.id !== e.id);
@@ -262,6 +274,12 @@ function Editor({ cfg, mutate, status, log, screen }) {
   const bsp = useMemo(() => statsBeispiel(spiel), [spiel?.id]);
   const vStatus = beispiel ? { ...status, ...bsp.regie } : status;
   const vLog = beispiel ? bsp.log : log;
+  // PCs zur Auswahl für Spieler-Karten und Spielerwerte: verbundene PCs der Session (mit Spielername), dazu die der Beispieldaten
+  const pcListe = useMemo(() => {
+    const m = new Map();
+    for (const st of [status, beispiel ? bsp.regie : null]) for (const p of st?.pcs || []) if (!p.sim && !m.has(p.pcId)) m.set(p.pcId, st.namen?.[p.pcId] || p.spieler || "");
+    return [...m].map(([pcId, name]) => ({ pcId, name }));
+  }, [status?.pcs, status?.namen, beispiel, bsp]);
 
 
   return (
@@ -271,6 +289,8 @@ function Editor({ cfg, mutate, status, log, screen }) {
           <button style={S.secondaryBtn} disabled={!redo.length} onClick={wiederholen} title="Wiederholen (Strg+Y)"><Redo2 size={14} /></button>
           <button style={S.secondaryBtn} onClick={zuruecksetzen} title="Standard-Layout"><RotateCcw size={14} /> Standard</button>
           <button style={S.secondaryBtn} disabled={bildBloecke >= MAX_BILDER} onClick={() => bildNeu()} title={`Bild als eigenen Block (höchstens ${MAX_BILDER}), auch per Drag and Drop auf die Fläche`}><ImagePlus size={14} /> Bild hinzufügen</button>
+          <button style={S.secondaryBtn} disabled={karten >= MAX_SPIELER} onClick={() => blockNeu(neuerSpieler({ rang: karten + 1 }, F))} title={`Name, Team und Zahlen eines Spielers (höchstens ${MAX_SPIELER})`} data-testid="spieler-neu"><UserSquare size={14} /> Spieler-Karte</button>
+          <button style={S.secondaryBtn} disabled={wertBloecke >= MAX_WERTE} onClick={() => blockNeu(neuerWert({}, F))} title={`Eine Zahl oder ein Name groß, z. B. Punkte, Runde oder Kills eines Spielers (höchstens ${MAX_WERTE})`} data-testid="wert-neu"><Hash size={14} /> Wert</button>
           <button style={S.primaryBtn} disabled={texte >= MAX_TEXTE} onClick={() => textNeu()}><Type size={14} /> Text hinzufügen</button>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", fontSize: 12, color: SUB, marginBottom: 10 }}>
@@ -326,7 +346,7 @@ function Editor({ cfg, mutate, status, log, screen }) {
 
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <Elemente layout={layout} auswahl={auswahl} setAuswahl={setAuswahl} sichtbar={(e, v) => elAendern(e.id, { sichtbar: v })} />
-            {gewaehlt ? <Eigenschaften e={gewaehlt} F={F} bilder={layout.bilder} aendern={(patch) => elAendern(gewaehlt.id, patch)} tippen={(patch) => {
+            {gewaehlt ? <Eigenschaften e={gewaehlt} F={F} pcs={pcListe} bilder={layout.bilder} aendern={(patch) => elAendern(gewaehlt.id, patch)} tippen={(patch) => {
               // Tippen: ein Rückgängig-Schritt pro Feldbesuch, nicht pro Taste
               elAendern(gewaehlt.id, patch, punktNehmen(null));
             }} fokus={fokus} stilAlle={stilAlle} bildErsetzen={() => bildErsetzen(gewaehlt)} originalFormat={() => originalFormat(gewaehlt)}
@@ -355,7 +375,7 @@ function Elemente({ layout, auswahl, setAuswahl, sichtbar }) {
               style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", fontSize: 12, cursor: "pointer", borderBottom: `1px solid ${LINE}`, background: an ? "rgba(157,92,255,.16)" : "transparent", color: e.sichtbar ? "#ece9f2" : MUTED }}>
               <button title={e.sichtbar ? "Ausblenden" : "Einblenden"} onClick={(ev) => { ev.stopPropagation(); sichtbar(e, !e.sichtbar); }}
                 style={{ background: "transparent", border: "none", color: e.sichtbar ? ACCENT_HI : MUTED, cursor: "pointer", padding: 0, display: "inline-flex" }}>{e.sichtbar ? <Eye size={14} /> : <EyeOff size={14} />}</button>
-              {e.typ === "text" ? <Type size={13} color={SUB} /> : e.typ === "bild" ? <ImageIcon size={13} color={SUB} /> : <span style={{ width: 13 }} />}
+              {e.typ === "text" ? <Type size={13} color={SUB} /> : e.typ === "bild" ? <ImageIcon size={13} color={SUB} /> : e.typ === "spieler" ? <UserSquare size={13} color={SUB} /> : e.typ === "wert" ? <Hash size={13} color={SUB} /> : <span style={{ width: 13 }} />}
               <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: an ? 700 : 400 }}>{elLabel(e)}</span>
             </div>
           );
@@ -375,6 +395,9 @@ const OPTION_INFO = {
   labels: "Beschriftung unter den Zahlen",
   zeilen: ["Zeilen", "0 = automatisch nach Höhe"], kopf: "Spaltenköpfe zeigen", textLeer: ["Text ohne Daten", "Leer = nichts"],
   anzahl: ["Anzahl Events", "0 = automatisch nach Höhe"], spieler: "Spieler/Team zeigen", zeit: "Uhrzeit zeigen",
+  zahlen: "Kills/Tode neben den Namen",
+  nurEnde: "Erst am Matchende zeigen", punkte: "Spalte Punkte", kd: "Spalte K/D", headshots: "Spalten Headshots und HS %", team: "Team zeigen",
+  textMvp: ["Text unter dem MVP", "Leer = nur das Team"],
 };
 function Optionen({ e, aendern, tippen, fokus }) {
   const o = OPTIONEN[e.typ];
@@ -404,9 +427,9 @@ function Optionen({ e, aendern, tippen, fokus }) {
 }
 
 // Darstellung, die jedes Element hat: Deckkraft, Kachel-Transparenz, Ecken, Rahmen, Farben
-const MIT_KACHEL = new Set(["spielstand", "zahlen", "bestenliste", "events"]);
+const MIT_KACHEL = new Set(["spielstand", "zahlen", "bestenliste", "events", "teams", "spieler", "mvp"]);
 function Darstellung({ e, tippen, aendern, fokus, stilAlle }) {
-  const kachel = MIT_KACHEL.has(e.typ) || ((e.typ === "text" || e.typ === "bild") && e.panel);
+  const kachel = MIT_KACHEL.has(e.typ) || ((e.typ === "text" || e.typ === "bild" || e.typ === "wert") && e.panel);
   const farbFeld = (k, label, std) => (
     <Field label={label}>
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -424,7 +447,7 @@ function Darstellung({ e, tippen, aendern, fokus, stilAlle }) {
         <Regler label="Ecken der Kachel" wert={e.ecken ?? 18} max={80} einheit=" px" fokus={fokus} onChange={(v) => tippen({ ecken: v })} />
         <Toggle checked={e.rahmen !== false} onChange={(v) => aendern({ rahmen: v })} label="Rahmen und Leuchten" />
       </>}
-      {ANZEIGE[e.typ] && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+      {(ANZEIGE[e.typ] || e.typ === "spieler") && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
         {farbFeld("schrift", "Schriftfarbe", "#ffffff")}
         {farbFeld("akzent", "Akzentfarbe", "#c39bff")}
       </div>}
@@ -433,10 +456,30 @@ function Darstellung({ e, tippen, aendern, fokus, stilAlle }) {
   );
 }
 
-function Eigenschaften({ e, F, bilder, aendern, tippen, fokus, duplizieren, entfernen, ebene, bildErsetzen, originalFormat, stilAlle }) {
+// Spieler wählen: nach Platz (bester, zweitbester …) oder ein fester PC
+function SpielerWahl({ e, pcs, aendern }) {
+  const fest = e.quelle && e.quelle !== "rang";
+  const liste = fest && !pcs.some((p) => p.pcId === e.quelle) ? [...pcs, { pcId: e.quelle, name: "" }] : pcs;
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 90px", gap: 8 }}>
+      <Field label="Spieler">
+        <select style={S.selectSm} value={fest ? e.quelle : "rang"} data-testid="spieler-quelle" onChange={(ev) => aendern({ quelle: ev.target.value })}>
+          <option value="rang">Nach Platz (die meisten Kills)</option>
+          {liste.map((p) => <option key={p.pcId} value={p.pcId}>{p.pcId}{p.name && p.name !== p.pcId ? ` · ${p.name}` : ""}</option>)}
+        </select>
+      </Field>
+      {!fest ? <Zahl label="Platz" wert={e.rang || 1} min={1} max={20} onChange={(v) => aendern({ rang: Math.max(1, Math.min(20, v)) })} />
+        : <Field label="PC-ID"><input style={S.inputSm} defaultValue={e.quelle} key={e.quelle} onBlur={(ev) => ev.target.value.trim() && aendern({ quelle: ev.target.value.trim() })} /></Field>}
+    </div>
+  );
+}
+
+const SPIELER_INFO = { team: "Team zeigen", seite: "Seite zeigen (Valorant: Angriff/Verteidigung)", kills: "Kills", tode: "Tode", headshots: "Headshots", kd: "K/D" };
+
+function Eigenschaften({ e, F, pcs = [], bilder, aendern, tippen, fokus, duplizieren, entfernen, ebene, bildErsetzen, originalFormat, stilAlle }) {
   const { b: B, h: H } = F;
   const ta = useRef(null);
-  const text = e.typ === "text", bild = e.typ === "bild", anzeige = !!ANZEIGE[e.typ];
+  const text = e.typ === "text", bild = e.typ === "bild", anzeige = !!ANZEIGE[e.typ], karte = e.typ === "spieler", wert = e.typ === "wert";
   const skala = inhaltsSkala(e);
   const platzhalter = (k) => {
     const el = ta.current, ein = `{${k}}`;
@@ -448,7 +491,37 @@ function Eigenschaften({ e, F, bilder, aendern, tippen, fokus, duplizieren, entf
   const ausr = [["links", AlignLeft], ["mitte", AlignCenter], ["rechts", AlignRight]];
   return (
     <div style={{ border: `1px solid ${ACCENT}`, borderRadius: 8, background: FELD, padding: 12, boxShadow: GLOW, display: "flex", flexDirection: "column", gap: 10 }} data-testid="eigenschaften">
-      <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700, fontSize: 13 }}>{text ? <Type size={14} /> : bild ? <ImageIcon size={14} /> : <Cast size={14} />} {text ? "Text" : bild ? "Bild" : ANZEIGE[e.typ]?.label}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700, fontSize: 13 }}>{text ? <Type size={14} /> : bild ? <ImageIcon size={14} /> : karte ? <UserSquare size={14} /> : wert ? <Hash size={14} /> : <Cast size={14} />} {text ? "Text" : bild ? "Bild" : karte ? "Spieler-Karte" : wert ? "Wert" : ANZEIGE[e.typ]?.label}</div>
+      {karte && <>
+        <SpielerWahl e={e} pcs={pcs} aendern={aendern} />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5 }}>
+          {Object.keys(SPIELER_OPTIONEN).map((k) => <Toggle key={k} checked={e[k] !== false} onChange={(v) => aendern({ [k]: v })} label={SPIELER_INFO[k]} />)}
+        </div>
+        <Toggle checked={e.skalieren !== false} onChange={(v) => aendern({ skalieren: v })} label="Inhalt skaliert mit der Blockgröße" />
+      </>}
+      {wert && <>
+        <Field label="Wert">
+          <select style={S.selectSm} value={e.wert} data-testid="wert-wahl" onChange={(ev) => aendern({ wert: ev.target.value })}>
+            <optgroup label="Match">{WERTE.filter((w) => !w[2]).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</optgroup>
+            <optgroup label="Ein Spieler">{WERTE.filter((w) => w[2]).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</optgroup>
+          </select>
+        </Field>
+        {String(e.wert).startsWith("sp.") && <SpielerWahl e={e} pcs={pcs} aendern={aendern} />}
+        <Toggle checked={e.beschriftung !== false} onChange={(v) => aendern({ beschriftung: v })} label="Beschriftung darunter" />
+        {e.beschriftung !== false && <Field label="Eigene Beschriftung" hint="Leer = Standard (z. B. „Kills“)">
+          <input style={S.inputSm} value={e.text} maxLength={80} onFocus={fokus} onChange={(ev) => tippen({ text: ev.target.value })} />
+        </Field>}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <Field label="Farbe"><input type="color" value={e.farbe} onChange={(ev) => aendern({ farbe: ev.target.value })} style={{ width: 40, height: 24, border: "none", background: "transparent", padding: 0, cursor: "pointer" }} /></Field>
+          <Field label="Ausrichtung">
+            <div style={{ display: "flex", gap: 3 }}>{ausr.map(([k, Ic]) => (
+              <button key={k} title={k} onClick={() => aendern({ ausrichtung: k })} style={{ ...S.smallBtn, flex: 1, padding: "5px 0", ...(e.ausrichtung === k ? { background: ACCENT, borderColor: ACCENT } : {}) }}><Ic size={13} /></button>
+            ))}</div>
+          </Field>
+        </div>
+        <Toggle checked={e.panel} onChange={(v) => aendern({ panel: v })} label="Mit Hintergrund-Kachel" />
+        <div style={{ fontSize: 11, color: MUTED }}>Die Schrift passt sich der Blockgröße an.</div>
+      </>}
       {text && <>
         <Field label="Text" hint="Mehrzeilig möglich. Platzhalter werden live ersetzt.">
           <textarea ref={ta} data-testid="text-eingabe" style={{ ...S.inputSm, minHeight: 72, resize: "vertical", fontFamily: "inherit" }} value={e.text} maxLength={500}

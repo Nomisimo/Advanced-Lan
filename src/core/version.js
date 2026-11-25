@@ -6,6 +6,12 @@ const REPO = "Nomisimo/Advanced-Lan";
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
+  "1.0.4": [
+    "Stats-Screen: neues Element „MVP und Ranking“ als Endscreen. Der beste Spieler groß mit Krone, darunter alle Spieler mit Kills, Tode, K/D, Headshots, HS-Quote und Punkten. Auf Wunsch erst am Matchende sichtbar",
+    "Stats-Screen: neue Elemente „Teams und Spieler“ (Valorant mit Shots Fired: Namen beider Teams aus ui_team_order), „Spieler-Karte“ (nach Platz oder fester PC) und „Wert“ (eine einzelne Zahl groß, z. B. Punkte, Runde oder Kills eines Spielers)",
+    "Neue Platzhalter für Texte: {runde}, {kills}, {tode}, {headshots}",
+    "Game-PCs schicken Team, Seite, Spielerlisten und Zähler von Shots Fired an die Regie",
+  ],
   "1.0.3": [
     "Mehrere Stats-Screens (bis zu 8): jeder mit eigener Größe in Pixeln (Full HD, 4K, Hochkant, Bauchbinde, Spielstand-Leiste, kleines Element oder frei), eigenem Layout, eigenem Pop-out-Fenster und eigener NDI-Quelle",
     "Einzelne Elemente streamen: neuer Screen mit Inhalt „Nur: Spielstand“ (oder ein anderes Element), „Ganzen Screen füllen“ und Hintergrund „Transparent (Alpha)“. Die NDI-Quelle sendet dann mit Alpha-Kanal, vMix und OBS brauchen keinen Key",

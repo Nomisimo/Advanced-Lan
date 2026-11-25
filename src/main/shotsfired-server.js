@@ -9,7 +9,9 @@ const MAX_BODY = 64 * 1024;
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS', 'Access-Control-Allow-Headers': '*' };
 
 class ShotsFiredServer {
-  constructor({ onEvent, onChange, onTeam }) {
+  // onInfo(info): Valorant-Infos (Seite, Team, Spieler beider Teams, Zähler) haben sich geändert, für die Regie und den Stats-Screen
+  constructor({ onEvent, onChange, onTeam, onInfo }) {
+    this.onInfo = onInfo || (() => {});
     this.onEvent = onEvent;
     this.onTeam = onTeam || (() => {});
     this.onChange = onChange || (() => {});
@@ -67,6 +69,7 @@ class ShotsFiredServer {
 
   verarbeiten(daten, { methode = 'POST', pfad = '/' } = {}) {
     const teamVorher = this.team();
+    const infoVorher = JSON.stringify(this.valorantInfo());
     const { spiel, nachrichten } = shotsfiredNachrichten(daten, pfad, this.z);
     this.anfragen++;
     const text = typeof daten === 'string' ? daten : JSON.stringify(daten);
@@ -76,6 +79,7 @@ class ShotsFiredServer {
     // Neues Team zuerst, damit die Events schon mit dem richtigen Team laufen
     if (this.team() !== teamVorher) this.onTeam(this.team());
     for (const n of nachrichten) this.onEvent({ spiel, ...n });
+    if (JSON.stringify(this.valorantInfo()) !== infoVorher) this.onInfo(this.valorantInfo());
     this.onChange();
   }
 
@@ -92,6 +96,13 @@ class ShotsFiredServer {
     if (!i.seite) this.letztesTeam = '';
     else if (i.team) this.letztesTeam = i.team;
     return this.letztesTeam || '';
+  }
+
+  // Was Shots Fired über das laufende Valorant-Match weiß: Seite, Team, Spieler beider Teams und die Zähler (null = noch nichts gemeldet)
+  valorantInfo() {
+    const z = this.z.valorant?.z || {};
+    const zahl = (v) => (Number.isFinite(v) ? v : null);
+    return { ...sfInfo(this.z.valorant), team: this.team(), kills: zahl(z.kills), deaths: zahl(z.deaths), headshots: zahl(z.headshots), runde: zahl(z.runde) };
   }
 
   status() {

@@ -4,7 +4,7 @@ import { api } from "./api.js";
 import { APP_ICON } from "./Kopf.jsx";
 import { EventIcon, eventLabel, zeit } from "./ui.jsx";
 import { SPIEL_BY_ID } from "../core/spiele.js";
-import { statsDaten, statsEvents } from "../core/stats-screen.js";
+import { statsDaten, statsEvents, spielerDaten, spielerWahl, teamListen, wertVon, WERT_KURZ, kd } from "../core/stats-screen.js";
 import { migrateLayout, textEinsetzen, verlaufCss, inhaltsSkala } from "../core/stats-layout.js";
 import { screenVon, leseStatsHash } from "../core/stats-screens.js";
 import { Crown, Trophy } from "lucide-react";
@@ -141,15 +141,19 @@ function Spielstand({ d, spiel, h, o, tx }) {
 
 const zwei = (n) => String(n).padStart(2, "0");
 // Werte für Platzhalter in Texten ({spiel}, {session}, …)
-export function textWerte({ spiel, d, cfg, jetzt }) {
+export function textWerte({ spiel, d, cfg, jetzt, statistik, stand }) {
   const t = new Date(jetzt);
+  const m = statistik?.spiel === spiel?.id ? statistik?.match || {} : {};
   return {
+    runde: wertVon("runde", { statistik: statistik?.spiel === spiel?.id ? statistik : null, stand }).replace("–", ""),
+    kills: m.kills ?? "", tode: m.tode ?? "", headshots: m.headshots ?? "",
     spiel: spiel?.name || "", kurz: spiel?.kurz || "", session: cfg?.regie?.session?.name || "",
     team1: d.teams?.[0]?.name || "", team2: d.teams?.[1]?.name || "", score1: d.teams?.[0]?.score ?? "", score2: d.teams?.[1]?.score ?? "",
     uhrzeit: `${zwei(t.getHours())}:${zwei(t.getMinutes())}`, datum: `${zwei(t.getDate())}.${zwei(t.getMonth() + 1)}.${t.getFullYear()}`,
   };
 }
 
+const WERT_SP = (k) => String(k).startsWith("sp.");
 const JUSTIFY = { links: "flex-start", mitte: "center", rechts: "flex-end" };
 function TextElement({ el, werte }) {
   const inhalt = (
@@ -159,6 +163,73 @@ function TextElement({ el, werte }) {
   );
   const box = { width: "100%", height: "100%", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: JUSTIFY[el.ausrichtung], overflow: "hidden" };
   return el.panel ? <Panel style={{ ...box, padding: "0 30px" }}>{inhalt}</Panel> : <div style={box}>{inhalt}</div>;
+}
+
+// Teams mit ihren Spielern (Valorant mit Shots Fired: Namen aus ui_team_order beider Teams)
+function TeamsAnzeige({ teams, titel, o, tx }) {
+  const zelle = { padding: "6px 12px", fontSize: 26, borderBottom: `1px solid ${LINE}` };
+  const leer = teams.every((t) => !t.spieler.length);
+  return (
+    <Panel style={{ height: "100%", boxSizing: "border-box", padding: "26px 32px", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+      {titel && <Titel>{titel}</Titel>}
+      {leer ? <div style={{ fontSize: 26, color: MUTED, fontStyle: "italic" }}>{tx(opt(o, "textLeer", "Noch keine Spieler."))}</div> : (
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(teams.length, 3)}, minmax(0,1fr))`, gap: 26, flex: 1, minHeight: 0 }}>
+          {teams.slice(0, 3).map((t) => {
+            const f = teamFarbe(t.name);
+            return (
+              <div key={t.name} style={{ minWidth: 0, overflow: "hidden" }}>
+                {o.kopf !== false && <div style={{ fontSize: 30, fontWeight: 800, color: f, letterSpacing: 2, borderBottom: `3px solid ${f}`, paddingBottom: 6, marginBottom: 4, textShadow: `0 0 14px ${f}88`, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</div>}
+                {t.spieler.map((p) => (
+                  <div key={p.name} style={{ ...zelle, display: "flex", gap: 12, alignItems: "center", borderLeft: `4px solid ${f}` }}>
+                    <span style={{ flex: 1, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
+                    {o.zahlen !== false && p.kills != null && <span style={{ fontSize: 22, color: SUB, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}><b style={{ color: TXT }}>{p.kills}</b> / {p.tode ?? 0}</span>}
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+// Spieler-Karte: Name, Team und Zahlen eines Spielers
+function SpielerKarte({ el, sp }) {
+  const f = sp?.team ? teamFarbe(sp.team) : ACCENT;
+  const zahlen = [["kills", "Kills", sp?.kills], ["tode", "Tode", sp?.tode], ["headshots", "HS", sp?.headshots], ["kd", "K/D", sp ? kd(sp) : null]].filter(([k]) => el[k] !== false);
+  const unter = [el.team !== false && sp?.team, el.seite !== false && sp?.seite].filter(Boolean).join(" · ");
+  return (
+    <Panel style={{ width: "100%", height: "100%", boxSizing: "border-box", display: "flex", alignItems: "center", gap: 24, padding: "0 28px 0 0", overflow: "hidden", position: "relative" }}>
+      <div style={{ alignSelf: "stretch", width: 10, background: f, boxShadow: `0 0 20px ${f}` }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 44, fontWeight: 800, color: TXT, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sp ? sp.name : "Kein Spieler"}</div>
+        {unter && <div style={{ fontSize: 22, fontWeight: 700, color: f, letterSpacing: 1, textTransform: "uppercase", marginTop: 4, whiteSpace: "nowrap" }}>{unter}</div>}
+      </div>
+      {zahlen.map(([k, l, v]) => (
+        <div key={k} style={{ textAlign: "center", minWidth: 70 }}>
+          <div style={{ fontSize: 46, fontWeight: 800, lineHeight: 1, color: k === "kills" ? AKZ : TXT, fontVariantNumeric: "tabular-nums" }}>{v ?? "–"}</div>
+          <div style={{ fontSize: 16, color: SUB, textTransform: "uppercase", letterSpacing: 1, marginTop: 6 }}>{l}</div>
+        </div>
+      ))}
+    </Panel>
+  );
+}
+
+// Einzelwert: groß, passt sich der Blockgröße an (Schrift aus Höhe und Länge)
+function WertElement({ el, wert }) {
+  const label = el.beschriftung !== false ? el.text || WERT_KURZ[el.wert] || "" : "";
+  const h = el.h - (el.panel ? 20 : 0), b = el.b - (el.panel ? 40 : 0);
+  const lh = label ? Math.max(10, Math.min(48, h * 0.2)) : 0;
+  const g = Math.max(10, Math.min((h - lh * 1.3) * 0.82, b / Math.max(1, String(wert).length * 0.62)));
+  const inhalt = (
+    <div style={{ width: "100%", textAlign: el.ausrichtung === "mitte" ? "center" : el.ausrichtung === "rechts" ? "right" : "left" }}>
+      <div style={{ fontSize: g, fontWeight: 800, lineHeight: 1, color: el.farbe, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", textShadow: `0 0 18px ${el.farbe}55` }}>{wert}</div>
+      {label && <div style={{ fontSize: lh, color: SUB, textTransform: "uppercase", letterSpacing: 1.5, marginTop: lh * 0.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</div>}
+    </div>
+  );
+  const box = { width: "100%", height: "100%", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: JUSTIFY[el.ausrichtung], overflow: "hidden" };
+  return el.panel ? <Panel style={{ ...box, padding: "0 20px" }}>{inhalt}</Panel> : <div style={box}>{inhalt}</div>;
 }
 
 const OBJECT_FIT = { fuellen: "cover", einpassen: "contain", strecken: "fill" };
@@ -216,6 +287,9 @@ export function ElementInhalt({ el, ctx }) {
     case "bestenliste": return <Bestenliste d={d} mitTeam={!!d.teams} titel={tx(el.titel || "")} o={el} tx={tx} zeilen={el.zeilen || Math.max(1, Math.floor((el.h - (el.titel ? 140 : 100)) / 54))} />;
     case "events": return <LetzteEvents titel={tx(el.titel || "")} o={el} tx={tx} events={statsEvents(log, spiel?.id, el.anzahl || Math.max(1, Math.min(12, Math.floor((el.h - (el.titel ? 100 : 60)) / 56))), namen)} />;
     case "text": return <TextElement el={el} werte={werte} />;
+    case "teams": return <TeamsAnzeige teams={ctx.teams} titel={tx(el.titel || "")} o={el} tx={tx} />;
+    case "spieler": return <SpielerKarte el={el} sp={spielerWahl(ctx.liste, el.quelle, el.rang)} />;
+    case "wert": return <WertElement el={el} wert={wertVon(el.wert, { d, statistik: ctx.statistik, stand: ctx.stand, sp: WERT_SP(el.wert) ? spielerWahl(ctx.liste, el.quelle, el.rang) : null })} />;
     case "bild": return <BildElement el={el} bilder={ctx.bilder} />;
     default: return null;
   }
@@ -263,7 +337,9 @@ export function buehnenDaten({ status, cfg, log, jetzt }) {
   const spiel = SPIEL_BY_ID[status?.aktivesSpiel || cfg?.regie?.aktivesSpiel];
   const d = statsDaten(spiel, status?.statistik, status?.stand);
   const live = !!(status?.stand?.t && jetzt - status.stand.t < FRISCH);
-  return { spiel, d, live, log, cfg, namen: status?.namen || {}, werte: textWerte({ spiel, d, cfg, jetzt }), bilder: {} };
+  const statistik = status?.statistik?.spiel === spiel?.id ? status.statistik : null;
+  return { spiel, d, live, log, cfg, namen: status?.namen || {}, werte: textWerte({ spiel, d, cfg, jetzt, statistik, stand: status?.stand }), bilder: {},
+    statistik, stand: status?.stand, liste: spielerDaten(status, spiel?.id), teams: teamListen(status, spiel) };
 }
 
 // screen: Eintrag aus cfg.regie.stats.screens (Größe und Layout), layout: statt des gespeicherten (Editor)

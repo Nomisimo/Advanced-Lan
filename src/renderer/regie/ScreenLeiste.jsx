@@ -7,7 +7,7 @@ import { MAX_SCREENS, GROESSE_MIN, GROESSE_MAX, NAME_MAX, FORMATE, neuerScreen, 
 import { Plus, Copy, Trash2, Monitor, X, Check } from "lucide-react";
 
 // Vorlagen für einen neuen Screen: alle Anzeigen oder nur ein Element, das den ganzen Screen füllt
-const VORLAGEN = [["standard", "Alle Anzeigen (Standard-Layout)"], ["leer", "Leer (nur Hintergrund)"], ...ANZEIGEN.map((a) => [a.typ, `Nur: ${a.label}`]), ["text", "Nur: eigener Text"]];
+const VORLAGEN = [["standard", "Alle Anzeigen (Standard-Layout)"], ["leer", "Leer (nur Hintergrund)"], ...ANZEIGEN.map((a) => [a.typ, `Nur: ${a.label}`]), ["spieler", "Nur: Spieler-Karte"], ["wert", "Nur: einzelner Wert (Zahl)"], ["text", "Nur: eigener Text"]];
 
 const kopie = (x) => JSON.parse(JSON.stringify(x));
 

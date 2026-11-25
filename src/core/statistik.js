@@ -127,7 +127,9 @@ class Statistik {
       .sort((a, b) => wert(b) - wert(a) || a.name.localeCompare(b.name)).slice(0, this.spiel === "rl" ? 6 : 5);
     const anzeige = (n) => (n ? name(n) || n : n);
     const m = this.match;
-    return { spiel: this.spiel, runde: { ...this.runde, mvp: anzeige(this.runde.mvp) }, letzteRunde: this.letzteRunde && { ...this.letzteRunde, mvp: anzeige(this.letzteRunde.mvp) },
+    // alle: jeder Spieler mit seinen Zahlen (Spieler-Karten, Teams und Einzelwerte auf dem Stats-Screen)
+    const alle = [...this.spieler.values()].map((p) => ({ ...p, id: p.name, name: name(p.name) || p.name }));
+    return { spiel: this.spiel, alle, runde: { ...this.runde, mvp: anzeige(this.runde.mvp) }, letzteRunde: this.letzteRunde && { ...this.letzteRunde, mvp: anzeige(this.letzteRunde.mvp) },
       match: { ...m, siege: { ...m.siege }, tore: { ...m.tore }, letztesTor: m.letztesTor && { ...m.letztesTor, spieler: anzeige(m.letztesTor.spieler) } }, top };
   }
 }

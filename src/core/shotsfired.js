@@ -10,8 +10,9 @@
 // liest zerlegen() auch andere übliche Formen, und der Empfänger schreibt jede Anfrage mit (Setup → „Letzte Anfragen“).
 //
 // Valorant (OW-Electron-Doku, supported-games/valorant):
-// Manche Shots-Fired-Versionen bieten für Valorant nur kills, deaths, round_number, team, map und game_mode an. Die Zähler
-// kills und deaths werden dann zu Kill (mit Ace) und Tod, eine neue round_number zum Rundenstart (siehe shotsfiredEvents).
+// Manche Shots-Fired-Versionen bieten für Valorant nur Zähler und Infos an: kills, deaths, headshots, round_number, team,
+// ui_team_order_allies / _enemies, map und game_mode. Die Zähler werden zu Kill (mit Ace), Tod und Headshot, eine neue
+// round_number zum Rundenstart. team und ui_team_order zeigt das Setup an, aus team folgt notfalls das Team dieses PCs.
 // - Events: match_start, match_end, kill, death, assist, headshot, spike_planted, spike_defused, spike_detonated
 // - Info-Updates: round_phase (shopping, combat, end), score / match_score ({ won, lost } aus Sicht dieses Spielers)
 // Rundenstart, Rundenende, Rundengewinner und Matchgewinner gibt es für Valorant nicht als Event (anders als bei R6 oder OW2):
@@ -45,9 +46,13 @@ const SF_EVENTS = {
 };
 const SCORE_KEYS = ["score", "match_score"];
 // Valorant: Events und Info-Updates, die gelesen werden (kill_feed kommt je nach Version als Event oder Info-Update)
-// Shots Fired bietet je nach Version statt der Events nur Zähler an: kills, deaths (Summe im Match) und round_number.
-const ZAEHLER_KEYS = ["kills", "deaths"];
-const VAL = { events: SF_EVENTS, infos: [...SCORE_KEYS, "round_phase", "kill_feed", ...ZAEHLER_KEYS, "round_number"] };
+// Shots Fired bietet je nach Version statt der Events nur Zähler an: kills, deaths, headshots (Summe im Match) und round_number.
+// Zähler → Event, das bei jedem Schritt nach oben entsteht
+const ZAEHLER = { kills: "kill", deaths: "death", headshots: "headshot" };
+const ZAEHLER_KEYS = Object.keys(ZAEHLER);
+// Dazu Infos ohne eigenen Cue: team (Seite: Angriff oder Verteidigung) und ui_team_order_allies / _enemies (Spieler beider Teams)
+const TEAM_KEYS = ["team", "ui_team_order_allies", "ui_team_order_enemies"];
+const VAL = { events: SF_EVENTS, infos: [...SCORE_KEYS, "round_phase", "kill_feed", ...ZAEHLER_KEYS, "round_number", ...TEAM_KEYS] };
 const SIEG_RUNDEN = 13;
 
 const norm = (s) => String(s ?? "").trim().toLowerCase().replace(/[\s\-.]+/g, "_");
@@ -117,8 +122,46 @@ const neueRunde = () => ({ kills: 0, tot: false, mitspielerTot: 0, ace: false })
 
 // Zustand je Game-PC: letzter Spielstand, ob das Match schon entschieden ist, und die laufende Runde
 // Zähler: letzter Stand von kills, deaths und round_number. Kommen echte kill- oder death-Events, gelten die (keine Doppelten).
-const neueZaehler = () => ({ kills: null, deaths: null, runde: null });
-const sfZustand = () => ({ score: null, entschieden: false, phase: "", r: neueRunde(), z: neueZaehler(), echt: { kill: false, death: false } });
+const neueZaehler = () => ({ kills: null, deaths: null, headshots: null, runde: null });
+const neueEcht = () => ({ kill: false, death: false, headshot: false });
+// info: Seite und Spieler aus team und ui_team_order (nur zur Anzeige und für das Team dieses PCs)
+const neueInfo = () => ({ seite: "", verbuendete: [], gegner: [] });
+const sfZustand = () => ({ score: null, entschieden: false, phase: "", r: neueRunde(), z: neueZaehler(), echt: neueEcht(), info: neueInfo() });
+
+// team → "Angriff", "Verteidigung" oder "" (Overwolf schreibt attack/attacker/defense/defender, sicherheitshalber auch Deutsch)
+function seiteVon(v) {
+  let x = json(v);
+  if (x && typeof x === "object") x = x.team ?? x.side ?? x.value;
+  const t = norm(x);
+  if (/^(att|angr)/.test(t)) return "Angriff";
+  if (/^(def|vert)/.test(t)) return "Verteidigung";
+  return "";
+}
+// ui_team_order_* → Liste von Namen. Nimmt Arrays (Texte oder Objekte), Objekte mit Liste, JSON-Text und kommagetrennten Text.
+const NAME_FELDER = ["name", "player_name", "playerName", "player", "nickname", "agent", "character", "id"];
+function spielerVon(v) {
+  let x = json(v);
+  if (typeof x === "string") x = x.split(/[,;|]/);
+  if (x && typeof x === "object" && !Array.isArray(x)) x = Object.values(x).find(Array.isArray) || Object.values(x);
+  if (!Array.isArray(x)) return [];
+  return x.map((p) => {
+    p = json(p);
+    if (p && typeof p === "object") { const f = NAME_FELDER.find((k) => typeof p[k] === "string" || typeof p[k] === "number"); return f ? String(p[f]) : ""; }
+    return p == null ? "" : String(p);
+  }).map((n) => n.trim()).filter(Boolean).slice(0, 10);
+}
+// Team dieses PCs aus der Seite: Rot (TEAM A) beginnt im Angriff, nach Runde 12 wechseln die Seiten (wie riot-team.js).
+// In der Verlängerung (ab Runde 25) wechseln die Seiten jede Runde, das ist zu unsicher: dann "".
+function teamAusSeite(seite, runde) {
+  if (!seite || !Number.isFinite(runde) || runde < 1 || runde > 24) return "";
+  const angriffIstA = runde <= 12;
+  return (seite === "Angriff") === angriffIstA ? "TEAM A" : "TEAM B";
+}
+// Was Shots Fired über die Teams weiß: { seite, team, verbuendete, gegner }
+function sfInfo(z) {
+  const i = z?.info || neueInfo();
+  return { seite: i.seite, team: teamAusSeite(i.seite, z?.z?.runde), verbuendete: [...i.verbuendete], gegner: [...i.gegner] };
+}
 // Zahl aus einem Wert: 3, "3", { kills: 3 } oder JSON-Text
 function zahlVon(v, key) {
   let x = json(v);
@@ -137,14 +180,15 @@ function shotsfiredEvents(body, z = sfZustand()) {
   const matchSieg = (seite) => { if (!z.entschieden) { z.entschieden = true; raus.push({ event: "match_won", seite }); } };
   z.r = z.r || neueRunde();
   z.z = z.z || neueZaehler();
-  z.echt = z.echt || { kill: false, death: false };
+  z.echt = z.echt || neueEcht();
+  z.info = z.info || neueInfo();
   const kill = () => {
     raus.push({ event: "kill", seite: "eigen" });
     if (++z.r.kills >= ACE_KILLS && !z.r.ace) { z.r.ace = true; raus.push({ event: "ace", seite: "eigen" }); }
   };
   const tod = () => { z.r.tot = true; raus.push({ event: "death", seite: "eigen" }); };
   // Echte Events zuerst merken: dann zählen die Zähler nur noch mit und lösen nichts aus
-  for (const { name: n } of events) { const id = eventName(n); if (id === "kill" || id === "death") z.echt[id] = true; }
+  for (const { name: n } of events) { const id = eventName(n); if (id in z.echt) z.echt[id] = true; }
   const rundeStart = () => { z.r = neueRunde(); raus.push({ event: "round_start", seite: "eigen" }); };
   // Rundenende: bei Sieg des eigenen Teams Clutch prüfen, danach zählt die nächste Runde neu
   const rundeEnde = (seite) => {
@@ -158,10 +202,16 @@ function shotsfiredEvents(body, z = sfZustand()) {
       if (n == null) continue;
       const alt = z.z[key];
       z.z[key] = n;
-      const echt = key === "kills" ? z.echt.kill : z.echt.death;
+      const ev = ZAEHLER[key];
       // Erster Wert: ab 0 oder 1 zählt er (Match läuft gerade an), ein höherer Stand ist nur der Ausgangswert (App mitten im Match gestartet)
       const neu = alt == null ? (n <= 1 ? n : 0) : n > alt ? n - alt : 0;
-      if (!echt) for (let i = 0; i < Math.min(neu, MAX_SPRUNG); i++) key === "kills" ? kill() : tod();
+      if (!z.echt[ev]) for (let i = 0; i < Math.min(neu, MAX_SPRUNG); i++) ev === "kill" ? kill() : ev === "death" ? tod() : raus.push({ event: ev, seite: "eigen" });
+      continue;
+    }
+    if (key === "team") { const s = seiteVon(value); if (s) z.info.seite = s; continue; }
+    if (key === "ui_team_order_allies" || key === "ui_team_order_enemies") {
+      const liste = spielerVon(value);
+      if (liste.length) z.info[key.endsWith("allies") ? "verbuendete" : "gegner"] = liste;
       continue;
     }
     if (key === "round_number") {
@@ -203,7 +253,7 @@ function shotsfiredEvents(body, z = sfZustand()) {
   }
   for (const { name: n } of events) {
     const id = eventName(n);
-    if (id === "match_start") { z.score = null; z.entschieden = false; z.phase = ""; z.r = neueRunde(); z.z = neueZaehler(); raus.push({ event: id, seite: "eigen" }); }
+    if (id === "match_start") { z.score = null; z.entschieden = false; z.phase = ""; z.r = neueRunde(); z.z = neueZaehler(); z.info = neueInfo(); raus.push({ event: id, seite: "eigen" }); }
     else if (id === "kill") kill();
     else if (id === "death") tod();
     else if (id === "match_end") {
@@ -271,7 +321,8 @@ const lolEvents = (body) => zerlegen(body, LOL).events.map(({ name }) => ({ even
 const SF_EINRICHTEN = {
   valorant: [["spike_planted, spike_defused, spike_detonated", "Spike gelegt, entschärft, explodiert"], ["match_start, match_end", "Match startet, Match vorbei"],
     ["kill, death, assist, headshot", "Kill, Tod, Assist, Headshot, dazu Ace (5 Kills in einer Runde)"], ["kill_feed", "für Clutch (letzter Überlebender gewinnt)"],
-    ["kills, deaths, round_number", "wenn Shots Fired nur diese anbietet: Kill und Ace, Tod, Rundenstart"],
+    ["kills, deaths, headshots, round_number", "wenn Shots Fired nur diese anbietet: Kill und Ace, Tod, Headshot, Rundenstart"],
+    ["team, ui_team_order_allies, ui_team_order_enemies", "Seite und Spieler beider Teams; Team dieses PCs, wenn der Riot Client keins liefert"],
     ["round_phase", "Rundenstart (Kaufphase) und Rundenende"], ["score", "Rundengewinner und Matchgewinner (13 Runden, 2 Vorsprung)"]],
   fortnite: [["matchStart, matchEnd", "Match startet, Match vorbei"], ["kill, knockout, assist", "Eliminierung, Gegner niedergeschlagen, Assist"],
     ["death, knockedout, revived", "Ausgeschieden, selbst niedergeschlagen, wiederbelebt"], ["phase", "Battle Bus startet, gelandet"], ["rank", "Top 10, Top 5, Victory Royale (Platz 1)"]],
@@ -302,4 +353,5 @@ function shotsfiredNachrichten(body, pfad = "/", z = sfZustaende()) {
 }
 
 module.exports = { SF_EINRICHTEN, ACE_KILLS, SHOTSFIRED_PORT, SHOTSFIRED_URL, SHOTSFIRED_BASIS, SHOTSFIRED_STORE_URL, SF_SPIELE, SF_GAME_IDS, sfUrl, SF_EVENTS,
-  shotsfiredEvents, fortniteEvents, finalsEvents, lolEvents, shotsfiredNachrichten, sfSpiel, sfZustand, fnZustand, sfZustaende, zerlegen, scoreVon, eventName };
+  shotsfiredEvents, fortniteEvents, finalsEvents, lolEvents, shotsfiredNachrichten, sfSpiel, sfZustand, fnZustand, sfZustaende, zerlegen, scoreVon, eventName,
+  sfInfo, seiteVon, spielerVon, teamAusSeite };

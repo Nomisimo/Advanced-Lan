@@ -76,6 +76,7 @@ function ShotsFiredAnleitung({ punkte, sf, mac, notify }) {
           <p style={S.hint}>{mac ? "Overwolf und diese Spiele gibt es nur für Windows. " : ""}Shots Fired ist nicht von uns. Valorant: kein Spike-Timer (Riot-Regel), gelegt, entschärft und explodiert sind einzelne Cues. Thrifty liefert Overwolf nicht, dafür bleibt die Bilderkennung.</p>
         </div>
       </div>
+      {spiel === "valorant" && <SfTeams info={sf?.valorant} />}
       <button style={{ ...S.smallBtn, marginTop: 12 }} onClick={() => setOffen(!offen)}>{offen ? "Letzte Anfragen ausblenden" : `Letzte Anfragen (${sf?.anfragen || 0})`}</button>
       {offen && (
         <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
@@ -89,6 +90,20 @@ function ShotsFiredAnleitung({ punkte, sf, mac, notify }) {
         </div>
       )}
     </Section>
+  );
+}
+
+// Valorant: was Shots Fired über die Teams weiß (team, ui_team_order_allies / _enemies)
+function SfTeams({ info }) {
+  if (!info || (!info.seite && !info.verbuendete?.length && !info.gegner?.length)) return null;
+  const zeile = (titel, wert) => wert ? <div><span style={{ color: SUB }}>{titel}:</span> {wert}</div> : null;
+  return (
+    <div style={{ marginTop: 12, fontSize: 12, padding: "6px 8px", background: "#1a1820", border: `1px solid ${LINE}`, borderRadius: 6, display: "grid", gap: 2 }}>
+      {zeile("Seite", info.seite)}
+      {zeile("Team dieses PCs (aus der Seite)", info.team)}
+      {zeile("Eigenes Team", info.verbuendete?.join(", "))}
+      {zeile("Gegner", info.gegner?.join(", "))}
+    </div>
   );
 }
 

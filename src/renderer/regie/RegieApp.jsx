@@ -65,8 +65,8 @@ export default function RegieApp({ cfg: alles, mutate: mutateAlles, ersetzen, st
         {status.spielAufRegie && <span style={{ color: ERR }}> · <TriangleAlert size={12} /> Auf diesem PC läuft {status.spielAufRegie}</span>}
       </>}>
         <ShowKnopf cfg={alles} ersetzen={ersetzen} notify={notify} />
-        {statsAn && <button onClick={() => api.statsFenster(!statsOffen)} title={statsOffen ? "Stats-Fenster schließen" : "Game-Stats-Screen als eigenes Fenster öffnen"}
-          style={{ ...S.ghostBtn, ...(statsOffen ? { borderColor: ACCENT, color: "#fff", boxShadow: GLOW_STARK } : {}) }}><MonitorPlay size={14} /> Stats{status.stats?.ndi?.laeuft ? " · NDI" : ""}</button>}
+        {statsAn && <button onClick={() => api.statsFenster(!statsOffen, cfg.stats?.screens?.[0]?.id)} title={statsOffen ? `Fenster „${cfg.stats?.screens?.[0]?.name || "Stats"}“ schließen` : `Game-Stats-Screen „${cfg.stats?.screens?.[0]?.name || "Stats"}“ als eigenes Fenster öffnen (weitere Screens im Tab Stats-Screen)`}
+          style={{ ...S.ghostBtn, ...(statsOffen ? { borderColor: ACCENT, color: "#fff", boxShadow: GLOW_STARK } : {}) }}><MonitorPlay size={14} /> Stats{status.stats?.ndi?.laeuft ? ` · NDI${status.stats.ndi.sender > 1 ? ` ×${status.stats.ndi.sender}` : ""}` : ""}</button>}
         {aktiv && <span title="Aktives Spiel (Tab „Control“)" style={{ borderRadius: 6, padding: "6px 12px", fontWeight: 800, fontSize: 12, letterSpacing: 0.5, background: aktiv.farbe, color: "#14121a", boxShadow: `0 0 12px ${aktiv.farbe}88` }}>{aktiv.kurz}</span>}
         <button onClick={() => mutate((d) => { d.armed = !d.armed; })}
           title={an ? "Ausgabe ausschalten" : "Ausgabe einschalten"}

@@ -1,9 +1,11 @@
 "use strict";
-// Layout des Game-Stats-Screens: welche Anzeigen und Texte wo auf der 1920×1080-Fläche stehen.
+// Layout des Game-Stats-Screens: welche Anzeigen und Texte wo auf der Fläche stehen.
+// Die Fläche ist standardmäßig 1920×1080, jeder Screen kann eine eigene Größe in Pixeln haben (flaeche = { b, h }).
 // Der Editor in der Regie bearbeitet es, Pop-out-Fenster und NDI-Stream zeigen es direkt an.
 // Reine Funktionen, laufen in der Oberfläche, im Hauptprozess und in den Tests.
 
 const B = 1920, H = 1080;
+const F0 = { b: B, h: H };
 const MIN = 40; // kleinste Breite und Höhe eines Elements
 const MAX_TEXTE = 30;
 const MAX_BILDER = 12; // Bild-Blöcke
@@ -24,7 +26,7 @@ const ANZEIGEN = [
   { typ: "events", label: "Letzte Events", x: 1116, y: 636, b: 760, h: 410, titel: "Letzte Events" },
 ];
 const ANZEIGE = Object.fromEntries(ANZEIGEN.map((a) => [a.typ, a]));
-const HINTERGRUENDE = [["verlauf", "Verlauf (Standard)"], ["schwarz", "Schwarz"], ["gruen", "Grün (Chroma-Key)"], ["farbe", "Eigene Farbe"], ["eigen", "Eigener Verlauf"], ["bild", "Eigenes Bild"]];
+const HINTERGRUENDE = [["verlauf", "Verlauf (Standard)"], ["schwarz", "Schwarz"], ["gruen", "Grün (Chroma-Key)"], ["transparent", "Transparent (Alpha)"], ["farbe", "Eigene Farbe"], ["eigen", "Eigener Verlauf"], ["bild", "Eigenes Bild"]];
 const VERLAUF_ARTEN = [["linear", "Linear"], ["radial", "Radial"], ["konisch", "Konisch"]];
 const PASSUNGEN = [["fuellen", "Füllen (zuschneiden)"], ["einpassen", "Einpassen (ganz zeigen)"], ["strecken", "Strecken"]];
 const MAX_STOPPS = 8;
@@ -42,6 +44,8 @@ const AUSRICHTUNG = ["links", "mitte", "rechts"];
 const PLATZHALTER = [["spiel", "Name des aktiven Spiels"], ["kurz", "Kürzel des Spiels"], ["session", "Name der Session"], ["team1", "Team links"], ["team2", "Team rechts"], ["score1", "Punkte links"], ["score2", "Punkte rechts"], ["uhrzeit", "Uhrzeit"], ["datum", "Datum"]];
 
 const zahl = (v, std, min, max) => { const n = Math.round(Number(v)); return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : std; };
+// Größe der Fläche: ohne Angabe 1920×1080, nie kleiner als ein Element
+const flaecheVon = (f) => ({ b: zahl(f?.b, B, MIN, 8192), h: zahl(f?.h, H, MIN, 8192) });
 const farbe = (v, std) => (typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v) ? v.toLowerCase() : std);
 
 // Darstellung, die jedes Element hat: Deckkraft des ganzen Elements, Transparenz und Ecken der Kacheln, Rahmen,
@@ -79,17 +83,23 @@ function anzeigeStandard(a) {
   return { id: typ, typ, x, y, b, h, sichtbar: true, skalieren: true, zoom: 100, ...(titel ? { titel } : {}), ...STIL, ...(OPTIONEN[typ] || {}) };
 }
 
-function neuerText(over = {}) {
-  return { id: neueId(), typ: "text", x: 660, y: 470, b: 600, h: 120, sichtbar: true, text: "Neuer Text", groesse: 64, farbe: "#ffffff", fett: true, ausrichtung: "mitte", panel: false, skalieren: true, ...STIL, ...over };
+function neuerText(over = {}, flaeche) {
+  const F = flaecheVon(flaeche);
+  const b = Math.min(600, F.b), h = Math.min(120, F.h);
+  return { id: neueId(), typ: "text", x: Math.round((F.b - b) / 2), y: Math.round((F.h - h) / 2), b, h, sichtbar: true, text: "Neuer Text", groesse: 64, farbe: "#ffffff", fett: true, ausrichtung: "mitte", panel: false, skalieren: true, ...STIL, ...over };
 }
 
 // Bild-Block: bild ist der Schlüssel in layout.bilder. b0 × h0: Seitenverhältnis des Bildes, um den Block passend zu setzen
-function neuesBild(bild, { b0 = 16, h0 = 9, ...over } = {}) {
+function neuesBild(bild, { b0 = 16, h0 = 9, flaeche, ...over } = {}) {
+  const F = flaecheVon(flaeche);
   const v = b0 > 0 && h0 > 0 ? b0 / h0 : 16 / 9;
-  let b = 640, h = Math.round(640 / v);
-  if (h > 480) { h = 480; b = Math.round(480 * v); }
-  b = Math.max(MIN, Math.min(B, b)); h = Math.max(MIN, Math.min(H, h));
-  return { id: neueId("i"), typ: "bild", x: Math.round((B - b) / 2), y: Math.round((H - h) / 2), b, h, sichtbar: true, bild, passung: "einpassen", radius: 0, panel: false, ...STIL, ...over };
+  // Auf 1920×1080 höchstens 640×480, auf anderen Screens ein Drittel der Fläche, sehr kleine Screens ganz
+  const gross = F.b >= 960 && F.h >= 540;
+  const mb = gross ? Math.round(F.b / 3) : F.b, mh = gross ? Math.round(F.h * 4 / 9) : F.h;
+  let b = mb, h = Math.round(mb / v);
+  if (h > mh) { h = mh; b = Math.round(mh * v); }
+  b = Math.max(MIN, Math.min(F.b, b)); h = Math.max(MIN, Math.min(F.h, h));
+  return { id: neueId("i"), typ: "bild", x: Math.round((F.b - b) / 2), y: Math.round((F.h - h) / 2), b, h, sichtbar: true, bild, passung: "einpassen", radius: 0, panel: false, ...STIL, ...over };
 }
 
 function standardVerlauf() {
@@ -100,8 +110,22 @@ function standardHg() {
   return { farbe: "#1b1922", verlauf: standardVerlauf(), bild: "", passung: "fuellen", abdunkeln: 0, verlaufDrueber: false };
 }
 
-function standardLayout() {
-  return { hintergrund: "verlauf", hg: standardHg(), bilder: {}, elemente: ANZEIGEN.map(anzeigeStandard) };
+// Standard-Layout; auf einer anderen Fläche werden die Anzeigen anteilig gesetzt
+function standardLayout(flaeche) {
+  const F = flaecheVon(flaeche);
+  const fx = F.b / B, fy = F.h / H;
+  const elemente = ANZEIGEN.map(anzeigeStandard).map((e) => (fx === 1 && fy === 1 ? e : { ...e, ...kasten({ x: e.x * fx, y: e.y * fy, b: e.b * fx, h: e.h * fy }, F) }));
+  return { hintergrund: "verlauf", hg: standardHg(), bilder: {}, elemente };
+}
+
+// Layout mit nur einem Element, das die ganze Fläche füllt (zum Streamen einzelner Elemente), Hintergrund transparent.
+// typ: eine Anzeige aus ANZEIGEN oder "text"; sonst ist nichts sichtbar
+function einzelLayout(typ, flaeche) {
+  const F = flaecheVon(flaeche);
+  const voll = { x: 0, y: 0, b: F.b, h: F.h };
+  const elemente = ANZEIGEN.map(anzeigeStandard).map((e) => (e.typ === typ ? { ...e, ...voll } : { ...e, ...kasten(e, F), sichtbar: false }));
+  if (typ === "text") elemente.push(neuerText({ ...voll, text: "{score1} : {score2}", groesse: Math.max(10, Math.min(400, Math.round(F.h * 0.6))) }, F));
+  return { hintergrund: "transparent", hg: standardHg(), bilder: {}, elemente };
 }
 
 const istBild = (v) => typeof v === "string" && v.length <= BILD_MAX && BILD_RE.test(v);
@@ -167,15 +191,16 @@ function inhaltsSkala(e) {
 }
 
 // Position und Größe in die Fläche bringen
-function kasten(e) {
-  const b = zahl(e.b, MIN, MIN, B), h = zahl(e.h, MIN, MIN, H);
-  return { x: zahl(e.x, 0, 0, B - b), y: zahl(e.y, 0, 0, H - h), b, h };
+function kasten(e, F = F0) {
+  const b = zahl(e.b, MIN, MIN, F.b), h = zahl(e.h, MIN, MIN, F.h);
+  return { x: zahl(e.x, 0, 0, F.b - b), y: zahl(e.y, 0, 0, F.h - h), b, h };
 }
 
 // Gespeichertes Layout prüfen: unbekannte Typen raus, jede Anzeige genau einmal (fehlende kommen dazu), Zahlen begrenzen
-function migrateLayout(l) {
-  const std = standardLayout();
-  if (!l || typeof l !== "object" || !Array.isArray(l.elemente)) return std;
+// flaeche: Größe des Screens, alle Elemente bleiben darin
+function migrateLayout(l, flaeche) {
+  const F = flaecheVon(flaeche);
+  if (!l || typeof l !== "object" || !Array.isArray(l.elemente)) return standardLayout(F);
   // Bilder: nur gültige Data-URLs, und nur solche, die ein Block oder der Hintergrund benutzt
   const quelle = l.bilder && typeof l.bilder === "object" ? l.bilder : {};
   const bilder = {};
@@ -193,7 +218,7 @@ function migrateLayout(l) {
       if (texte >= MAX_TEXTE) continue;
       texte++;
       out.push({
-        id: eigeneId(e, "t"), typ: "text", ...kasten(e), sichtbar: e.sichtbar !== false,
+        id: eigeneId(e, "t"), typ: "text", ...kasten(e, F), sichtbar: e.sichtbar !== false,
         text: typeof e.text === "string" ? e.text.slice(0, TEXT_MAX) : "",
         groesse: zahl(e.groesse, 64, 10, 400), farbe: farbe(e.farbe, "#ffffff"), fett: e.fett !== false,
         ausrichtung: AUSRICHTUNG.includes(e.ausrichtung) ? e.ausrichtung : "mitte", panel: !!e.panel, skalieren: e.skalieren !== false, ...migrateStil(e),
@@ -203,7 +228,7 @@ function migrateLayout(l) {
       if (!bild || bloecke >= MAX_BILDER) continue;
       bloecke++;
       out.push({
-        id: eigeneId(e, "i"), typ: "bild", ...kasten(e), sichtbar: e.sichtbar !== false, bild,
+        id: eigeneId(e, "i"), typ: "bild", ...kasten(e, F), sichtbar: e.sichtbar !== false, bild,
         passung: PASSUNGEN.some(([k]) => k === e.passung) ? e.passung : "einpassen",
         radius: zahl(e.radius, 0, 0, 540), panel: !!e.panel, ...migrateStil(e),
         ...(typeof e.name === "string" && e.name ? { name: e.name.slice(0, 60) } : {}),
@@ -211,11 +236,11 @@ function migrateLayout(l) {
     } else if (ANZEIGE[e.typ] && !gesehen.has(e.typ)) {
       gesehen.add(e.typ);
       const a = ANZEIGE[e.typ];
-      out.push({ id: e.typ, typ: e.typ, ...kasten(e), sichtbar: e.sichtbar !== false, skalieren: e.skalieren !== false, zoom: zahl(e.zoom, 100, ZOOM_MIN, ZOOM_MAX),
+      out.push({ id: e.typ, typ: e.typ, ...kasten(e, F), sichtbar: e.sichtbar !== false, skalieren: e.skalieren !== false, zoom: zahl(e.zoom, 100, ZOOM_MIN, ZOOM_MAX),
         ...(a.titel ? { titel: typeof e.titel === "string" ? e.titel.slice(0, 80) : a.titel } : {}), ...migrateStil(e), ...migrateOptionen(e.typ, e) });
     }
   }
-  for (const a of ANZEIGEN) if (!gesehen.has(a.typ)) out.push({ ...anzeigeStandard(a), sichtbar: false });
+  for (const a of ANZEIGEN) if (!gesehen.has(a.typ)) { const st = anzeigeStandard(a); out.push({ ...st, ...kasten(st, F), sichtbar: false }); }
   const hg = migrateHg(l.hg);
   hg.bild = nimmBild(hg.bild);
   let hintergrund = HINTERGRUENDE.some(([k]) => k === l.hintergrund) ? l.hintergrund : "verlauf";
@@ -240,8 +265,9 @@ function textEinsetzen(text, werte) {
 // Einrasten beim Ziehen: an das Raster und an Kanten und Mitten der Fläche und der anderen Elemente.
 // k: { x, y, b, h } des gezogenen Elements, andere: Liste von Kästen, modus: "bewegen" oder Liste der gezogenen Kanten ("l","r","o","u").
 // → { x, y, b, h, linien: [{ achse: "x"|"y", pos }] }
-function einrasten(k, andere, { raster = 0, abstand = 8, kanten = null } = {}) {
-  const ziele = { x: [0, B / 2, B], y: [0, H / 2, H] };
+function einrasten(k, andere, { raster = 0, abstand = 8, kanten = null, flaeche } = {}) {
+  const F = flaecheVon(flaeche);
+  const ziele = { x: [0, F.b / 2, F.b], y: [0, F.h / 2, F.h] };
   for (const o of andere || []) { ziele.x.push(o.x, o.x + o.b / 2, o.x + o.b); ziele.y.push(o.y, o.y + o.h / 2, o.y + o.h); }
   const linien = [];
   const nah = (werte, achse) => {
@@ -266,12 +292,12 @@ function einrasten(k, andere, { raster = 0, abstand = 8, kanten = null } = {}) {
     if (kanten.includes("u")) { const t = nah([[r.y + r.h]], "y"); const e = t ? t.z : grid(r.y + r.h); if (t) linien.push({ achse: "y", pos: t.z }); r.h = e - r.y; }
   }
   // In der Fläche halten, Mindestgröße
-  r.b = Math.max(MIN, Math.min(B, Math.round(r.b))); r.h = Math.max(MIN, Math.min(H, Math.round(r.h)));
-  r.x = Math.max(0, Math.min(B - r.b, Math.round(r.x))); r.y = Math.max(0, Math.min(H - r.h, Math.round(r.y)));
+  r.b = Math.max(MIN, Math.min(F.b, Math.round(r.b))); r.h = Math.max(MIN, Math.min(F.h, Math.round(r.h)));
+  r.x = Math.max(0, Math.min(F.b - r.b, Math.round(r.x))); r.y = Math.max(0, Math.min(F.h - r.h, Math.round(r.y)));
   return { ...r, linien };
 }
 
 module.exports = {
   STIL, OPTIONEN, OPTION_TEXT_MAX, migrateStil, B, H, MIN, MAX_TEXTE, MAX_BILDER, MAX_STOPPS, BILD_MAX, ZOOM_MIN, ZOOM_MAX, ANZEIGEN, ANZEIGE, HINTERGRUENDE, VERLAUF_ARTEN, VERLAUF_VORLAGEN, PASSUNGEN, AUSRICHTUNG, PLATZHALTER,
-  standardLayout, standardHg, migrateLayout, migrateVerlauf, neuerText, neuesBild, textEinsetzen, einrasten, verlaufCss, farbeBei, rgba, inhaltsSkala, istBild, bilderAufraeumen, neueId,
+  standardLayout, einzelLayout, flaecheVon, standardHg, migrateLayout, migrateVerlauf, neuerText, neuesBild, textEinsetzen, einrasten, verlaufCss, farbeBei, rgba, inhaltsSkala, istBild, bilderAufraeumen, neueId,
 };

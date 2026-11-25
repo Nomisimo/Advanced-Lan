@@ -66,6 +66,43 @@ const BILDER = process.argv[3] || require('os').tmpdir();
   assert.deepStrictEqual([w.wert, w.quelle], ['sp.kills', 'PC 01']);
   await page.screenshot({ path: BILDER + '/elemente-1.png' });
 
+  // 3b) Valorant: Spielstand nennt die Teams nach Seite, Name von Hand überschreibt, Farbe je Team
+  const t0 = await flaeche.textContent();
+  assert.ok(t0.includes('ANGRIFF') && t0.includes('VERTEIDIGUNG'), 'Teams nach Seite benannt');
+  await page.getByTestId('liste-spielstand').click();
+  await page.getByTestId('team-name1').fill('ROT');
+  await page.getByTestId('team-textVerteidigung').fill('DEFENSE');
+  await page.waitForTimeout(400);
+  let ss = (await layout()).elemente.find((e) => e.id === 'spielstand');
+  assert.deepStrictEqual([ss.name1, ss.textVerteidigung, ss.benennung], ['ROT', 'DEFENSE', 'auto']);
+  const t1 = await flaeche.textContent();
+  assert.ok(t1.includes('ROT') && t1.includes('DEFENSE'), 'eigener Name und eigener Text');
+  await page.getByTestId('team-farbe2').fill('#00ff00');
+  await page.waitForTimeout(300);
+  assert.strictEqual((await layout()).elemente.find((e) => e.id === 'spielstand').farbe2, '#00ff00');
+  const farbe2 = await page.locator('[data-testid=screen-flaeche] [data-team="1"]').first().evaluate((d) => getComputedStyle(d).color);
+  assert.strictEqual(farbe2, 'rgb(0, 255, 0)', 'Farbe Team 2');
+
+  // 3c) Zweiten Spielstand hinzufügen: eigene ID, eigene Einstellungen, löschbar
+  await page.getByTestId('anzeige-neu').selectOption('spielstand');
+  await page.waitForTimeout(300);
+  let staende = (await layout()).elemente.filter((e) => e.typ === 'spielstand');
+  assert.strictEqual(staende.length, 2, 'zwei Spielstände');
+  const zweiter = staende.find((e) => e.id !== 'spielstand');
+  assert.ok(zweiter.sichtbar && zweiter.name1 === '', 'neuer Spielstand mit Standard-Einstellungen');
+  await page.getByTestId('team-benennung').selectOption('spiel');
+  await page.waitForTimeout(300);
+  assert.strictEqual((await layout()).elemente.find((e) => e.id === zweiter.id).benennung, 'spiel');
+  assert.strictEqual((await layout()).elemente.find((e) => e.id === 'spielstand').benennung, 'auto', 'erster bleibt');
+  const tz = await flaeche.textContent();
+  assert.ok(tz.includes('TEAM B'), 'zweiter Spielstand mit Teamnamen des Spiels');
+  assert.ok(await page.getByTestId(`liste-${zweiter.id}`).textContent().then((t) => t.includes('Spielstand 2')));
+  await page.screenshot({ path: BILDER + '/elemente-1b-teams.png' });
+  await page.getByTestId('eigenschaften').getByRole('button', { name: 'Löschen' }).click();
+  await page.waitForTimeout(300);
+  staende = (await layout()).elemente.filter((e) => e.typ === 'spielstand');
+  assert.strictEqual(staende.length, 1, 'Kopie gelöscht');
+
   // 4) MVP-Endscreen einblenden: bester Spieler oben, darunter das Ranking
   await page.getByTestId('liste-mvp').locator('button').click();
   await page.getByTestId('liste-mvp').click();

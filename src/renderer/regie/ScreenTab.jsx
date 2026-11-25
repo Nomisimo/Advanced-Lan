@@ -9,9 +9,9 @@ import SoundEinstellungen from "./SoundEinstellungen.jsx";
 import { screenVon } from "../../core/stats-screens.js";
 import { SPIEL_BY_ID } from "../../core/spiele.js";
 import { WERTE } from "../../core/stats-screen.js";
-import { MIN, MAX_TEXTE, MAX_BILDER, MAX_SPIELER, MAX_WERTE, SPIELER_OPTIONEN, neuerSpieler, neuerWert, ZOOM_MIN, ZOOM_MAX, OPTIONEN, OPTION_TEXT_MAX, ANZEIGE, HINTERGRUENDE, PASSUNGEN, PLATZHALTER, standardLayout, migrateLayout, neuerText, neuesBild, einrasten, bilderAufraeumen, neueId, inhaltsSkala } from "../../core/stats-layout.js";
+import { MIN, MAX_TEXTE, MAX_BILDER, MAX_SPIELER, MAX_WERTE, SPIELER_OPTIONEN, neuerSpieler, neuerWert, ZOOM_MIN, ZOOM_MAX, OPTIONEN, OPTION_TEXT_MAX, ANZEIGE, ANZEIGEN, HINTERGRUENDE, PASSUNGEN, elementVerlauf, MAX_KOPIEN, neueAnzeige, TEAM_TYPEN, TEAM_OPTIONEN, BENENNUNGEN, PLATZHALTER, standardLayout, migrateLayout, neuerText, neuesBild, einrasten, bilderAufraeumen, neueId, inhaltsSkala } from "../../core/stats-layout.js";
 import { statsBeispiel } from "../../core/stats-beispiel.js";
-import HintergrundEditor, { Regler, durchscheinend } from "./HintergrundEditor.jsx";
+import HintergrundEditor, { Regler, durchscheinend, VerlaufLage, VerlaufEditor } from "./HintergrundEditor.jsx";
 import { bildWaehlen, bildVorbereiten } from "./bild-laden.js";
 import { Type, UserSquare, Hash, Eye, EyeOff, Undo2, Redo2, RotateCcw, Copy, Trash2, ArrowUpToLine, ArrowDownToLine, AlignLeft, AlignCenter, AlignRight, Cast, Move, ImagePlus, Image as ImageIcon, Scaling } from "lucide-react";
 
@@ -32,7 +32,9 @@ const WERT_LABEL = Object.fromEntries(WERTE.map(([k, l]) => [k, l]));
 const elLabel = (e) => (e.typ === "text" ? (e.text || "").split("\n")[0].slice(0, 28) || "Leerer Text" : e.typ === "bild" ? e.name || "Bild"
   : e.typ === "spieler" ? `Spieler: ${quelleText(e)}` : e.typ === "wert" ? `Wert: ${WERT_LABEL[e.wert] || e.wert}${String(e.wert).startsWith("sp.") ? ` (${quelleText(e)})` : ""}` : ANZEIGE[e.typ]?.label || e.typ);
 const EIGEN = new Set(["text", "bild", "spieler", "wert"]);
-const eigen = (e) => EIGEN.has(e?.typ); // eigene Blöcke: löschen statt ausblenden
+// eigene Blöcke und hinzugefügte Anzeigen (ID ≠ Typ): löschen statt ausblenden
+const kopie = (e) => !!(ANZEIGE[e?.typ] && e.id !== e.typ);
+const eigen = (e) => EIGEN.has(e?.typ) || kopie(e);
 const gleich = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 function useBreite(ref) {
@@ -126,6 +128,7 @@ function Editor({ cfg, mutate, status, log, screen }) {
   const karten = layout.elemente.filter((e) => e.typ === "spieler").length;
   const wertBloecke = layout.elemente.filter((e) => e.typ === "wert").length;
   // Neuer Block (Spieler-Karte oder Wert)
+  const kopien = layout.elemente.filter(kopie).length;
   const blockNeu = (el) => { setzen({ ...layoutRef.current, elemente: [...layoutRef.current.elemente, el] }); setAuswahl(el.id); };
   const [bildFehler, setBildFehler] = useState("");
   // Bild laden (verkleinert) → { id, url, b, h } oder null
@@ -158,7 +161,7 @@ function Editor({ cfg, mutate, status, log, screen }) {
     const r = await bildLaden(await bildWaehlen());
     if (!r) return;
     const l = layoutRef.current;
-    const hg = { ...l.hg, bild: r.id, ...(mitVerlauf === true ? { verlaufDrueber: true, verlauf: durchscheinend(l.hg.verlauf) } : {}) };
+    const hg = { ...l.hg, bild: r.id, ...(mitVerlauf === true ? { verlaufLage: "vor", verlauf: durchscheinend(l.hg.verlauf) } : {}) };
     setzen({ ...l, hintergrund: "bild", bilder: { ...l.bilder, [r.id]: r.url }, hg }, l, true);
   };
   const hgArt = (k) => {
@@ -179,7 +182,7 @@ function Editor({ cfg, mutate, status, log, screen }) {
   };
   // Darstellung eines Elements auf alle übertragen (Schrift- und Akzentfarbe nur auf Anzeigen)
   const stilAlle = (q) => {
-    const st = { deckkraft: q.deckkraft ?? 100, kachel: q.kachel ?? 92, ecken: q.ecken ?? 18, rahmen: q.rahmen !== false };
+    const st = { deckkraft: q.deckkraft ?? 100, kachel: q.kachel ?? 92, ecken: q.ecken ?? 18, rahmen: q.rahmen !== false, verlaufLage: q.verlaufLage || "aus", ...(q.verlauf ? { verlauf: JSON.parse(JSON.stringify(q.verlauf)) } : {}) };
     const farben = ANZEIGE[q.typ] ? { schrift: q.schrift || "", akzent: q.akzent || "" } : {};
     setzen({ ...layout, elemente: layout.elemente.map((x) => ({ ...x, ...st, ...(ANZEIGE[x.typ] ? farben : {}) })) });
   };
@@ -195,6 +198,8 @@ function Editor({ cfg, mutate, status, log, screen }) {
     // Spieler-Karte: gleich der nächste Platz
     if (e?.typ === "spieler" && karten < MAX_SPIELER) blockNeu({ ...e, ...pos, id: neueId("p"), ...(e.quelle === "rang" ? { rang: Math.min(20, (e.rang || 1) + 1) } : {}) });
     if (e?.typ === "wert" && wertBloecke < MAX_WERTE) blockNeu({ ...e, ...pos, id: neueId("w") });
+    // Anzeigen: als weiteres Element mit denselben Einstellungen
+    if (ANZEIGE[e?.typ] && kopien < MAX_KOPIEN) blockNeu({ ...JSON.parse(JSON.stringify(e)), ...pos, sichtbar: true, id: neueId("a") });
   };
   const ebene = (e, richtung) => {
     const l = layout.elemente.filter((x) => x.id !== e.id);
@@ -293,6 +298,18 @@ function Editor({ cfg, mutate, status, log, screen }) {
           <button style={S.secondaryBtn} disabled={bildBloecke >= MAX_BILDER} onClick={() => bildNeu()} title={`Bild als eigenen Block (höchstens ${MAX_BILDER}), auch per Drag and Drop auf die Fläche`}><ImagePlus size={14} /> Bild hinzufügen</button>
           <button style={S.secondaryBtn} disabled={karten >= MAX_SPIELER} onClick={() => blockNeu(neuerSpieler({ rang: karten + 1 }, F))} title={`Name, Team und Zahlen eines Spielers (höchstens ${MAX_SPIELER})`} data-testid="spieler-neu"><UserSquare size={14} /> Spieler-Karte</button>
           <button style={S.secondaryBtn} disabled={wertBloecke >= MAX_WERTE} onClick={() => blockNeu(neuerWert({}, F))} title={`Eine Zahl oder ein Name groß, z. B. Punkte, Runde oder Kills eines Spielers (höchstens ${MAX_WERTE})`} data-testid="wert-neu"><Hash size={14} /> Wert</button>
+          <select style={{ ...S.selectSm, width: 190 }} value="" disabled={kopien >= MAX_KOPIEN} data-testid="anzeige-neu"
+            title={`Anzeige als weiteres Element hinzufügen, auch mehrmals mit eigenen Einstellungen (höchstens ${MAX_KOPIEN})`}
+            onChange={(ev) => {
+              const n = neueAnzeige(ev.target.value, {}, F);
+              if (!n) return;
+              // Liegt schon eine Anzeige dieses Typs dort, etwas versetzt hinlegen
+              if (layout.elemente.some((x) => x.typ === n.typ && x.sichtbar && x.x === n.x && x.y === n.y)) { n.x = Math.min(B - n.b, n.x + 30); n.y = Math.min(H - n.h, n.y + 30); }
+              blockNeu(n);
+            }}>
+            <option value="">+ Element hinzufügen …</option>
+            {ANZEIGEN.map((a) => <option key={a.typ} value={a.typ}>{a.label}</option>)}
+          </select>
           <button style={S.primaryBtn} disabled={texte >= MAX_TEXTE} onClick={() => textNeu()}><Type size={14} /> Text hinzufügen</button>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", fontSize: 12, color: SUB, marginBottom: 10 }}>
@@ -355,7 +372,7 @@ function Editor({ cfg, mutate, status, log, screen }) {
               duplizieren={() => duplizieren(gewaehlt)} entfernen={() => entfernen(gewaehlt)} ebene={(r) => ebene(gewaehlt, r)} />
               : <>
                 <div style={{ ...S.hint, marginTop: 0, border: `1px dashed ${LINE}`, borderRadius: 8, padding: 10 }}>Ein Element anklicken, um Position, Größe und Inhalt zu bearbeiten. Ohne Auswahl: Hintergrund.</div>
-                <HintergrundEditor layout={layout} setArt={hgArt} aendern={hgAendern} fokus={fokus} bildSetzen={() => hgBild()} bildDarunter={() => (layout.hg.bild ? setzen({ ...layout, hintergrund: "bild", hg: { ...layout.hg, verlaufDrueber: true, verlauf: durchscheinend(layout.hg.verlauf) } }) : hgBild(true))} />
+                <HintergrundEditor layout={layout} setArt={hgArt} aendern={hgAendern} fokus={fokus} bildSetzen={() => hgBild()} bildDarunter={() => (layout.hg.bild ? setzen({ ...layout, hintergrund: "bild", hg: { ...layout.hg, verlaufLage: "vor", verlauf: durchscheinend(layout.hg.verlauf) } }) : hgBild(true))} />
               </>}
           </div>
         </div>
@@ -366,6 +383,9 @@ function Editor({ cfg, mutate, status, log, screen }) {
 function Elemente({ layout, auswahl, setAuswahl, sichtbar }) {
   // Oberste Ebene zuerst, wie in Grafikprogrammen
   const liste = [...layout.elemente].reverse();
+  // Mehrere Anzeigen desselben Typs: durchnummerieren (Spielstand, Spielstand 2 …)
+  const nr = {}, zaehl = {};
+  for (const e of layout.elemente) if (ANZEIGE[e.typ]) { zaehl[e.typ] = (zaehl[e.typ] || 0) + 1; nr[e.id] = zaehl[e.typ]; }
   return (
     <div style={{ border: `1px solid ${LINE}`, borderRadius: 8, background: FELD, overflow: "hidden" }}>
       <div style={{ fontSize: 11, fontWeight: 700, color: SUB, textTransform: "uppercase", letterSpacing: 0.5, padding: "8px 10px", borderBottom: `1px solid ${LINE}` }}>Anzeigen und Texte</div>
@@ -378,7 +398,7 @@ function Elemente({ layout, auswahl, setAuswahl, sichtbar }) {
               <button title={e.sichtbar ? "Ausblenden" : "Einblenden"} onClick={(ev) => { ev.stopPropagation(); sichtbar(e, !e.sichtbar); }}
                 style={{ background: "transparent", border: "none", color: e.sichtbar ? ACCENT_HI : MUTED, cursor: "pointer", padding: 0, display: "inline-flex" }}>{e.sichtbar ? <Eye size={14} /> : <EyeOff size={14} />}</button>
               {e.typ === "text" ? <Type size={13} color={SUB} /> : e.typ === "bild" ? <ImageIcon size={13} color={SUB} /> : e.typ === "spieler" ? <UserSquare size={13} color={SUB} /> : e.typ === "wert" ? <Hash size={13} color={SUB} /> : <span style={{ width: 13 }} />}
-              <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: an ? 700 : 400 }}>{elLabel(e)}</span>
+              <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: an ? 700 : 400 }}>{elLabel(e)}{zaehl[e.typ] > 1 ? ` ${nr[e.id]}` : ""}</span>
             </div>
           );
         })}
@@ -428,6 +448,44 @@ function Optionen({ e, aendern, tippen, fokus }) {
   );
 }
 
+// Teams in Spielstand und Teams-Liste: Benennung nach Spiel, Namen von Hand, Texte für die Seiten, Farbe je Team
+function TeamEinstellungen({ e, aendern, tippen, fokus }) {
+  const feld = (k, label, platz) => (
+    <Field label={label}>
+      <input data-testid={`team-${k}`} style={S.inputSm} value={e[k] ?? TEAM_OPTIONEN[k]} maxLength={40} placeholder={platz} onFocus={fokus} onChange={(ev) => tippen({ [k]: ev.target.value })} />
+    </Field>
+  );
+  const farbe = (k, label) => (
+    <Field label={label}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <input type="color" data-testid={`team-${k}`} value={e[k] || "#ffffff"} onFocus={fokus} onPointerDown={fokus} onChange={(ev) => tippen({ [k]: ev.target.value })} style={{ width: 30, height: 22, border: "none", background: "transparent", padding: 0, cursor: "pointer" }} />
+        {e[k] ? <button style={{ ...S.smallBtn, fontSize: 10, padding: "2px 6px" }} onClick={() => aendern({ [k]: "" })}>Standard</button> : <span style={{ fontSize: 10, color: MUTED }}>nach Spiel</span>}
+      </div>
+    </Field>
+  );
+  return (
+    <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }} data-testid="team-einstellungen">
+      <div style={{ fontSize: 11, fontWeight: 700, color: SUB, textTransform: "uppercase", letterSpacing: 0.5 }}>Teams</div>
+      <Field label="Namen der Teams">
+        <select style={S.selectSm} value={e.benennung || "auto"} data-testid="team-benennung" onChange={(ev) => aendern({ benennung: ev.target.value })}>
+          {BENENNUNGEN.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+        </select>
+      </Field>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        {feld("name1", "Name Team 1", "nach Spiel")}
+        {feld("name2", "Name Team 2", "nach Spiel")}
+        {farbe("farbe1", "Farbe Team 1")}
+        {farbe("farbe2", "Farbe Team 2")}
+      </div>
+      {(e.benennung || "auto") === "auto" && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        {feld("textAngriff", "Text Angriff", "ANGRIFF")}
+        {feld("textVerteidigung", "Text Verteidigung", "VERTEIDIGUNG")}
+      </div>}
+      <div style={{ fontSize: 10, color: MUTED, lineHeight: 1.4 }}>Ein eigener Name überschreibt den Namen nach Spiel, leer = nach Spiel. Team 1 ist das erste Team des Spiels (Valorant: TEAM A, CS2: CT). Bei Valorant zeigt „Nach Spiel“ die Seite, sobald sie bekannt ist (Shots Fired oder Runde), z. B. ATTACK / DEFENSE als eigener Text. Platzhalter wie {"{score1}"} gehen auch.</div>
+    </div>
+  );
+}
+
 // Darstellung, die jedes Element hat: Deckkraft, Kachel-Transparenz, Ecken, Rahmen, Farben
 const MIT_KACHEL = new Set(["spielstand", "zahlen", "bestenliste", "events", "teams", "spieler", "mvp"]);
 function Darstellung({ e, tippen, aendern, fokus, stilAlle }) {
@@ -453,7 +511,13 @@ function Darstellung({ e, tippen, aendern, fokus, stilAlle }) {
         {farbFeld("schrift", "Schriftfarbe", "#ffffff")}
         {farbFeld("akzent", "Akzentfarbe", "#c39bff")}
       </div>}
-      <button style={{ ...S.smallBtn, alignSelf: "flex-start" }} onClick={() => stilAlle(e)} title="Deckkraft, Kachel, Ecken, Rahmen und Farben dieses Elements für alle Elemente übernehmen">Darstellung auf alle Elemente übertragen</button>
+      <VerlaufLage label="Eigener Verlauf" wert={e.verlaufLage || "aus"} testid="el-verlauf-lage" titel={{ hinter: "Verlauf hinter dem Inhalt (wie ein eigener Hintergrund des Elements)", vor: "Verlauf vor dem Inhalt, als Überlagerung" }}
+        onChange={(k) => aendern({ verlaufLage: k, ...(k !== "aus" && !e.verlauf ? { verlauf: elementVerlauf() } : {}) })} />
+      {e.verlaufLage && e.verlaufLage !== "aus" && e.verlauf && <>
+        <div style={{ fontSize: 10, color: MUTED }}>{e.verlaufLage === "vor" ? "Liegt über dem Inhalt: Farbstopps mit wenig Deckkraft lassen ihn durchscheinen." : "Liegt hinter dem Inhalt. Bei Kacheln den Kachel-Hintergrund senken, damit er durchscheint."}</div>
+        <VerlaufEditor v={e.verlauf} aendern={(v, vorher) => (vorher === null ? tippen({ verlauf: v }) : aendern({ verlauf: v }))} fokus={fokus} />
+      </>}
+      <button style={{ ...S.smallBtn, alignSelf: "flex-start" }} onClick={() => stilAlle(e)} title="Deckkraft, Kachel, Ecken, Rahmen, Farben und Verlauf dieses Elements für alle Elemente übernehmen">Darstellung auf alle Elemente übertragen</button>
     </div>
   );
 }
@@ -570,6 +634,7 @@ function Eigenschaften({ e, F, pcs = [], bilder, aendern, tippen, fokus, duplizi
         {(e.zoom ?? 100) !== 100 && <button style={{ ...S.smallBtn, alignSelf: "flex-start" }} onClick={() => aendern({ zoom: 100 })}>Zoom auf 100 %</button>}
       </>}
       {OPTIONEN[e.typ] && Object.keys(OPTIONEN[e.typ]).length > 0 && <Optionen e={e} aendern={aendern} tippen={tippen} fokus={fokus} />}
+      {TEAM_TYPEN.has(e.typ) && <TeamEinstellungen e={e} aendern={aendern} tippen={tippen} fokus={fokus} />}
       <Darstellung e={e} tippen={tippen} aendern={aendern} fokus={fokus} stilAlle={stilAlle} />
       {!text && "titel" in e && (
         <Field label="Überschrift" hint="Leer lassen für keine Überschrift. Platzhalter wie {spiel} gehen auch.">
@@ -587,7 +652,7 @@ function Eigenschaften({ e, F, pcs = [], bilder, aendern, tippen, fokus, duplizi
       <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
         <button style={S.smallBtn} onClick={() => ebene(1)} title="Vor alle anderen"><ArrowUpToLine size={12} /> Nach vorne</button>
         <button style={S.smallBtn} onClick={() => ebene(-1)} title="Hinter alle anderen"><ArrowDownToLine size={12} /> Nach hinten</button>
-        {eigen(e) && <button style={S.smallBtn} onClick={duplizieren}><Copy size={12} /> Duplizieren</button>}
+        <button style={S.smallBtn} onClick={duplizieren} title={ANZEIGE[e.typ] ? "Als weiteres Element mit denselben Einstellungen hinzufügen" : "Kopie anlegen"}><Copy size={12} /> Duplizieren</button>
         <span style={{ flex: 1 }} />
         {eigen(e) ? <button style={S.dangerBtn} onClick={entfernen}><Trash2 size={12} /> Löschen</button>
           : <button style={S.smallBtn} onClick={entfernen}><EyeOff size={12} /> Ausblenden</button>}

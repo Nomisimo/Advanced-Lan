@@ -15,6 +15,7 @@ const { LolClient } = require('./lol-client');
 const { QuellenVorrang } = require('../core/quellen-vorrang');
 const { overdriveInstalliert, overdriveOeffnen } = require('./overdrive-start');
 const { RiotClient } = require('./riot-client');
+const { teamMeldung } = require('../core/riot-team');
 const { Regie } = require('../core/regie');
 const { RegieSim } = require('../core/regie-sim');
 const { CsQuelle } = require('../core/cs-quelle');
@@ -126,6 +127,7 @@ const stats = new StatsAusgabe({
   root, preload: path.join(root, 'src', 'preload', 'preload.js'), icon: APP_ICON,
   getStats: () => cfg.regie.stats, aktiv: () => istRegie(), onChange: statusMelden,
   onFensterZu: () => restoreFocus(mainWin),
+  ndiKarte: () => cfg.regie.netz?.ndi || '', ndiOrdner: () => path.join(app.getPath('userData'), 'ndi'),
 });
 
 // Auf dem Regie-PC darf kein Spiel laufen (Windows: Prozessliste prüfen)
@@ -153,8 +155,8 @@ let quellen = {};
 // Valorant-Team über den Riot Client: ein neues Team gilt sofort für die Quelle und die nächsten Events
 // Neue MatchID: sofort an die Regie, damit sie diesen PC dem richtigen Match zuordnet (auch vor dem ersten Event)
 const riot = new RiotClient({
-  onTeam: () => { if (quellen.valorant) quellen.valorant.team = teamVon('valorant'); statusMelden(); },
-  onMatch: () => { if (quellen.valorant) statusAnRegie('valorant', quellen.valorant.status(), quellen.valorant.stand()); },
+  onTeam: () => { if (quellen.valorant) quellen.valorant.team = teamVon('valorant'); teamPruefen(); statusMelden(); },
+  onMatch: () => { if (quellen.valorant) statusAnRegie('valorant', quellen.valorant.status(), quellen.valorant.stand()); teamPruefen(); },
   onChange: statusMelden,
 });
 // Der Riot Client wird nur gefragt, wenn „Automatisch (Riot Client)“ an ist
@@ -168,6 +170,20 @@ const teamVon = (id) => {
   // Valorant automatisch: Riot Client zuerst, sonst die Seite aus Shots Fired (team + round_number)
   return (sc?.teamAuto && id === 'valorant' && (riot.status().team || sfTeam)) || sc?.team;
 };
+// Valorant-Match dieses PCs: MatchID vom Riot Client, sonst match_id/pseudo_match_id aus Shots Fired (GEP match_info)
+const valorantMatch = () => riot.status().match || shotsfired.valorantInfo().match || '';
+// Event „Team steht fest“: einmal je Match und Team, sobald das Team automatisch erkannt ist (core/riot-team.js teamMeldung).
+// Riot Client: schon in der Agentenwahl, vor match_start. Shots Fired: mit der ersten Runde. Ein Team von Hand löst es nicht aus.
+let teamGemeldet = { team: '', match: '' };
+function teamPruefen() {
+  if (!hatSpiele() || !cfg.gamepc.bild.spiele.valorant?.teamAuto) return;
+  const { melden, zustand } = teamMeldung(teamGemeldet, { team: riot.status().team || sfTeam, match: valorantMatch() });
+  teamGemeldet = zustand;
+  if (!melden) return;
+  const pc = cfg.gamepc.pcId || '';
+  const ev = { type: 'team', team: zustand.team, player: pc, round: 0, einmal: `team:${pc}:${zustand.match || Date.now()}:${zustand.team}` };
+  gamePcLog({ spiel: 'valorant', ev, gesendet: anRegie('valorant', ev) });
+}
 const bildQuelle = (id) => new BildQuelle(id, { team: teamVon(id), name: cfg?.gamepc.pcId || '' });
 const neueQuellen = () => { quellen = { dota2: new DotaQuelle(), ...Object.fromEntries(BILD_SPIELE.map((d) => [d.id, bildQuelle(d.id)])) }; };
 neueQuellen();
@@ -188,9 +204,9 @@ const overdrive = new OverdriveServer({ onEvent: (event) => bildNachricht('valor
 // Valorant, Fortnite, LoL und The Finals über die Overwolf-App „Shots Fired“ (Webhook): alle Overwolf-Events, dieselbe Quelle
 const shotsfired = new ShotsFiredServer({
   onEvent: ({ spiel, event, seite }) => bildNachricht(spiel, { bild: true, event, seite, aktion: 'Shots Fired', quelle: 'shotsfired' }),
-  onTeam: (team) => { sfTeam = team; if (quellen.valorant) quellen.valorant.team = teamVon('valorant'); statusMelden(); },
-  // Neue Infos (Spieler, Seite, Zähler) gleich an die Regie, auch wenn kein Event dabei war
-  onInfo: () => { if (hatSpiele() && quellen.valorant) statusAnRegie('valorant', quellen.valorant.status(), quellen.valorant.stand()); },
+  onTeam: (team) => { sfTeam = team; if (quellen.valorant) quellen.valorant.team = teamVon('valorant'); teamPruefen(); statusMelden(); },
+  // Neue Infos (Spieler, Seite, Zähler, Match-ID) gleich an die Regie, auch wenn kein Event dabei war
+  onInfo: () => { if (hatSpiele() && quellen.valorant) statusAnRegie('valorant', quellen.valorant.status(), quellen.valorant.stand()); teamPruefen(); },
   onChange: statusMelden,
 });
 // League of Legends über Riots Live Client Data API (https://127.0.0.1:2999): beste Quelle für LoL, Team kommt aus dem Spiel
@@ -250,7 +266,7 @@ function anRegie(spiel, ev) {
 }
 function statusAnRegie(spiel, status, stand) {
   // Valorant: MatchID vom Riot Client, damit die Regie die PCs nach Match trennt (core/match-check.js)
-  const match = spiel === 'valorant' ? riot.status().match : '';
+  const match = spiel === 'valorant' ? valorantMatch() : '';
   if (match) stand = { ...(stand || {}), match };
   // Valorant: was Shots Fired weiß (Seite, Team, Spieler beider Teams, Zähler) für den Stats-Screen der Regie
   if (spiel === 'valorant') { const sf = shotsfired.valorantInfo(); if (sf.seite || sf.verbuendete.length || sf.gegner.length || sf.kills != null || sf.runde != null) stand = { ...(stand || {}), sf }; }

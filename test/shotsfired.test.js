@@ -218,7 +218,7 @@ test("Shots Fired: headshots-Zähler, team und ui_team_order", () => {
   assert.deepEqual(ev({ event: "round_number", data: 3 }, z), ["round_start"]);
   assert.deepEqual(ev({ event: "ui_team_order_allies", data: JSON.stringify([{ name: "Momo" }, { name: "Ben" }]) }, z), []);
   assert.deepEqual(ev({ event: "ui team order enemies", data: "Ana, Tom" }, z), []);
-  assert.deepEqual(sfInfo(z), { seite: "Angriff", team: "TEAM A", verbuendete: ["Momo", "Ben"], gegner: ["Ana", "Tom"] });
+  assert.deepEqual(sfInfo(z), { seite: "Angriff", team: "TEAM A", verbuendete: ["Momo", "Ben"], gegner: ["Ana", "Tom"], match: "" });
   ev({ event: "round_number", data: 13 }, z);
   assert.equal(sfInfo(z).team, "TEAM B", "Seitenwechsel nach Runde 12: im Angriff ist jetzt Blau");
   ev({ event: "team", data: "defense" }, z);
@@ -227,7 +227,7 @@ test("Shots Fired: headshots-Zähler, team und ui_team_order", () => {
   assert.equal(sfInfo(z).team, "", "Verlängerung: zu unsicher");
   // match_start setzt alles zurück
   ev({ event: "match_start" }, z);
-  assert.deepEqual(sfInfo(z), { seite: "", team: "", verbuendete: [], gegner: [] });
+  assert.deepEqual(sfInfo(z), { seite: "", team: "", verbuendete: [], gegner: [], match: "" });
 });
 
 test("Shots Fired: Formen von team und ui_team_order", () => {
@@ -277,4 +277,16 @@ test("Shots Fired: echtes Event mit höherer Zahl als der Zähler ist ein neuer 
   const z2 = sfZustand();
   shotsfiredEvents({ event: "kills", data: 1 }, z2, 1000);
   assert.deepEqual(shotsfiredEvents({ event: "kill", data: 1 }, z2, 9000).map((n) => n.event), [], "gleiche Zahl: derselbe Kill, auch später");
+});
+
+test("Shots Fired: match_id und pseudo_match_id ergeben das Match des PCs", () => {
+  const z = sfZustand();
+  shotsfiredEvents({ gameId: 21640, feature: "match_info", info: { match_info: { pseudo_match_id: "abc-123" } } }, z);
+  assert.equal(sfInfo(z).match, "abc-123");
+  shotsfiredEvents({ info: { match_info: { match_id: "riot-9" } } }, z);
+  assert.equal(sfInfo(z).match, "riot-9"); // match_id hat Vorrang
+  shotsfiredEvents({ event: "match_start" }, z);
+  assert.equal(sfInfo(z).match, "riot-9"); // match_start löscht die ID nicht (kann kurz davor kommen)
+  shotsfiredEvents({ event: "match_id", value: "null" }, z);
+  assert.equal(sfInfo(z).match, "riot-9");
 });

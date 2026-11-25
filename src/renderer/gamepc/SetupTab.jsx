@@ -95,7 +95,7 @@ function ShotsFiredAnleitung({ punkte, sf, mac, notify }) {
 
 // Valorant: was Shots Fired über die Teams weiß (team, ui_team_order_allies / _enemies)
 function SfTeams({ info }) {
-  if (!info || (!info.seite && !info.verbuendete?.length && !info.gegner?.length)) return null;
+  if (!info || (!info.seite && !info.verbuendete?.length && !info.gegner?.length && !info.match)) return null;
   const zeile = (titel, wert) => wert ? <div><span style={{ color: SUB }}>{titel}:</span> {wert}</div> : null;
   return (
     <div style={{ marginTop: 12, fontSize: 12, padding: "6px 8px", background: "#1a1820", border: `1px solid ${LINE}`, borderRadius: 6, display: "grid", gap: 2 }}>
@@ -103,6 +103,7 @@ function SfTeams({ info }) {
       {zeile("Team dieses PCs (aus der Seite)", info.team)}
       {zeile("Eigenes Team", info.verbuendete?.join(", "))}
       {zeile("Gegner", info.gegner?.join(", "))}
+      {zeile("Match-ID", info.match)}
     </div>
   );
 }

@@ -6,6 +6,14 @@ const REPO = "Nomisimo/Advanced-Lan";
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
+  "1.0.7": [
+    "Valorant: neues Event „Team steht fest“. Jeder Game-PC meldet es einmal je Match, sobald sein Team automatisch erkannt ist: mit dem Riot Client schon in der Agentenwahl (vor „Match startet“), sonst mit der ersten Runde aus Shots Fired. Je Team eine Zuweisung mit Team-Filter, Werte wie immer mit {nr} oder {plan}",
+    "Shots Fired (Valorant): match_id bzw. pseudo_match_id (match_info) trennt die PCs nach Match, auch ohne Riot Client. Das Setup zeigt die Match-ID",
+    "Stats-Screen: eigener Verlauf dahinter oder davor, beim Hintergrundbild und je Element (Darstellung → Eigener Verlauf)",
+    "Stats-Screen: Teams in Spielstand und Teams-Liste nach Spiel benannt (Valorant: Angriff/Verteidigung, Texte änderbar, z. B. ATTACK/DEFENSE), eigener Name und eigene Farbe je Team",
+    "Stats-Screen: Anzeigen mehrfach hinzufügen („+ Element hinzufügen …“), z. B. ein zweiter Spielstand mit anderen Einstellungen; Duplizieren auch für Anzeigen",
+    "NDI: Netzwerkkarte wählbar (Stats-Screen → Ausgabe). Eine andere Karte gilt nach einem Neustart der App",
+  ],
   "1.0.6": [
     "Simulator der Regie spielt mit den verbundenen Session-PCs: ihre PC-IDs (Plätze aus dem Plan, {nr}, {plan}, PC-Filter), Spielernamen und Teams. Bots füllen bis zur Matchgröße auf. Ohne Session-PCs wie bisher „SIM 01“ und folgende",
     "Simulator: „Event auslösen“ als bestimmter PC, Zurücksetzen gibt den Session-PCs ihren eigenen Stand zurück",

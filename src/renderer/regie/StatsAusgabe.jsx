@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { S, LINE, SUB, MUTED, OK, WARN, ERR, ACCENT } from "../theme.js";
-import { Section, Toggle, Dot } from "../ui.jsx";
+import { Section, Toggle, Dot, Field, KartenWahl, useKarten } from "../ui.jsx";
 import { api } from "../api.js";
 import { NDI_NAME_MAX, freierNdiName } from "../../core/stats-screens.js";
 import { MonitorPlay, X, Cast } from "lucide-react";
@@ -13,6 +13,7 @@ export default function StatsAusgabe({ cfg, mutate, status }) {
   const s = cfg.stats || {}, st = status.stats || {};
   const screens = s.screens || [];
   const [ndiCheck, setNdiCheck] = useState(null);
+  const karten = useKarten();
   useEffect(() => { if (api.ndiPruefen) api.ndiPruefen().then(setNdiCheck); else setNdiCheck({ verfuegbar: false, fehler: "nur in der App, nicht in der Browser-Vorschau" }); }, []);
   const setAn = (v) => mutate((d) => { d.stats = { ...d.stats, an: v }; });
   const setScreen = (id, patch) => mutate((d) => { d.stats = { ...d.stats, screens: kopie(d.stats.screens).map((x) => (x.id === id ? { ...x, ...patch } : x)) }; });
@@ -29,6 +30,13 @@ export default function StatsAusgabe({ cfg, mutate, status }) {
               setNdi={(v) => setScreen(x.id, { ndi: v })}
               setName={(v) => setScreen(x.id, { ndiName: freierNdiName(v, screens.filter((y) => y.id !== x.id).map((y) => y.ndiName)) })} />
           ))}
+        </div>
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 12, flexWrap: "wrap", marginTop: 10 }}>
+          <Field label="Netzwerkkarte für NDI" style={{ width: 320 }} hint={st.ndi?.karteFehler ? "" : st.ndi?.karte ? `NDI sendet über ${st.ndi.karte} (${st.ndi.ip})` : "Automatisch: NDI nutzt alle Karten"}>
+            <div data-testid="ndi-karte"><KartenWahl karten={karten} wert={cfg.netz?.ndi} leer="Automatisch (alle Karten)" onChange={(v) => mutate((d) => { d.netz = { ...d.netz, ndi: v }; })} /></div>
+          </Field>
+          {st.ndi?.neustart && <div style={{ fontSize: 11, color: WARN, paddingBottom: 6, maxWidth: 380, lineHeight: 1.4 }} data-testid="ndi-neustart">Die neue Karte gilt nach einem Neustart der App: das NDI SDK liest sie nur beim Start.</div>}
+          {st.ndi?.karteFehler && <div style={{ fontSize: 11, color: WARN, paddingBottom: 6, maxWidth: 380, lineHeight: 1.4 }}>{st.ndi.karteFehler}</div>}
         </div>
         {ohneEmpfaenger && <div style={{ fontSize: 11, color: WARN, marginTop: 8, lineHeight: 1.5 }}>{MAC ? "Kein Empfänger sieht eine Quelle? Unter Systemeinstellungen → Datenschutz & Sicherheit → Lokales Netzwerk muss Advanced LAN erlaubt sein. Ist der Schalter schon an, einmal aus- und wieder einschalten und die App neu starten. Sender und Empfänger müssen im selben Netz sein." : "Kein Empfänger sieht eine Quelle? Die Windows-Firewall muss Advanced LAN im privaten Netz erlauben (Windows-Sicherheit → Firewall → App zulassen), und Sender und Empfänger müssen im selben Netz sein."}</div>}
         <div style={{ fontSize: 10, color: MUTED, marginTop: 8 }}>{st.ndi?.fps || 30} fps, im selben Netz. Transparenter Hintergrund: die Quelle sendet mit Alpha-Kanal (Key in vMix/OBS nicht nötig). Jede Quelle braucht etwas Rechenleistung, viele große Screens gleichzeitig belasten die Regie.{st.ndi?.version ? ` ${st.ndi.version}.` : ""} NDI® ist eine eingetragene Marke von Vizrt NDI AB.</div>

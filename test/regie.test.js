@@ -199,3 +199,23 @@ test("Simulator der Regie: Session-PCs in Rocket League, Dota 2 und Valorant", (
     sim.neu();
   }
 });
+
+test("Valorant: „Team steht fest“ je PC, ein Befehl je Team mit {nr} aus dem Plan", () => {
+  const signale = { valorant: { team: [
+    { id: "a", ziel: "ma", befehl: "goto_cue", werte: { seq: "{100+nr}", cue: "1" }, pc: "", team: "TEAM A" },
+    { id: "b", ziel: "ma", befehl: "goto_cue", werte: { seq: "{100+nr}", cue: "2" }, pc: "", team: "TEAM B" },
+  ] } };
+  const plan = { pcs: [{ id: "1", pcId: "PC 1", rechner: "", werte: {} }, { id: "2", pcId: "PC 2", rechner: "", werte: {} }], regeln: {}, auto: false, vorlage: null, vorlageAuto: true };
+  const cfg = { ...standardRegie(), armed: true, aktivesSpiel: "valorant", targets: ZIELE, signale, plan };
+  const gesendet = [];
+  const regie = new Regie({ getConfig: () => cfg, send: (s) => gesendet.push(s), now: () => 1000 });
+  for (const pc of ["PC 1", "PC 2"]) regie.pcVerbunden(pc, { spiele: ["valorant"] });
+  regie.pcEvent("PC 1", "valorant", { type: "team", team: "TEAM A", player: "PC 1", round: 0, einmal: "team:PC 1:m1:TEAM A" });
+  regie.pcEvent("PC 2", "valorant", { type: "team", team: "TEAM B", player: "PC 2", round: 0, einmal: "team:PC 2:m1:TEAM B" });
+  regie.pcEvent("PC 2", "valorant", { type: "team", team: "TEAM B", player: "PC 2", round: 0, einmal: "team:PC 2:m1:TEAM B" }); // doppelt
+  const text = gesendet.map((s) => `${s.address} ${s.args.map((a) => a.value).join(" ")}`);
+  assert.equal(gesendet.length, 2, text.join("\n"));
+  assert.match(text[0], /101/);
+  assert.match(text[0], /\b1\b/);
+  assert.match(text[1], /102/);
+});

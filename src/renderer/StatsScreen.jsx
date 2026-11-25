@@ -4,7 +4,7 @@ import { api } from "./api.js";
 import { APP_ICON } from "./Kopf.jsx";
 import { EventIcon, eventLabel, zeit } from "./ui.jsx";
 import { SPIEL_BY_ID } from "../core/spiele.js";
-import { ranking, statsDaten, statsEvents, spielerDaten, spielerWahl, teamListen, wertVon, WERT_KURZ, kd } from "../core/stats-screen.js";
+import { teamSeiten, teamAnzeige, ranking, statsDaten, statsEvents, spielerDaten, spielerWahl, teamListen, wertVon, WERT_KURZ, kd } from "../core/stats-screen.js";
 import { migrateLayout, textEinsetzen, verlaufCss, inhaltsSkala } from "../core/stats-layout.js";
 import { screenVon, leseStatsHash } from "../core/stats-screens.js";
 import { Crown, Trophy } from "lucide-react";
@@ -43,13 +43,14 @@ const Titel = ({ children }) => <div style={{ fontSize: 22, fontWeight: 700, col
 // Zeichenkette der Anzeige (Option) oder ihr Standard; leer = nichts anzeigen
 const opt = (el, k, std) => (typeof el?.[k] === "string" ? el[k] : std);
 
-function TeamBlock({ t, rechts, h = 330, o, tx }) {
-  const f = teamFarbe(t.name);
+function TeamBlock({ t, i, seiten, rechts, h = 330, o, tx }) {
+  const ta = teamAnzeige(o, t.name, i, seiten);
+  const f = ta.farbe || teamFarbe(t.name);
   return (
     <Panel style={{ flex: 1, display: "flex", flexDirection: rechts ? "row-reverse" : "row", alignItems: "center", gap: 36, padding: "0 46px", borderColor: t.sieger ? f : LINE, boxShadow: t.sieger ? `0 0 40px ${f}66` : undefined, position: "relative", overflow: "hidden" }}>
       <div style={{ position: "absolute", [rechts ? "right" : "left"]: 0, top: 0, bottom: 0, width: 10, background: f, boxShadow: `0 0 24px ${f}` }} />
       <div style={{ flex: 1, textAlign: rechts ? "right" : "left" }}>
-        {o.teamnamen !== false && <div style={{ fontSize: 56, fontWeight: 800, color: f, letterSpacing: 3, textShadow: `0 0 18px ${f}88` }}>{t.name}</div>}
+        {o.teamnamen !== false && <div style={{ fontSize: 56, fontWeight: 800, color: f, letterSpacing: 3, textShadow: `0 0 18px ${f}88`, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} data-team={i}>{tx(ta.name)}</div>}
         {t.sieger && tx(opt(o, "textSieger", "Sieger")) && <div style={{ fontSize: 26, fontWeight: 700, color: TXT, display: "inline-flex", alignItems: "center", gap: 10, marginTop: 6 }}><Trophy size={28} color={f} /> {tx(opt(o, "textSieger", "Sieger"))}</div>}
       </div>
       <div style={{ fontSize: Math.min(190, h * 0.58), fontWeight: 800, lineHeight: 1, color: TXT, fontVariantNumeric: "tabular-nums", textShadow: `0 0 34px ${f}aa` }}>{t.score}</div>
@@ -124,7 +125,7 @@ function LetzteEvents({ events, titel, o, tx }) {
   );
 }
 
-function Spielstand({ d, spiel, h, o, tx }) {
+function Spielstand({ d, spiel, seiten, h, o, tx }) {
   return (
     <div style={{ display: "flex", gap: 26, height: "100%" }}>
       {d.leer ? (
@@ -133,7 +134,7 @@ function Spielstand({ d, spiel, h, o, tx }) {
           {o.wartenKlein !== false && <div style={{ fontSize: 28, color: SUB }}>{spiel ? `${spiel.name}: der Screen füllt sich, sobald das Match läuft` : "Kein aktives Spiel"}</div>}
         </Panel>
       ) : d.teams ? (
-        <><TeamBlock t={d.teams[0]} h={h} o={o} tx={tx} /><Mitte d={d} o={o} /><TeamBlock t={d.teams[1]} rechts h={h} o={o} tx={tx} /></>
+        <><TeamBlock t={d.teams[0]} i={0} seiten={seiten} h={h} o={o} tx={tx} /><Mitte d={d} o={o} /><TeamBlock t={d.teams[1]} i={1} seiten={seiten} rechts h={h} o={o} tx={tx} /></>
       ) : <Panel style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}><Mitte d={d} o={o} /></Panel>}
     </div>
   );
@@ -166,7 +167,7 @@ function TextElement({ el, werte }) {
 }
 
 // Teams mit ihren Spielern (Valorant mit Shots Fired: Namen aus ui_team_order beider Teams)
-function TeamsAnzeige({ teams, titel, o, tx }) {
+function TeamsAnzeige({ teams, spiel, seiten, titel, o, tx }) {
   const zelle = { padding: "6px 12px", fontSize: 26, borderBottom: `1px solid ${LINE}` };
   const leer = teams.every((t) => !t.spieler.length);
   return (
@@ -174,11 +175,14 @@ function TeamsAnzeige({ teams, titel, o, tx }) {
       {titel && <Titel>{titel}</Titel>}
       {leer ? <div style={{ fontSize: 26, color: MUTED, fontStyle: "italic" }}>{tx(opt(o, "textLeer", "Noch keine Spieler."))}</div> : (
         <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(teams.length, 3)}, minmax(0,1fr))`, gap: 26, flex: 1, minHeight: 0 }}>
-          {teams.slice(0, 3).map((t) => {
-            const f = teamFarbe(t.name);
+          {teams.slice(0, 3).map((t, k) => {
+            // Teams des Spiels nach ihrer Nummer im Spiel, sonst (Verbündete/Gegner) nach der Reihenfolge
+            const nr = spiel?.teams?.includes(t.name) ? spiel.teams.indexOf(t.name) : k;
+            const ta = teamAnzeige(o, t.name, nr, seiten);
+            const f = ta.farbe || teamFarbe(t.name);
             return (
               <div key={t.name} style={{ minWidth: 0, overflow: "hidden" }}>
-                {o.kopf !== false && <div style={{ fontSize: 30, fontWeight: 800, color: f, letterSpacing: 2, borderBottom: `3px solid ${f}`, paddingBottom: 6, marginBottom: 4, textShadow: `0 0 14px ${f}88`, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</div>}
+                {o.kopf !== false && <div style={{ fontSize: 30, fontWeight: 800, color: f, letterSpacing: 2, borderBottom: `3px solid ${f}`, paddingBottom: 6, marginBottom: 4, textShadow: `0 0 14px ${f}88`, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} data-team={nr}>{tx(ta.name)}</div>}
                 {t.spieler.map((p) => (
                   <div key={p.name} style={{ ...zelle, display: "flex", gap: 12, alignItems: "center", borderLeft: `4px solid ${f}` }}>
                     <span style={{ flex: 1, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
@@ -338,7 +342,7 @@ export function ElementInhalt({ el, ctx }) {
           </span>
         </div>
       );
-    case "spielstand": return <Spielstand d={d} spiel={spiel} h={el.h} o={el} tx={tx} />;
+    case "spielstand": return <Spielstand d={d} spiel={spiel} seiten={ctx.seiten} h={el.h} o={el} tx={tx} />;
     case "zahlen":
       return d.zahlen.length > 0 ? (
         <div style={{ display: "grid", gridTemplateColumns: `repeat(${d.zahlen.length}, 1fr)`, gap: 18, height: "100%" }}>
@@ -354,7 +358,7 @@ export function ElementInhalt({ el, ctx }) {
     case "events": return <LetzteEvents titel={tx(el.titel || "")} o={el} tx={tx} events={statsEvents(log, spiel?.id, el.anzahl || Math.max(1, Math.min(12, Math.floor((el.h - (el.titel ? 100 : 60)) / 56))), namen)} />;
     case "text": return <TextElement el={el} werte={werte} />;
     case "mvp": return <MvpAnzeige el={el} liste={ctx.ranking} d={d} spiel={spiel} tx={tx} h={el.h} />;
-    case "teams": return <TeamsAnzeige teams={ctx.teams} titel={tx(el.titel || "")} o={el} tx={tx} />;
+    case "teams": return <TeamsAnzeige teams={ctx.teams} spiel={spiel} seiten={ctx.seiten} titel={tx(el.titel || "")} o={el} tx={tx} />;
     case "spieler": return <SpielerKarte el={el} sp={spielerWahl(ctx.liste, el.quelle, el.rang)} />;
     case "wert": return <WertElement el={el} wert={wertVon(el.wert, { d, statistik: ctx.statistik, stand: ctx.stand, sp: WERT_SP(el.wert) ? spielerWahl(ctx.liste, el.quelle, el.rang) : null })} />;
     case "bild": return <BildElement el={el} bilder={ctx.bilder} />;
@@ -411,7 +415,7 @@ export function buehnenDaten({ status, cfg, log, jetzt }) {
   const live = !!(status?.stand?.t && jetzt - status.stand.t < FRISCH);
   const statistik = status?.statistik?.spiel === spiel?.id ? status.statistik : null;
   return { spiel, d, live, log, cfg, namen: status?.namen || {}, werte: textWerte({ spiel, d, cfg, jetzt, statistik, stand: status?.stand }), bilder: {},
-    statistik, stand: status?.stand, liste: spielerDaten(status, spiel?.id), teams: teamListen(status, spiel), ranking: ranking(status, spiel) };
+    statistik, stand: status?.stand, liste: spielerDaten(status, spiel?.id), teams: teamListen(status, spiel), seiten: teamSeiten(status, spiel), ranking: ranking(status, spiel) };
 }
 
 // screen: Eintrag aus cfg.regie.stats.screens (Größe und Layout), layout: statt des gespeicherten (Editor)

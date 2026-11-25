@@ -408,3 +408,47 @@ test("MVP-Endscreen: Ranking nach Punkten (Kills, Headshots, Assists, MVPs, Tode
   assert.deepEqual(r.map((p) => [p.name, p.punkte, p.kd, p.hsQuote]), [["B", 9*100 + 6*30 + 2*150 - 2*50, "4.50", 67], ["A", 10*100 + 2*30 - 8*50, "1.25", 20], ["C", 0, "0", 0]]);
   assert.deepEqual(ranking({}, SPIEL_BY_ID.cs2), []);
 });
+
+test("Anzeigen mehrfach: hinzugefügte Kopien mit eigener ID und eigenen Einstellungen", () => {
+  const { neueAnzeige, MAX_KOPIEN } = require("../src/core/stats-layout");
+  const n = neueAnzeige("spielstand", { name1: "ROT" }, { b: 800, h: 200 });
+  assert.ok(n.id !== "spielstand" && n.sichtbar && n.typ === "spielstand");
+  assert.ok(n.x + n.b <= 800 && n.y + n.h <= 200, "in der Fläche");
+  assert.equal(neueAnzeige("gibtsnicht"), null);
+  const l = migrateLayout({ elemente: [
+    { id: "a1", typ: "spielstand", x: 0, y: 0, b: 500, h: 200, benennung: "spiel", farbe1: "#FF0000" },
+    { id: "spielstand", typ: "spielstand", x: 0, y: 0, b: 500, h: 200 },
+    { id: "spielstand", typ: "spielstand", x: 10, y: 10, b: 500, h: 200 }, // doppelte Basis: fällt weg
+    { id: "a1", typ: "spielstand", x: 10, y: 10, b: 500, h: 200 }, // doppelte ID einer Kopie: neue ID
+    ...Array.from({ length: MAX_KOPIEN + 5 }, (_, i) => ({ id: `k${i}`, typ: "logo", x: 0, y: 0, b: 300, h: 80 })),
+  ] });
+  const staende = l.elemente.filter((e) => e.typ === "spielstand");
+  assert.equal(staende.length, 3);
+  assert.equal(staende.filter((e) => e.id === "spielstand").length, 1, "nur eine Basis-Anzeige");
+  const a1 = staende.find((e) => e.id === "a1");
+  assert.deepEqual([a1.benennung, a1.farbe1, a1.name1], ["spiel", "#ff0000", ""]);
+  assert.equal(new Set(l.elemente.map((e) => e.id)).size, l.elemente.length, "IDs eindeutig");
+  assert.equal(l.elemente.filter((e) => e.id !== e.typ && e.typ !== "text").length, MAX_KOPIEN, "höchstens MAX_KOPIEN Kopien");
+  assert.ok(l.elemente.some((e) => e.id === "logo"), "Basis-Logo bleibt (ausgeblendet)");
+});
+
+test("Teams: Benennung nach Spiel, Namen von Hand, Farbe je Team", () => {
+  const { teamSeiten, teamAnzeige } = require("../src/core/stats-screen");
+  const { SPIEL_BY_ID } = require("../src/core/spiele");
+  const val = SPIEL_BY_ID.valorant;
+  // Shots Fired meldet Team und Seite eines PCs
+  const s1 = teamSeiten({ pcs: [{ spiel: "valorant", stand: { sf: { team: "TEAM B", seite: "Angriff" } } }] }, val);
+  assert.deepEqual(s1, { "TEAM B": "Angriff", "TEAM A": "Verteidigung" });
+  // Ohne Shots Fired: aus der Runde (TEAM A beginnt im Angriff)
+  assert.deepEqual(teamSeiten({ statistik: { spiel: "valorant", runde: { nr: 3 } } }, val), { "TEAM A": "Angriff", "TEAM B": "Verteidigung" });
+  assert.deepEqual(teamSeiten({ statistik: { spiel: "valorant", runde: { nr: 14 } } }, val), { "TEAM A": "Verteidigung", "TEAM B": "Angriff" });
+  assert.deepEqual(teamSeiten({ statistik: { spiel: "valorant", runde: { nr: 26 } } }, val), {}, "Verlängerung: unsicher");
+  assert.deepEqual(teamSeiten({}, SPIEL_BY_ID.cs2), {});
+  const el = { benennung: "auto", name1: "", name2: "", textAngriff: "ATTACK", textVerteidigung: "DEFENSE", farbe1: "", farbe2: "" };
+  assert.deepEqual(teamAnzeige(el, "TEAM A", 0, s1), { name: "DEFENSE", farbe: "#3fd4c0" });
+  assert.deepEqual(teamAnzeige(el, "TEAM B", 1, s1), { name: "ATTACK", farbe: "#ff4655" });
+  assert.deepEqual(teamAnzeige({ ...el, benennung: "spiel" }, "TEAM B", 1, s1), { name: "TEAM B", farbe: "" });
+  assert.deepEqual(teamAnzeige({ ...el, name2: "Rot", farbe2: "#00ff00" }, "TEAM B", 1, s1), { name: "Rot", farbe: "#00ff00" }, "von Hand überschreibt");
+  assert.deepEqual(teamAnzeige(el, "CT", 0, {}), { name: "CT", farbe: "" });
+  assert.deepEqual(teamAnzeige(undefined, "CT", 0), { name: "CT", farbe: "" }, "ohne Einstellungen");
+});

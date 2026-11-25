@@ -3,6 +3,7 @@
 const { STANDARD_HOTKEY, gueltigerHotkey } = require("./app-info");
 const { standardBild, migrateBild } = require("./bild-spiele");
 const { standardStats, migrateStats } = require("./stats-screens");
+const { standardSound, migrateSound } = require("./sound");
 const { standardNamensAbfrage, migrateNamensAbfrage } = require("./namen");
 const { leseSpieler } = require("./protokoll");
 const { standardPlan, migratePlan } = require("./plan");
@@ -38,6 +39,8 @@ function standardRegie() {
     // Tab „Stats-Screen“: Game-Stats-Screens (Spielstand, beste Spieler, letzte Events) als Pop-out-Fenster oder NDI-Stream.
     // Mehrere Screens, jeder mit eigener Größe, eigenem Layout und eigener NDI-Quelle (core/stats-screens.js)
     stats: standardStats(),
+    // Tab „Stats-Screen“ → Sound: spielt bei Events Audiodateien auf einem wählbaren Ausgabegerät (core/sound.js)
+    sound: standardSound(),
   };
 }
 
@@ -137,6 +140,7 @@ function migrateKonfig(k) {
       plan: migratePlan(r.plan),
       spiele: genutzteSpiele(r.spiele, d.regie.spiele),
       stats: migrateStats(r.stats),
+      sound: migrateSound(r.sound),
     },
     gamepc: { ...d.gamepc, ...g, regie: { ...d.gamepc.regie, ...(g.regie || {}) }, overlay: { ...d.gamepc.overlay, ...(g.overlay && typeof g.overlay === "object" ? g.overlay : {}) }, bild: migrateBild(g.bild), spieler: leseSpieler(g.spieler), namensAbfrage: migrateNamensAbfrage(g.namensAbfrage), gsiToken: g.gsiToken || d.gamepc.gsiToken, verwaltet: g.verwaltet !== false },
   };

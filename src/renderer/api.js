@@ -19,6 +19,24 @@ import { screenVon, statsHash } from "../core/stats-screens.js";
 export const isElectron = typeof window !== "undefined" && !!window.regieAPI;
 const VORSCHAU_BILDSCHIRM = { id: "1", name: "Bildschirm 1 (Haupt)", b: 1920, h: 1080, primaer: true };
 
+// Vorschau ohne Electron: Ordner (webkitdirectory) oder Dateien wählen → { dateien: [{ pfad, url, name, ordner }] }
+function soundWahl(ordner) {
+  return new Promise((ok) => {
+    const i = document.createElement("input");
+    i.type = "file"; i.multiple = true; i.accept = "audio/*";
+    if (ordner) i.webkitdirectory = true;
+    i.onchange = () => {
+      const files = [...(i.files || [])].filter((f) => /^audio\//.test(f.type) || /\.(wav|mp3|ogg|m4a|aac|flac|opus|webm)$/i.test(f.name));
+      if (!files.length) return ok({ abbruch: true });
+      ok({ dateien: files.map((f) => {
+        const teile = (f.webkitRelativePath || f.name).split("/");
+        return { pfad: f.webkitRelativePath || f.name, url: URL.createObjectURL(f), name: f.name, ordner: teile.length > 1 ? teile[teile.length - 2] : "" };
+      }) });
+    };
+    i.click();
+  });
+}
+
 function browserApi() {
   const KEY = "advancedlan_konfig";
   let cfg;
@@ -241,6 +259,9 @@ function browserApi() {
       for (const p of pcs) download(showDateiName(p.pcId, "gamepc"), JSON.stringify(paketDatei(vorlage, p.pcId, { appVersion: __APP_VERSION__ }), null, 1));
       return { ok: true, n: pcs.length, ordner: "Downloads" };
     },
+    // Vorschau: Dateien über den Browser wählen, abgespielt über Object-URLs (gelten nur bis zum Neuladen)
+    soundOrdner: () => soundWahl(true),
+    soundDateien: () => soundWahl(false),
     eventAusloesen: async (ev) => regie.fire({ round: regie.stand?.runde, map: regie.stand?.map, ...ev, spiel: cfg.regie.aktivesSpiel, pc: "Regie", pcId: "regie" }, "manuell"),
     signalTesten: async (spiel, type, z) => regie.testeZuweisung(spiel, type, z),
     overlayZuruecksetzen: async () => {},

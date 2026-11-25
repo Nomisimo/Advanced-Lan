@@ -135,3 +135,67 @@ test("Simulator der Regie meldet 10 virtuelle PCs", () => {
   sim.neu();
   assert.equal(regie.snapshot().pcs.length, 0);
 });
+
+// Session-PCs verbunden: der Simulator spielt mit genau diesen PCs, ohne virtuelle SIM-PCs
+// Eine Runde ohne Wartezeiten: Match anlegen, Echtzeit-Lauf anhalten, Schritte direkt zustellen
+function simRunde(sim, spiel) {
+  sim.start("runde", spiel);
+  sim.stop();
+  for (const s of sim.runner.match.naechsteRunde()) for (const p of s.payloads) sim.runner.deliver(p);
+}
+
+test("Simulator der Regie spielt mit den verbundenen Session-PCs", () => {
+  const cfg = standardRegie();
+  const events = [];
+  const regie = new Regie({ getConfig: () => cfg, send: () => {}, emit: (typ, d) => typ === "event" && events.push(d) });
+  regie.pcVerbunden("PC 02", { spiele: ["cs2"], remote: "10.0.0.12", spieler: "Kira" });
+  regie.pcVerbunden("PC 01", { spiele: ["cs2"], remote: "10.0.0.11", spieler: "Momo" });
+  regie.pcStatus("PC 02", { spiel: "cs2", status: { spieler: "Kira", team: "T" } });
+  regie.pcVerbunden("Regie-PC", { spiele: ["cs2"], remote: "dieser PC" }); // der PC der Regie zählt nicht
+  const sim = new RegieSim({ regie });
+  simRunde(sim, "cs2");
+  const st = sim.status();
+  assert.equal(st.echt, true);
+  assert.deepEqual(st.pcs, [{ pcId: "PC 01", name: "Momo", team: "CT" }, { pcId: "PC 02", name: "Kira", team: "T" }]);
+  assert.equal(regie.snapshot().pcs.filter((p) => p.sim).length, 0);
+  assert.ok(events.length > 0);
+  assert.ok(events.every((e) => ["PC 01", "PC 02"].includes(e.ev.pcId) && e.quelle === "sim"));
+  assert.ok(events.some((e) => e.ev.type === "round_end"));
+  // Zurücksetzen: die PCs bleiben verbunden und bekommen ihren eigenen Stand zurück
+  sim.neu();
+  assert.equal(regie.pcs.size, 3);
+  assert.deepEqual(regie.pcs.get("PC 02").status, { spieler: "Kira", team: "T" });
+  assert.equal(regie.pcs.get("PC 01").status, undefined);
+});
+
+test("Simulator der Regie: ohne Session-PCs virtuelle PCs, beim Verbinden wechselt er", () => {
+  const cfg = standardRegie();
+  const regie = new Regie({ getConfig: () => cfg, send: () => {} });
+  const sim = new RegieSim({ regie });
+  sim.start("runde", "cs2"); sim.stop();
+  assert.equal(sim.status().echt, false);
+  assert.equal(regie.snapshot().pcs.filter((p) => p.sim).length, 10);
+  regie.pcVerbunden("PC 01", { spiele: ["cs2"], remote: "10.0.0.11" });
+  sim.start("runde", "cs2"); sim.stop();
+  assert.equal(sim.status().echt, true);
+  assert.deepEqual(regie.snapshot().pcs.map((p) => p.pcId), ["PC 01"]);
+  regie.pcGetrennt("PC 01");
+  sim.start("runde", "cs2"); sim.stop();
+  assert.equal(sim.status().echt, false);
+});
+
+test("Simulator der Regie: Session-PCs in Rocket League, Dota 2 und Valorant", () => {
+  for (const spiel of ["rl", "dota2", "valorant"]) {
+    const cfg = { ...standardRegie(), aktivesSpiel: spiel };
+    const events = [];
+    const regie = new Regie({ getConfig: () => cfg, send: () => {}, emit: (typ, d) => typ === "event" && events.push(d) });
+    for (let i = 1; i <= 3; i++) regie.pcVerbunden(`PC 0${i}`, { spiele: [spiel], remote: `10.0.0.1${i}`, spieler: `Spieler ${i}` });
+    const sim = new RegieSim({ regie });
+    simRunde(sim, spiel);
+    assert.equal(sim.status().pcs.length, 3, spiel);
+    assert.equal(regie.pcs.size, 3, spiel);
+    assert.ok(events.length > 0, spiel);
+    assert.ok(events.every((e) => e.ev.pcId.startsWith("PC 0")), spiel);
+    sim.neu();
+  }
+});

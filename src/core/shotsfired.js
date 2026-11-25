@@ -10,6 +10,8 @@
 // liest zerlegen() auch andere übliche Formen, und der Empfänger schreibt jede Anfrage mit (Setup → „Letzte Anfragen“).
 //
 // Valorant (OW-Electron-Doku, supported-games/valorant):
+// Manche Shots-Fired-Versionen bieten für Valorant nur kills, deaths, round_number, team, map und game_mode an. Die Zähler
+// kills und deaths werden dann zu Kill (mit Ace) und Tod, eine neue round_number zum Rundenstart (siehe shotsfiredEvents).
 // - Events: match_start, match_end, kill, death, assist, headshot, spike_planted, spike_defused, spike_detonated
 // - Info-Updates: round_phase (shopping, combat, end), score / match_score ({ won, lost } aus Sicht dieses Spielers)
 // Rundenstart, Rundenende, Rundengewinner und Matchgewinner gibt es für Valorant nicht als Event (anders als bei R6 oder OW2):
@@ -43,7 +45,9 @@ const SF_EVENTS = {
 };
 const SCORE_KEYS = ["score", "match_score"];
 // Valorant: Events und Info-Updates, die gelesen werden (kill_feed kommt je nach Version als Event oder Info-Update)
-const VAL = { events: SF_EVENTS, infos: [...SCORE_KEYS, "round_phase", "kill_feed"] };
+// Shots Fired bietet je nach Version statt der Events nur Zähler an: kills, deaths (Summe im Match) und round_number.
+const ZAEHLER_KEYS = ["kills", "deaths"];
+const VAL = { events: SF_EVENTS, infos: [...SCORE_KEYS, "round_phase", "kill_feed", ...ZAEHLER_KEYS, "round_number"] };
 const SIEG_RUNDEN = 13;
 
 const norm = (s) => String(s ?? "").trim().toLowerCase().replace(/[\s\-.]+/g, "_");
@@ -112,7 +116,18 @@ const MITSPIELER = 4;
 const neueRunde = () => ({ kills: 0, tot: false, mitspielerTot: 0, ace: false });
 
 // Zustand je Game-PC: letzter Spielstand, ob das Match schon entschieden ist, und die laufende Runde
-const sfZustand = () => ({ score: null, entschieden: false, phase: "", r: neueRunde() });
+// Zähler: letzter Stand von kills, deaths und round_number. Kommen echte kill- oder death-Events, gelten die (keine Doppelten).
+const neueZaehler = () => ({ kills: null, deaths: null, runde: null });
+const sfZustand = () => ({ score: null, entschieden: false, phase: "", r: neueRunde(), z: neueZaehler(), echt: { kill: false, death: false } });
+// Zahl aus einem Wert: 3, "3", { kills: 3 } oder JSON-Text
+function zahlVon(v, key) {
+  let x = json(v);
+  if (x && typeof x === "object") x = x[key] ?? x.value ?? x.count;
+  const n = Number(x);
+  return x !== "" && x != null && Number.isFinite(n) && n >= 0 ? Math.floor(n) : null;
+}
+// Höchstens so viele Kills oder Tode aus einem Sprung des Zählers (ein Ausreißer löst keine Flut von Cues aus)
+const MAX_SPRUNG = 5;
 const wahr = (v) => v === true || v === "true" || v === 1 || v === "1";
 
 // Anfrage → Nachrichten für die Valorant-Quelle: [{ event, seite }]. seite: eigen = Team dieses PCs, gegner = das andere, keins = ohne Team.
@@ -121,6 +136,15 @@ function shotsfiredEvents(body, z = sfZustand()) {
   const raus = [];
   const matchSieg = (seite) => { if (!z.entschieden) { z.entschieden = true; raus.push({ event: "match_won", seite }); } };
   z.r = z.r || neueRunde();
+  z.z = z.z || neueZaehler();
+  z.echt = z.echt || { kill: false, death: false };
+  const kill = () => {
+    raus.push({ event: "kill", seite: "eigen" });
+    if (++z.r.kills >= ACE_KILLS && !z.r.ace) { z.r.ace = true; raus.push({ event: "ace", seite: "eigen" }); }
+  };
+  const tod = () => { z.r.tot = true; raus.push({ event: "death", seite: "eigen" }); };
+  // Echte Events zuerst merken: dann zählen die Zähler nur noch mit und lösen nichts aus
+  for (const { name: n } of events) { const id = eventName(n); if (id === "kill" || id === "death") z.echt[id] = true; }
   const rundeStart = () => { z.r = neueRunde(); raus.push({ event: "round_start", seite: "eigen" }); };
   // Rundenende: bei Sieg des eigenen Teams Clutch prüfen, danach zählt die nächste Runde neu
   const rundeEnde = (seite) => {
@@ -129,9 +153,33 @@ function shotsfiredEvents(body, z = sfZustand()) {
     z.r = neueRunde();
   };
   for (const { key, value } of infos) {
+    if (ZAEHLER_KEYS.includes(key)) {
+      const n = zahlVon(value, key);
+      if (n == null) continue;
+      const alt = z.z[key];
+      z.z[key] = n;
+      const echt = key === "kills" ? z.echt.kill : z.echt.death;
+      // Erster Wert: ab 0 oder 1 zählt er (Match läuft gerade an), ein höherer Stand ist nur der Ausgangswert (App mitten im Match gestartet)
+      const neu = alt == null ? (n <= 1 ? n : 0) : n > alt ? n - alt : 0;
+      if (!echt) for (let i = 0; i < Math.min(neu, MAX_SPRUNG); i++) key === "kills" ? kill() : tod();
+      continue;
+    }
+    if (key === "round_number") {
+      const n = zahlVon(value, key);
+      if (n == null || n === z.z.runde) continue;
+      z.z.runde = n;
+      // Neue Rundennummer = Rundenstart. Hat die Kaufphase (round_phase) diese Runde schon gestartet, nicht doppelt.
+      if (z.r.perPhase && !z.r.perNummer) z.r.perNummer = true;
+      else { rundeStart(); z.r.perNummer = true; }
+      continue;
+    }
     if (key === "round_phase") {
       const p = norm(json(value)?.round_phase ?? value);
-      if (p === "shopping" && z.phase !== "shopping") rundeStart();
+      if (p === "shopping" && z.phase !== "shopping") {
+        // Hat round_number diese Runde schon gestartet, nur merken
+        if (z.r.perNummer && !z.r.perPhase) z.r.perPhase = true;
+        else { rundeStart(); z.r.perPhase = true; }
+      }
       // Ohne Spielstand: Rundenende ohne Sieger. Mit Spielstand kommt das Rundenende mit Sieger, wenn score steigt.
       if (p === "end" && z.phase !== "end" && !z.score) rundeEnde("keins");
       z.phase = p;
@@ -155,11 +203,9 @@ function shotsfiredEvents(body, z = sfZustand()) {
   }
   for (const { name: n } of events) {
     const id = eventName(n);
-    if (id === "match_start") { z.score = null; z.entschieden = false; z.phase = ""; z.r = neueRunde(); raus.push({ event: id, seite: "eigen" }); }
-    else if (id === "kill") {
-      raus.push({ event: id, seite: "eigen" });
-      if (++z.r.kills >= ACE_KILLS && !z.r.ace) { z.r.ace = true; raus.push({ event: "ace", seite: "eigen" }); }
-    } else if (id === "death") { z.r.tot = true; raus.push({ event: id, seite: "eigen" }); }
+    if (id === "match_start") { z.score = null; z.entschieden = false; z.phase = ""; z.r = neueRunde(); z.z = neueZaehler(); raus.push({ event: id, seite: "eigen" }); }
+    else if (id === "kill") kill();
+    else if (id === "death") tod();
     else if (id === "match_end") {
       // Mit bekanntem Stand den Sieger mitliefern, sonst nur „Match vorbei“
       const s = z.score;
@@ -225,6 +271,7 @@ const lolEvents = (body) => zerlegen(body, LOL).events.map(({ name }) => ({ even
 const SF_EINRICHTEN = {
   valorant: [["spike_planted, spike_defused, spike_detonated", "Spike gelegt, entschärft, explodiert"], ["match_start, match_end", "Match startet, Match vorbei"],
     ["kill, death, assist, headshot", "Kill, Tod, Assist, Headshot, dazu Ace (5 Kills in einer Runde)"], ["kill_feed", "für Clutch (letzter Überlebender gewinnt)"],
+    ["kills, deaths, round_number", "wenn Shots Fired nur diese anbietet: Kill und Ace, Tod, Rundenstart"],
     ["round_phase", "Rundenstart (Kaufphase) und Rundenende"], ["score", "Rundengewinner und Matchgewinner (13 Runden, 2 Vorsprung)"]],
   fortnite: [["matchStart, matchEnd", "Match startet, Match vorbei"], ["kill, knockout, assist", "Eliminierung, Gegner niedergeschlagen, Assist"],
     ["death, knockedout, revived", "Ausgeschieden, selbst niedergeschlagen, wiederbelebt"], ["phase", "Battle Bus startet, gelandet"], ["rank", "Top 10, Top 5, Victory Royale (Platz 1)"]],

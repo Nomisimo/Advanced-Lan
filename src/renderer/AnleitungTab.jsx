@@ -201,6 +201,7 @@ const OverwolfSpiele = ({ goTab }) => (
       <li>Overwolf installieren, darin <b>Shots Fired</b> aus dem Store installieren und starten.</li>
       <li>In Shots Fired das Spiel wählen und je Event eine <b>Sequence</b> mit der Aktion <b>Webhook</b> anlegen, Adresse wie oben (im Game-PC-Setup gibt es dafür „Adresse kopieren“).</li>
       <li>Welche Events je Spiel, steht im Game-PC-Setup unter „Overwolf-Spiele über Shots Fired“. Kurz: Valorant spike_planted, spike_defused, spike_detonated, match_start, match_end, kill, death, assist, headshot, kill_feed, round_phase, score. Fortnite matchStart, matchEnd, kill, knockout, assist, death, knockedout, revived, phase, rank. The Finals match_start, match_end, elimination, death. LoL kill, death, assist, matchStart, matchEnd.</li>
+      <li>Bietet Shots Fired für Valorant nur <b>kills, deaths, round_number</b> (dazu team, map, game_mode) an: diese drei anlegen. Daraus werden Kill (mit Ace), Tod und Rundenstart. Spike, Rundengewinner, Matchgewinner und Clutch kommen dann nur über die Bilderkennung.</li>
       <li>Testen: im Setup unter „Letzte Anfragen“ steht jede Anfrage im Rohformat und welches Event daraus wurde.</li>
     </L>
     <P>

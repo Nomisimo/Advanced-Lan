@@ -164,3 +164,48 @@ test("Shots Fired: echtes Format { gameId, event: feature.name, data } für alle
   assert.equal(n("/lol", { gameId: 5426, event: "kill.kill", data: "" }), "lol:kill");
   assert.equal(n("/lol", { gameId: 5426, event: "announcer.penta_kill", data: "" }), "lol:penta_kill");
 });
+
+test("Shots Fired: Zähler kills, deaths und round_number (wenn es keine Einzel-Events gibt)", () => {
+  const z = sfZustand();
+  const sf = (event, data) => ev({ gameId: 21640, event, data }, z);
+  assert.deepEqual(sf("match_info.round_number", 1), ["round_start"]);
+  assert.deepEqual(sf("round_number", 1), [], "gleiche Runde löst nichts aus");
+  assert.deepEqual(sf("kills", 1), ["kill"]);
+  assert.deepEqual(sf("kills", "3"), ["kill", "kill"]);
+  assert.deepEqual(sf("deaths", 0), []);
+  assert.deepEqual(sf("deaths", 1), ["death"]);
+  assert.deepEqual(sf("round_number", "2"), ["round_start"]);
+  // Ace: 5 Kills in Runde 2
+  assert.deepEqual(sf("kills", 7), ["kill", "kill", "kill", "kill"]);
+  assert.deepEqual(sf("kills", 8), ["kill", "ace"]);
+  // Stand fällt zurück: neues Match, nur neuer Ausgangswert
+  assert.deepEqual(sf("kills", 0), []);
+  assert.deepEqual(sf("kills", 1), ["kill"]);
+});
+
+test("Shots Fired: Zähler mitten im Match und neben echten Events", () => {
+  const z = sfZustand();
+  // App startet mitten im Match: hoher Stand ist nur der Ausgangswert
+  assert.deepEqual(ev({ event: "kills", data: 9 }, z), []);
+  assert.deepEqual(ev({ event: "kills", data: 10 }, z), ["kill"]);
+  // Kommen echte kill-Events, zählt der Zähler nicht doppelt
+  assert.deepEqual(ev({ event: "kill.kill", data: 11 }, z), ["kill"]);
+  assert.deepEqual(ev({ event: "kills", data: 11 }, z), []);
+  // Rundennummer nach der Kaufphase aus round_phase: kein zweiter Rundenstart
+  const z2 = sfZustand();
+  assert.deepEqual(ev({ info: { match_info: { round_phase: "shopping" } } }, z2), ["round_start"]);
+  assert.deepEqual(ev({ event: "round_number", data: 4 }, z2), []);
+  // Unsinn wird ignoriert
+  assert.deepEqual(ev({ event: "kills", data: "abc" }, sfZustand()), []);
+});
+
+test("Shots Fired: round_number vor der Kaufphase startet die Runde nur einmal", () => {
+  const z = sfZustand();
+  const phase = (p) => ({ info: { match_info: { round_phase: p } } });
+  assert.deepEqual(ev({ event: "round_number", data: 1 }, z), ["round_start"]);
+  assert.deepEqual(ev(phase("shopping"), z), []);
+  assert.deepEqual(ev(phase("combat"), z), []);
+  assert.deepEqual(ev(phase("shopping"), z), ["round_start"]);
+  assert.deepEqual(ev({ event: "round_number", data: 2 }, z), []);
+  assert.deepEqual(ev({ event: "round_number", data: 3 }, z), ["round_start"]);
+});

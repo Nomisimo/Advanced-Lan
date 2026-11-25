@@ -78,14 +78,73 @@ test("Stats-Screen: letzte Events nur echte des aktiven Spiels", () => {
 
 test("Einstellungen: Standalone-Modus und Stats-Screen", () => {
   const k = standardKonfig();
-  assert.deepEqual(k.regie.stats, { an: false, ndi: false, ndiName: "Advanced LAN Stats", layout: standardLayout() });
+  assert.deepEqual(k.regie.stats, { an: false, aktiv: "haupt", screens: [{ id: "haupt", name: "Haupt-Screen", b: 1920, h: 1080, ndi: false, ndiName: "Advanced LAN Stats", layout: standardLayout() }] });
   k.modus = "standalone";
+  // Alte Einstellungen mit genau einem Screen werden zum ersten Screen
   k.regie.stats = { an: true, ndi: true, ndiName: "  Bühne  ", fremd: 1 };
   const m = migrateKonfig(JSON.parse(JSON.stringify(k)));
   assert.equal(m.modus, "standalone");
-  assert.deepEqual(m.regie.stats, { an: true, ndi: true, ndiName: "Bühne", layout: standardLayout() });
+  assert.deepEqual(m.regie.stats, { an: true, aktiv: "haupt", screens: [{ id: "haupt", name: "Haupt-Screen", b: 1920, h: 1080, ndi: true, ndiName: "Bühne", layout: standardLayout() }] });
   assert.equal(migrateKonfig({ ...k, modus: "quatsch" }).modus, null);
-  assert.equal(migrateKonfig({ ...k, regie: { ...k.regie, stats: { an: 1, ndiName: "" } } }).regie.stats.ndiName, "Advanced LAN Stats");
+  assert.equal(migrateKonfig({ ...k, regie: { ...k.regie, stats: { an: 1, ndiName: "" } } }).regie.stats.screens[0].ndiName, "Advanced LAN Stats");
+});
+
+test("Mehrere Screens: eigene Größe, eindeutige IDs und NDI-Namen, höchstens 8", () => {
+  const { migrateStats, neuerScreen, freierNdiName, MAX_SCREENS, GROESSE_MIN, GROESSE_MAX, screenVon, statsHash, leseStatsHash } = require("../src/core/stats-screens");
+  const a = neuerScreen({ name: "Score", b: 800, h: 200, vorlage: "spielstand" });
+  const s = migrateStats({ an: true, aktiv: "weg", screens: [
+    { id: "haupt", name: "Haupt", ndi: true, ndiName: "Stage" },
+    { ...a, ndi: true, ndiName: "stage" },
+    { id: "haupt", name: "", b: 5, h: 99999, ndiName: "" },
+    "quatsch",
+  ] });
+  assert.equal(s.screens.length, 3);
+  assert.equal(s.aktiv, "haupt");
+  assert.equal(new Set(s.screens.map((x) => x.id)).size, 3);
+  assert.deepEqual(s.screens.map((x) => x.ndiName), ["Stage", "stage 2", "Advanced LAN Stats"]);
+  assert.deepEqual([s.screens[2].b, s.screens[2].h], [GROESSE_MIN, GROESSE_MAX]);
+  assert.equal(s.screens[2].name, "Screen 3");
+  // Layout bleibt in der Fläche des Screens
+  const k = s.screens[1];
+  assert.deepEqual([k.b, k.h], [800, 200]);
+  assert.ok(k.layout.elemente.every((e) => e.x >= 0 && e.y >= 0 && e.x + e.b <= 800 && e.y + e.h <= 200));
+  const sicht = k.layout.elemente.filter((e) => e.sichtbar);
+  assert.deepEqual(sicht.map((e) => [e.typ, e.x, e.y, e.b, e.h]), [["spielstand", 0, 0, 800, 200]]);
+  assert.equal(k.layout.hintergrund, "transparent");
+  assert.equal(migrateStats({ screens: Array.from({ length: 12 }, (_, i) => ({ id: `x${i}` })) }).screens.length, MAX_SCREENS);
+  assert.equal(migrateStats({ screens: [] }).screens[0].id, "haupt");
+  assert.equal(freierNdiName("A", ["a", "A 2"]), "A 3");
+  assert.equal(screenVon(s, k.id), k);
+  assert.equal(screenVon(s, "gibtsnicht"), s.screens[0]);
+  assert.deepEqual(leseStatsHash("#" + statsHash(k.id, true)), { id: k.id, ndi: true });
+  assert.deepEqual(leseStatsHash("#stats"), { id: "", ndi: false });
+  assert.equal(leseStatsHash("#regie"), null);
+});
+
+test("Layout auf kleiner Fläche: Standard anteilig, Einrasten an der Fläche, neue Blöcke passen hinein", () => {
+  const { neuerText, neuesBild } = require("../src/core/stats-layout");
+  const F = { b: 960, h: 540 };
+  const l = standardLayout(F);
+  const sp = l.elemente.find((e) => e.typ === "spielstand");
+  assert.deepEqual([sp.x, sp.y, sp.b, sp.h], [22, 69, 916, 165]);
+  assert.ok(l.elemente.every((e) => e.x + e.b <= 960 && e.y + e.h <= 540));
+  const r = einrasten({ x: 455, y: 0, b: 50, h: 50 }, [], { abstand: 8, flaeche: { b: 400, h: 100 } });
+  assert.equal(r.x, 350); // rechte Kante an der Fläche (400), sonst nichts in der Nähe
+  const t = neuerText({}, { b: 300, h: 60 });
+  assert.deepEqual([t.x, t.y, t.b, t.h], [0, 0, 300, 60]);
+  const i = neuesBild("b1", { b0: 4, h0: 1, flaeche: { b: 400, h: 100 } });
+  assert.deepEqual([i.x, i.y, i.b, i.h], [0, 0, 400, 100]);
+  // Gespeicherte Elemente außerhalb kommen in die Fläche
+  const m = migrateLayout({ elemente: [{ typ: "text", id: "t1", x: 1500, y: 900, b: 600, h: 120 }] }, { b: 400, h: 100 });
+  const tx = m.elemente.find((e) => e.id === "t1");
+  assert.deepEqual([tx.x, tx.y, tx.b, tx.h], [0, 0, 400, 100]);
+});
+
+test("NDI mit Alpha: vormultiplizierte Pixel werden gerade", () => {
+  const { alphaGerade } = require("../src/core/stats-screens");
+  const b = Buffer.from([10, 20, 30, 255, 0, 0, 0, 0, 50, 64, 0, 128]);
+  alphaGerade(b);
+  assert.deepEqual([...b], [10, 20, 30, 255, 0, 0, 0, 0, 100, 128, 0, 128]);
 });
 
 test("Screen-Layout: Standard hat jede Anzeige einmal, sichtbar", () => {

@@ -946,8 +946,9 @@ ipcMain.handle('sim-start', (_, modus) => { regieSim.start(modus, cfg.regie.akti
 ipcMain.handle('sim-stop', () => { regieSim.stop(); return regieSim.status(); });
 ipcMain.handle('sim-neu', () => { regieSim.neu(); return regieSim.status(); });
 // Game-Stats-Screen
-ipcMain.handle('stats-fenster', (_, offen) => { if (offen === false) stats.fensterSchliessen(); else stats.fensterOeffnen(); statusMelden(); return stats.status(); });
-ipcMain.handle('stats-vollbild', () => stats.vollbild());
+// id: Screen (ohne Angabe der erste); offen === false schließt, ohne id alle Fenster
+ipcMain.handle('stats-fenster', (_, offen, id) => { if (offen === false) stats.fensterSchliessen(id); else stats.fensterOeffnen(id); statusMelden(); return stats.status(); });
+ipcMain.handle('stats-vollbild', (e) => stats.vollbild(e.sender));
 ipcMain.handle('ndi-pruefen', () => stats.ndiVerfuegbar());
 
 // Game-PC

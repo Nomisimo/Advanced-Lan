@@ -14,6 +14,7 @@ import { QUELLEN } from "../core/spiele.js";
 import { feedbackUrl } from "../core/app-info.js";
 import { SHOW_ENDUNG, ART_NAME, arten as showArten, showDatei, leseShow, showAnwenden, leereShow, alsGespeichert, dateiName as showDateiName, showDaten, vorlageAus, paketDatei } from "../core/show.js";
 import { leseSpieler } from "../core/protokoll.js";
+import { screenVon, statsHash } from "../core/stats-screens.js";
 
 export const isElectron = typeof window !== "undefined" && !!window.regieAPI;
 const VORSCHAU_BILDSCHIRM = { id: "1", name: "Bildschirm 1 (Haupt)", b: 1920, h: 1080, primaer: true };
@@ -25,9 +26,9 @@ function browserApi() {
   const speichern = () => { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch {} };
   const hoerer = { status: new Set(), meldung: new Set(), regieEvent: new Set(), gamePcEvent: new Set(), config: new Set() };
   // Game-Stats-Screen der Vorschau: eigener Tab (index.html#stats), bekommt Status und Events über einen BroadcastChannel
-  const istStats = typeof location !== "undefined" && location.hash === "#stats";
+  const istStats = typeof location !== "undefined" && /^#stats(=|&|$)/.test(location.hash);
   const kanal = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("advancedlan-vorschau") : null;
-  let statsTab = null;
+  const statsTabs = new Map(); // Screen-ID → Tab
   const melde = (k, d) => { hoerer[k].forEach((cb) => cb(d)); if (kanal && !istStats && (k === "status" || k === "regieEvent")) kanal.postMessage({ k, d }); };
   let sessionOffen = false;
   const gp = { zustand: "getrennt", log: [], nr: 0 };
@@ -38,9 +39,11 @@ function browserApi() {
   ];
   const status = () => {
     const s = { modus: cfg.modus, jetzt: Date.now(), vorschau: true, app: { hotkeyFehler: "", plattform: "win32" } };
-    const statsOffen = !!(statsTab && !statsTab.closed);
+    const offen = (id) => { const t = statsTabs.get(id); return !!(t && !t.closed); };
+    const scr = cfg.regie.stats.screens;
+    const screens = Object.fromEntries(scr.map((x) => [x.id, { fenster: offen(x.id), ndi: { laeuft: false, name: "", verbindungen: 0, bilder: 0, fehler: "", aufloesung: `${x.b}×${x.h}`, fps: 30 } }]));
     if (cfg.modus === "regie" || cfg.modus === "standalone") s.regie = { ...regie.snapshot(), session: { offen: sessionOffen, port: cfg.regie.session.port, ip: "", fehler: "", verbunden: regie.snapshot().pcs.filter((p) => p.verbunden && !p.sim).length }, sim: sim.status(), armed: cfg.regie.armed, spielAufRegie: "",
-      stats: { fenster: statsOffen, ndi: { verfuegbar: false, laeuft: false, name: "", verbindungen: 0, fehler: "", aufloesung: "1920×1080", fps: 30 } }, lokal: cfg.modus === "standalone" ? cfg.gamepc.pcId.trim() || "Dieser PC" : null };
+      stats: { fenster: offen(scr[0]?.id), offen: scr.filter((x) => offen(x.id)).length, ndi: { verfuegbar: false, laeuft: false, sender: 0, fps: 30 }, screens }, lokal: cfg.modus === "standalone" ? cfg.gamepc.pcId.trim() || "Dieser PC" : null };
     if (cfg.modus === "gamepc" || cfg.modus === "standalone") s.gamepc = {
       spieler: cfg.gamepc.spieler, spielerAnzeige: cfg.gamepc.spieler || cfg.gamepc.pcId.trim() || "Dieser PC",
       client: { zustand: gp.zustand, grund: "", session: gp.zustand === "verbunden" ? cfg.gamepc.regie.session : "", aktivesSpiel: "cs2", ziel: null, gesendet: gp.log.filter((e) => e.gesendet).length, verworfen: 0 },
@@ -246,9 +249,17 @@ function browserApi() {
     simStop: async () => { sim.stop(); return sim.status(); },
     simNeu: async () => { sim.neu(); return sim.status(); },
     onRegieEvent: abo("regieEvent"),
-    statsFenster: async (offen) => {
-      if (offen === false) { if (statsTab && !statsTab.closed) statsTab.close(); statsTab = null; }
-      else { statsTab = window.open(location.href.split("#")[0] + "#stats", "advancedlan-stats", "width=1280,height=720"); const t = setInterval(() => { if (!statsTab || statsTab.closed) { clearInterval(t); statsMelden(); } }, 1000); }
+    // id: Screen, ohne Angabe der erste (Schließen ohne id: alle)
+    statsFenster: async (offen, id) => {
+      const sc = screenVon(cfg.regie.stats, id);
+      if (offen === false) {
+        for (const [k, t] of statsTabs) if (id === undefined || k === sc?.id) { if (!t.closed) t.close(); statsTabs.delete(k); }
+      } else if (sc) {
+        const f = Math.min(1, 1280 / sc.b, 720 / sc.h);
+        const tab = window.open(location.href.split("#")[0] + "#" + statsHash(sc.id), `advancedlan-stats-${sc.id}`, `width=${Math.max(160, Math.round(sc.b * f))},height=${Math.max(90, Math.round(sc.h * f))}`);
+        statsTabs.set(sc.id, tab);
+        const t = setInterval(() => { if (!tab || tab.closed) { clearInterval(t); statsMelden(); } }, 1000);
+      }
       statsMelden(); return status().regie?.stats;
     },
     statsVollbild: async () => { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen?.(); },

@@ -11,7 +11,7 @@ const URL = 'file://' + path.resolve(process.argv[2] || 'dist-app/index.html');
 const BILDER = process.argv[3] || require('os').tmpdir();
 (async () => {
   const browser = await chromium.launch();
-  const ctx = await browser.newContext({ viewport: { width: 1480, height: 940 } });
+  const ctx = await browser.newContext({ viewport: { width: 1480, height: 1100 } });
   const page = await ctx.newPage();
   const fehler = [];
   page.on('pageerror', (e) => fehler.push(e.message));
@@ -35,7 +35,7 @@ const BILDER = process.argv[3] || require('os').tmpdir();
   await flaeche.waitFor();
   await page.waitForTimeout(300);
   await page.screenshot({ path: BILDER + '/editor-1-standard.png' });
-  const layout = () => page.evaluate(() => JSON.parse(localStorage.getItem('advancedlan_konfig')).regie.stats.layout);
+  const layout = () => page.evaluate(() => JSON.parse(localStorage.getItem('advancedlan_konfig')).regie.stats.screens[0].layout);
   const box = await flaeche.boundingBox();
   const s = box.width / 1920;
 
@@ -129,7 +129,7 @@ const BILDER = process.argv[3] || require('os').tmpdir();
   // 9) Bild als Block: Dateiauswahl, landet verkleinert als WebP im Layout
   const [wahl] = await Promise.all([page.waitForEvent('filechooser'), page.getByRole('button', { name: 'Bild hinzufügen' }).click()]);
   await wahl.setFiles(path.resolve(__dirname, '../../assets/app-icon/icon.png'));
-  await page.waitForFunction(() => JSON.parse(localStorage.getItem('advancedlan_konfig')).regie.stats.layout.elemente.some((e) => e.typ === 'bild'));
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('advancedlan_konfig')).regie.stats.screens[0].layout.elemente.some((e) => e.typ === 'bild'));
   let lay = await layout();
   const bild = lay.elemente.find((x) => x.typ === 'bild');
   assert.ok(lay.bilder[bild.bild].startsWith('data:image/webp;base64,'), 'Bild als WebP gespeichert');
@@ -199,7 +199,7 @@ const BILDER = process.argv[3] || require('os').tmpdir();
   await page.mouse.click(box.x + 6, box.y + 6);
   const [wahl2] = await Promise.all([page.waitForEvent('filechooser'), page.getByRole('button', { name: 'Bild darunterlegen' }).click()]);
   await wahl2.setFiles(path.resolve(__dirname, '../../assets/app-icon/icon.png'));
-  await page.waitForFunction(() => JSON.parse(localStorage.getItem('advancedlan_konfig')).regie.stats.layout.hintergrund === 'bild');
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('advancedlan_konfig')).regie.stats.screens[0].layout.hintergrund === 'bild');
   lay = await layout();
   assert.ok(lay.hg.verlaufDrueber && lay.hg.bild && lay.bilder[lay.hg.bild], 'Bild mit Verlauf darüber');
   assert.ok(lay.hg.verlauf.stopps.some((x) => x.alpha < 100), 'Verlauf scheint durch');

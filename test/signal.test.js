@@ -48,7 +48,7 @@ test("Jeder Datenbank-Befehl ergibt gültige OSC-Nachrichten", () => {
       for (const n of ns) assert.doesNotThrow(() => encodeMessage(n.address, n.args), `${t.id}/${b.id}`);
     }
     assert.doesNotThrow(() => { const n = testNachricht({ typ: t.id }); encodeMessage(n.address, n.args); });
-    assert.ok(t.port > 0 && t.einrichten && t.doku, t.id);
+    assert.ok((t.lokal || t.port > 0) && t.einrichten && (t.lokal || t.doku), t.id);
   }
 });
 

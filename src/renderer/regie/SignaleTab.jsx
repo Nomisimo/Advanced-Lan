@@ -7,16 +7,43 @@ import { SPIELE, SPIEL_BY_ID } from "../../core/spiele.js";
 import { zielTyp, befehleVon, befehlVon } from "../../core/ziel-typen.js";
 import { baueNachrichten, zeigeNachricht, nutztPlan } from "../../core/signal.js";
 import { ALLGEMEIN, AKTIONEN, aktionVon, geerbt, modus } from "../../core/aktionen.js";
-import { migrateSound, soundsVon, soundZumTest } from "../../core/sound.js";
-import { abspielen } from "./sound-player.js";
+import { migrateSound, vorschlagFuer, dateiListe, dateiWert } from "../../core/sound.js";
+import { istLokal } from "../../core/ziel-typen.js";
+import { SEITEN } from "../../core/signal.js";
 import { Send, Plus, Trash2, Layers, Volume2 } from "lucide-react";
 
-// Sound eines Events zum Test abspielen (Tab „Stats-Screen“ → Sound). Fehler als Meldung.
-function soundTesten(cfg, spiel, event, notify) {
-  const sound = migrateSound(cfg.sound);
-  const d = soundZumTest(sound, spiel, event);
-  if (d) abspielen(d, sound).catch((f) => notify(`Sound: ${f.message}`, "err"));
-  return d;
+// Werte eines neuen Befehls: „Sound abspielen“ schlägt die Dateien aus dem Event-Ordner der Bibliothek vor
+const startWerte = (cfg, spiel, event, typ, befehl) => (typ === "sound" && befehl === "abspielen" ? { datei: dateiWert(vorschlagFuer(cfg.sound, spiel, event)) } : {});
+
+// Parameter „datei“ (Local Sound): Dateien aus der Sound-Bibliothek ankreuzen, mehrere = zufällig eine
+function SoundWahl({ cfg, spiel, wert, setzen }) {
+  const bib = migrateSound(cfg.sound).dateien.filter((d) => d.spiel === spiel);
+  const gewaehlt = dateiListe(wert);
+  const name = (p) => bib.find((d) => d.pfad === p)?.name || `${p.split(/[\\/]/).pop()} (fehlt)`;
+  const text = !gewaehlt.length ? "– Datei wählen –" : gewaehlt.length === 1 ? name(gewaehlt[0]) : `${gewaehlt.length} Dateien, zufällig eine`;
+  const umschalten = (p, an) => setzen(dateiWert(an ? [...gewaehlt, p] : gewaehlt.filter((x) => x !== p)));
+  const events = SPIEL_BY_ID[spiel]?.events || [];
+  return (
+    <details style={{ position: "relative" }} data-testid="sound-wahl">
+      <summary style={{ ...S.selectSm, listStyle: "none", cursor: "pointer", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: gewaehlt.length ? "#fff" : MUTED }} title={gewaehlt.map(name).join("\n")}>{text}</summary>
+      <div style={{ position: "absolute", zIndex: 20, top: "100%", left: 0, minWidth: 260, maxHeight: 300, overflow: "auto", background: "#1a1820", border: `1px solid ${LINE}`, borderRadius: 6, padding: 8, display: "grid", gap: 2, fontSize: 12 }}>
+        {!bib.length && <span style={{ color: MUTED }}>Bibliothek leer: Tab „Ziele“ → Local Sound → Ordner wählen</span>}
+        {[...new Set(bib.map((d) => d.event))].map((e) => (
+          <React.Fragment key={e || "_"}>
+            <span style={{ color: MUTED, fontSize: 10, marginTop: 4 }}>{e ? events.find((x) => x.id === e)?.label || e : "Ohne Event"}</span>
+            {bib.filter((d) => d.event === e).map((d) => (
+              <label key={d.id} style={{ display: "flex", gap: 6, alignItems: "center", cursor: "pointer" }}>
+                <input type="checkbox" checked={gewaehlt.includes(d.pfad)} onChange={(ev) => umschalten(d.pfad, ev.target.checked)} /> {d.name}
+              </label>
+            ))}
+          </React.Fragment>
+        ))}
+        {gewaehlt.filter((p) => !bib.some((d) => d.pfad === p)).map((p) => (
+          <label key={p} style={{ display: "flex", gap: 6, alignItems: "center", color: WARN }}><input type="checkbox" checked onChange={() => umschalten(p, false)} /> {name(p)}</label>
+        ))}
+      </div>
+    </details>
+  );
 }
 
 // Bereich „Allgemein“: wie ein Spiel, dessen Events die allgemeinen Aktionen sind (core/aktionen.js). Kein Team-Filter, die Teams sind je Spiel anders.
@@ -26,12 +53,10 @@ const ALLGEMEIN_SPIEL = { id: ALLGEMEIN, name: "Allgemein", teams: [], events: A
 const ZEILE = "170px 230px minmax(220px,1fr) 130px 130px 92px";
 
 // Jedes Feld hat einen Titel darüber, auch leere Spalten, damit alle Zeilen gleich hoch beginnen
-const Feld = ({ titel, children, style }) => (
-  <label style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0, ...style }}>
-    <span style={{ fontSize: 10, color: MUTED, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", height: 13 }}>{titel}</span>
-    {children}
-  </label>
-);
+// div statt label, wenn das Feld selbst mehrere Eingaben hat (Dateiwahl): ein label würde jeden Klick aufs erste Kästchen lenken
+const Feld = ({ titel, children, style, div }) => React.createElement(div ? "div" : "label", { style: { display: "flex", flexDirection: "column", gap: 3, minWidth: 0, ...style } },
+  <span style={{ fontSize: 10, color: MUTED, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", height: 13 }}>{titel}</span>,
+  children);
 const Leer = ({ text = "–" }) => <span className="sig-leer" style={{ ...S.inputSm, display: "flex", alignItems: "center", color: MUTED, background: "transparent", borderColor: "transparent", fontSize: 12 }}>{text}</span>;
 
 // Vorschau mit Platzhaltern statt Werten aus dem Spiel. Nutzt der Befehl den Plan ({nr}, {plan}), zeigt sie die ersten Plätze.
@@ -53,9 +78,8 @@ function Zuweisung({ spiel, ev, z, cfg, pcs, aendern, loeschen, notify }) {
   const befehl = ziel && befehlVon(ziel.typ, z.befehl);
   const v = ziel && befehl ? vorschau(ziel, z, cfg.plan) : { text: "", fehler: ziel ? "Befehl wählen" : "Ziel fehlt" };
   const testen = async () => {
-    const d = soundTesten(cfg, spiel.id, ev.id, notify);
     const k = await api.signalTesten(spiel.id, ev.id, z);
-    k.fehler?.length ? notify(k.fehler.join(", "), "err") : notify(`${k.nachrichten.join(" · ")} → ${k.ziel}${d ? ` · Sound ${d.name}` : ""}`);
+    k.fehler?.length ? notify(k.fehler.join(", "), "err") : notify(`${k.nachrichten.join(" · ")} → ${k.ziel}`);
   };
   return (
     <div style={{ padding: "8px 0 8px 30px", borderTop: `1px dashed ${LINE}` }}>
@@ -63,23 +87,25 @@ function Zuweisung({ spiel, ev, z, cfg, pcs, aendern, loeschen, notify }) {
         <Feld titel="Ziel">
           <select style={S.selectSm} value={z.ziel} onChange={(e) => {
             const t = cfg.targets.find((x) => x.id === e.target.value);
-            aendern((w) => { w.ziel = e.target.value; if (t && !befehlVon(t.typ, w.befehl)) { w.befehl = befehleVon(t.typ)[0].id; w.werte = {}; } });
+            aendern((w) => { w.ziel = e.target.value; if (t && !befehlVon(t.typ, w.befehl)) { w.befehl = befehleVon(t.typ)[0].id; w.werte = startWerte(cfg, spiel.id, ev.id, t.typ, w.befehl); } });
           }}>
             {!ziel && <option value={z.ziel}>– Ziel wählen –</option>}
             {cfg.targets.map((t) => <option key={t.id} value={t.id}>{t.name || zielTyp(t.typ).name}</option>)}
           </select>
         </Feld>
         <Feld titel="Befehl">
-          <select style={S.selectSm} value={befehl ? z.befehl : ""} disabled={!ziel} onChange={(e) => aendern((w) => { w.befehl = e.target.value; w.werte = {}; })}>
+          <select style={S.selectSm} value={befehl ? z.befehl : ""} disabled={!ziel} onChange={(e) => aendern((w) => { w.befehl = e.target.value; w.werte = startWerte(cfg, spiel.id, ev.id, ziel.typ, e.target.value); })}>
             {!befehl && <option value="">– Befehl –</option>}
             {ziel && befehleVon(ziel.typ).map((b) => <option key={b.id} value={b.id}>{b.label}</option>)}
           </select>
         </Feld>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", minWidth: 0 }}>
           {(befehl?.params || []).map((p) => (
-            <Feld key={p.key} titel={p.label} style={{ flex: p.art === "zahl" ? "0 0 84px" : "1 1 150px" }}>
-              <input style={{ ...S.inputSm, ...S.mono }} value={z.werte?.[p.key] ?? p.standard} inputMode={p.art === "zahl" ? "decimal" : undefined}
-                onChange={(e) => aendern((w) => { w.werte = { ...(w.werte || {}), [p.key]: e.target.value }; })} />
+            <Feld key={p.key} titel={p.label} div={p.art === "sound"} style={{ flex: p.art === "zahl" ? "0 0 84px" : "1 1 150px" }}>
+              {p.art === "sound"
+                ? <SoundWahl cfg={cfg} spiel={spiel.id === ALLGEMEIN ? cfg.aktivesSpiel : spiel.id} wert={z.werte?.[p.key] ?? ""} setzen={(v) => aendern((w) => { w.werte = { ...(w.werte || {}), [p.key]: v }; })} />
+                : <input style={{ ...S.inputSm, ...S.mono }} value={z.werte?.[p.key] ?? p.standard} inputMode={p.art === "zahl" ? "decimal" : undefined}
+                  onChange={(e) => aendern((w) => { w.werte = { ...(w.werte || {}), [p.key]: e.target.value }; })} />}
             </Feld>
           ))}
           {befehl && !befehl.params?.length && <Feld titel="Werte"><Leer text="keine" /></Feld>}
@@ -89,11 +115,14 @@ function Zuweisung({ spiel, ev, z, cfg, pcs, aendern, loeschen, notify }) {
             ? <input list="advancedlan-pcs" style={S.inputSm} value={z.pc} placeholder="Alle PCs" title="Nur wenn dieser PC das Ereignis meldet" onChange={(e) => aendern((w) => { w.pc = e.target.value.trim(); })} />
             : <Leer text="alle" />}
         </Feld>
-        <Feld titel="Team">
+        <Feld titel={spiel.id === "valorant" && ev.team ? "Team / Seite" : "Team"}>
           {ev.team && spiel.teams?.length > 0
-            ? <select style={{ ...S.selectSm, color: z.team ? teamFarbe(z.team) : "#fff" }} value={z.team} onChange={(e) => aendern((w) => { w.team = e.target.value; })}>
+            ? <select style={{ ...S.selectSm, color: z.team ? teamFarbe(z.team) : "#fff" }} value={z.seite ? `seite:${z.seite}` : z.team} data-testid="signal-team"
+              title={spiel.id === "valorant" ? "Team oder Seite des Teams im Event (bei „Runde gewonnen“: die Seite des Siegers). Angriff/Verteidigung wechselt zur Halbzeit." : undefined}
+              onChange={(e) => aendern((w) => { const v = e.target.value; if (v.startsWith("seite:")) { w.team = ""; w.seite = v.slice(6); } else { w.team = v; delete w.seite; } })}>
               <option value="">Alle Teams</option>
               {spiel.teams.map((t) => <option key={t} value={t}>{t}</option>)}
+              {spiel.id === "valorant" && <optgroup label="Seite">{SEITEN.map((x) => <option key={x} value={`seite:${x}`}>{x}</option>)}</optgroup>}
             </select>
             : <Leer text="alle" />}
         </Feld>
@@ -106,7 +135,7 @@ function Zuweisung({ spiel, ev, z, cfg, pcs, aendern, loeschen, notify }) {
       </div>
       <div style={{ ...S.mono, fontSize: 11, marginTop: 5, color: v.fehler ? ERR : "#d9c6ff", display: "flex", gap: 8, alignItems: "center", overflow: "hidden" }}>
         {ziel && <ZielBadge typ={ziel.typ} />}
-        <span style={{ color: MUTED }}>{ziel ? `${ziel.host || "?"}:${ziel.port}` : ""}</span>
+        <span style={{ color: MUTED }}>{ziel ? (istLokal(ziel) ? "dieser PC" : `${ziel.host || "?"}:${ziel.port}`) : ""}</span>
         <span title={v.alle} style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.fehler || v.text}</span>
       </div>
     </div>
@@ -132,16 +161,16 @@ function EventZeile({ spiel, ev, cfg, mutate, pcs, notify }) {
     if (!d.ersetzt[spiel.id].length) delete d.ersetzt[spiel.id];
   });
   const aktiv = zuw.length > 0 || (m !== "ersetzt" && nGeerbt > 0);
-  const sounds = soundsVon(cfg.sound, spiel.id, ev.id);
+  const soundZiel = cfg.targets.find((t) => t.typ === "sound");
   const aendereListe = (fn) => mutate((d) => {
     d.signale = d.signale || {};
     d.signale[spiel.id] = d.signale[spiel.id] || {};
     const l = Array.isArray(d.signale[spiel.id][ev.id]) ? d.signale[spiel.id][ev.id] : [];
     d.signale[spiel.id][ev.id] = fn(l);
   });
-  const neu = () => {
-    const t = cfg.targets[0];
-    aendereListe((l) => [...l, { id: uid(), ziel: t.id, befehl: befehleVon(t.typ)[0].id, werte: {}, pc: "", team: "" }]);
+  const neu = (t = cfg.targets.find((x) => !istLokal(x)) || cfg.targets[0]) => {
+    const befehl = befehleVon(t.typ)[0].id;
+    aendereListe((l) => [...l, { id: uid(), ziel: t.id, befehl, werte: startWerte(cfg, spiel.id === ALLGEMEIN ? cfg.aktivesSpiel : spiel.id, ev.id, t.typ, befehl), pc: "", team: "" }]);
   };
   return (
     <div style={{ padding: "8px 0", borderBottom: `1px solid ${LINE}` }}>
@@ -152,10 +181,9 @@ function EventZeile({ spiel, ev, cfg, mutate, pcs, notify }) {
         <span style={{ flex: 1 }} />
         {aktion && <span title={`${MODUS[m].title}. Allgemeine Aktion „${aktion.label}“.`} style={{ ...S.badge, background: "transparent", border: `1px solid ${MODUS[m].farbe}55`, color: MODUS[m].farbe, display: "inline-flex", alignItems: "center", gap: 4 }}><Layers size={10} /> {MODUS[m].text(nGeerbt)}</span>}
         {aktion && <button style={S.smallBtn} onClick={() => ersetzen(m !== "ersetzt")} title={m === "ersetzt" ? "Allgemeine Befehle wieder gelten lassen" : "Allgemeine Befehle hier nicht senden, nur die eigenen"}>{m === "ersetzt" ? "Allgemein nutzen" : "Ersetzen"}</button>}
-        {sounds.length > 0 && <button style={{ ...S.smallBtn, color: "#9be7b4" }} data-testid={`signal-sound-${ev.id}`} onClick={() => abspielen(sounds[Math.floor(Math.random() * sounds.length)], migrateSound(cfg.sound)).catch((f) => notify(`Sound: ${f.message}`, "err"))}
-          title={`${sounds.length} Sound(s) aus Tab „Stats-Screen“ → Sound: ${sounds.map((d) => d.name).join(", ")}. Klick spielt einen.`}><Volume2 size={12} /> {sounds.length}</button>}
         {zuw.length > 0 && <span style={{ ...S.badge, background: ACCENT + "33", color: "#d9c6ff" }}>{zuw.length} {zuw.length === 1 ? "Befehl" : "Befehle"}</span>}
-        <button style={S.smallBtn} disabled={!cfg.targets.length} onClick={neu}><Plus size={12} /> Befehl</button>
+        {soundZiel && <button style={{ ...S.smallBtn, color: "#9be7b4" }} data-testid={`signal-sound-${ev.id}`} onClick={() => neu(soundZiel)} title={`Befehl „Sound abspielen“ an „${soundZiel.name || "Local Sound"}“`}><Volume2 size={12} /> Sound</button>}
+        <button style={S.smallBtn} disabled={!cfg.targets.length} onClick={() => neu()}><Plus size={12} /> Befehl</button>
       </div>
       {zuw.map((z) => (
         <Zuweisung key={z.id} spiel={spiel} ev={ev} z={z} cfg={cfg} pcs={pcs} notify={notify}
@@ -228,8 +256,6 @@ export default function SignaleTab(props) {
       <SpielSignale spiel={ALLGEMEIN_SPIEL} {...props} />
       <div style={{ display: "flex", justifyContent: "flex-end", margin: "-8px 0 12px" }}>
         <span style={{ display: "inline-flex", gap: 16 }}>
-          <Toggle checked={cfg.sound?.beimTest !== false} onChange={(v) => props.mutate((d) => { d.sound = { ...migrateSound(d.sound), beimTest: v }; })}
-            title="Der Test-Knopf eines Befehls spielt auch einen eingeschalteten Sound des Events (Tab „Stats-Screen“ → Sound), auf dem gewählten Ausgabegerät" label="Beim Test auch den Sound spielen" />
           <Toggle checked={nurAbweichungen} onChange={setNurAbweichungen} label="In den Spielen nur Abweichungen von „Allgemein“ zeigen" />
         </span>
       </div>

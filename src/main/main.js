@@ -32,6 +32,7 @@ const { migrateKonfig, MODI } = require('../core/defaults');
 const { gsiCfg, CFG_DATEI } = require('../core/cfg');
 const { SHOW_ENDUNG, ART_NAME, arten: showArten, showDatei, leseShow, showAnwenden, leereShow, alsGespeichert, dateiName: showDateiName, showDaten, vorlageStand, vorlageAus, vorlageAnwenden, paketDatei, sauberName } = require('../core/show');
 const { testNachricht, zeigeNachricht } = require('../core/signal');
+const { istLokal } = require('../core/ziel-typen');
 const { overlayStatus } = require('../core/overlay-status');
 const { kartenListe, lokaleIp } = require('../core/netzwerk');
 const { SimRunner } = require('../core/sim-runner');
@@ -42,6 +43,9 @@ const { ValSimMatch } = require('../core/val-sim');
 const { einrichtenUpdates } = require('./updates');
 const { restoreFocus, mitFokus } = require('./fokus');
 const { StatsAusgabe } = require('./stats-ausgabe');
+const { ndiUmgebungBeimStart, neuStarten } = require('./ndi-umgebung');
+const { StatsSender, StatsEmpfaenger } = require('./stats-sync');
+const { cfgAuszug, statusAuszug } = require('../core/stats-sync');
 const { NamensAbfrage, obenHalten } = require('./name-abfrage');
 const { VollbildWaechter } = require('./vollbild');
 const { NamensWaechter } = require('../core/namen');
@@ -65,6 +69,10 @@ function ladeKonfig() {
   catch { cfg = migrateKonfig(null); }
 }
 let speicherTimer = null;
+function speichereKonfigSofort() {
+  clearTimeout(speicherTimer);
+  try { fs.mkdirSync(path.dirname(KONFIG_DATEI()), { recursive: true }); fs.writeFileSync(KONFIG_DATEI(), JSON.stringify(cfg, null, 1)); } catch {}
+}
 function speichereKonfig() {
   clearTimeout(speicherTimer);
   speicherTimer = setTimeout(() => {
@@ -75,6 +83,7 @@ function speichereKonfig() {
 
 // Modi: Regie, Game-PC oder Standalone (Regie und Spiel auf demselben PC, ohne Netzwerk)
 const istRegie = () => cfg?.modus === 'regie' || cfg?.modus === 'standalone';
+const istStatsPc = () => cfg?.modus === 'stats'; // zeigt nur die Stats-Screens der Regie (Daten per UDP)
 const hatSpiele = () => cfg?.modus === 'gamepc' || cfg?.modus === 'standalone';
 
 /* ── An die Oberfläche melden ─────────────────────────────────────────── */
@@ -82,6 +91,11 @@ const hatSpiele = () => cfg?.modus === 'gamepc' || cfg?.modus === 'standalone';
 const an = (kanal, daten) => {
   if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.send(kanal, daten);
   if (kanal === 'status' || kanal === 'regie-event') for (const wc of stats.webContents()) wc.send(kanal, daten);
+  // Regie: dieselben Meldungen an die Stats-Screen-PCs
+  if (istRegie() && statsSender.laeuft()) {
+    if (kanal === 'status' && daten.regie) statsSender.status(statusAuszug(daten.regie, regie.alleLogs()));
+    if (kanal === 'regie-event') statsSender.event(daten);
+  }
 };
 const meldung = (text, art = 'ok') => an('meldung', { text, art });
 let statusTimer = null;
@@ -102,7 +116,9 @@ const regie = new Regie({
   },
 });
 // Absenderkarte: die des Ziels, sonst die für „Senden“, sonst automatisch
+// Local Sound geht nicht ins Netz: die Regie-Oberfläche spielt die Datei (renderer/regie/sound-player.js)
 function oscSenden(s) {
+  if (istLokal(s.ziel)) { an('sound-ausgabe', { ziel: s.ziel, address: s.address, args: s.args }); return Promise.resolve(); }
   const l = lokaleIp(karten(), s.ziel.netz || cfg.regie.netz?.senden);
   return l.fehler ? Promise.reject(new Error(l.fehler)) : osc.send({ ...s, lokal: l.ip });
 }
@@ -125,10 +141,74 @@ function planAendern(fn) {
 const regieSim = new RegieSim({ regie, onChange: statusMelden });
 const stats = new StatsAusgabe({
   root, preload: path.join(root, 'src', 'preload', 'preload.js'), icon: APP_ICON,
-  getStats: () => cfg.regie.stats, aktiv: () => istRegie(), onChange: statusMelden,
+  getStats: () => (istStatsPc() ? fernStats() : cfg.regie.stats), aktiv: () => istRegie() || istStatsPc(), onChange: statusMelden,
   onFensterZu: () => restoreFocus(mainWin),
   ndiKarte: () => cfg.regie.netz?.ndi || '', ndiOrdner: () => path.join(app.getPath('userData'), 'ndi'),
 });
+
+/* ── Stats-Screen-PCs: Regie sendet per UDP, der Stats-PC empfängt (core/stats-sync.js) ── */
+const ipVonKarte = (name) => lokaleIp(karten(), name).ip || '';
+const statsSender = new StatsSender({
+  einstellungen: () => cfg.regie.statsSync, ip: () => ipVonKarte(cfg.regie.statsSync.netz), name: () => cfg.regie.session.name, onChange: () => statusMelden(),
+});
+// Was der Stats-PC von der Regie hat: Einstellungen (Screens, Layouts), Stand, letzte Events
+const fern = { cfg: null, status: null, log: [] };
+const logMischen = (alt, neu) => {
+  const m = new Map(alt.map((e) => [e.id, e]));
+  for (const e of neu) if (e && e.id != null) m.set(e.id, e);
+  return [...m.values()].sort((a, b) => b.id - a.id).slice(0, 100);
+};
+// Screens der Regie, auf dem Stats-PC immer an, NDI sendet die Regie
+function fernStats() {
+  const s = fern.cfg?.regie?.stats;
+  return s ? { ...s, an: true, screens: (s.screens || []).map((x) => ({ ...x, ndi: false })) } : { an: true, aktiv: '', screens: [] };
+}
+const fernKonfig = () => ({ ...cfg, regie: { ...cfg.regie, ...(fern.cfg?.regie || {}), stats: fernStats() } });
+const fensterGeoeffnet = new Set(); // beim Start schon geöffnete Fenster (nur einmal automatisch)
+async function statsPcFenster() {
+  if (!istStatsPc()) return;
+  await stats.anwenden();
+  for (const id of cfg.statspc.fenster) {
+    if (fensterGeoeffnet.has(id) || !fernStats().screens.some((x) => x.id === id)) continue;
+    fensterGeoeffnet.add(id);
+    stats.fensterOeffnen(id, { vollbild: cfg.statspc.vollbild });
+  }
+}
+const statsEmpfaenger = new StatsEmpfaenger({
+  einstellungen: () => cfg.statspc, ip: () => ipVonKarte(cfg.statspc.netz), regieAdressen: () => discovery.liste().map((x) => x.ip),
+  onCfg: (c) => {
+    fern.cfg = c;
+    for (const wc of stats.webContents()) wc.send('stats-config', fernKonfig());
+    statsPcFenster();
+    statusMelden();
+  },
+  onStatus: (s) => {
+    fern.status = s.status || null;
+    if (Array.isArray(s.log)) fern.log = logMischen(fern.log, s.log);
+    // Stats-Fenster sofort, Hauptfenster gebündelt
+    const st = gesamtStatus();
+    for (const wc of stats.webContents()) wc.send('status', st);
+    statusMelden();
+  },
+  onEvent: (e) => {
+    if (fern.log.some((x) => x.id === e?.id)) return;
+    fern.log = logMischen(fern.log, [e]);
+    an('regie-event', e);
+  },
+  onChange: () => statusMelden(),
+});
+let syncSchluessel = '';
+// Sender (Regie) oder Empfänger (Stats-PC) passend zu Modus und Einstellungen starten
+async function statsSyncAnwenden() {
+  const sendet = istRegie() && cfg.regie.statsSync.an, empfaengt = istStatsPc();
+  const schluessel = JSON.stringify([sendet, empfaengt, sendet && cfg.regie.statsSync, sendet && ipVonKarte(cfg.regie.statsSync.netz), empfaengt && [cfg.statspc.gruppe, cfg.statspc.port, ipVonKarte(cfg.statspc.netz)]]);
+  if (schluessel !== syncSchluessel) {
+    syncSchluessel = schluessel;
+    if (sendet) await statsSender.start(); else await statsSender.stop();
+    if (empfaengt) await statsEmpfaenger.start(); else { await statsEmpfaenger.stop(); fern.cfg = null; fern.status = null; fern.log = []; fensterGeoeffnet.clear(); }
+  }
+  if (sendet) statsSender.setCfg(cfgAuszug(cfg));
+}
 
 // Auf dem Regie-PC darf kein Spiel laufen (Windows: Prozessliste prüfen)
 const SPIEL_PROZESSE = { 'cs2.exe': 'CS2', 'rocketleague.exe': 'Rocket League', 'dota2.exe': 'Dota 2',
@@ -295,9 +375,18 @@ function quelleMelden(spiel, r, sim = false) {
   const d = daten[spiel] = daten[spiel] || { letzte: 0, statusGesendet: 0 };
   if (!sim) spielDaten();
   Object.assign(d, { letzte: Date.now(), stand: r.stand, status: r.status });
-  for (const ev of r.events) gamePcLog({ spiel, ev, gesendet: anRegie(spiel, ev), sim });
+  for (const ev of r.events) { seiteDazu(spiel, ev); gamePcLog({ spiel, ev, gesendet: anRegie(spiel, ev), sim }); }
   if (r.events.length || Date.now() - d.statusGesendet > 500) { statusAnRegie(spiel, r.status, r.stand); d.statusGesendet = Date.now(); }
   statusMelden();
+}
+
+// Valorant: Seite des Teams im Event (Angriff/Verteidigung) aus Shots Fired, für den Seiten-Filter in den Signalen.
+// Eigenes Team = Seite dieses PCs, das andere die Gegenseite. Ohne Shots Fired rechnet die Regie aus Team und Runde.
+function seiteDazu(spiel, ev) {
+  if (spiel !== 'valorant' || !ev?.team || ev.seiteTeam) return;
+  const sf = shotsfired.valorantInfo(), eigen = teamVon('valorant');
+  if (!sf.seite || !eigen) return;
+  ev.seiteTeam = ev.team === eigen ? sf.seite : sf.seite === 'Angriff' ? 'Verteidigung' : 'Angriff';
 }
 
 // Bild-Spiele: erkannte Aktionen auf diesem PC. Team und Name kommen aus dem Setup dieses PCs, auch im Simulator.
@@ -619,13 +708,22 @@ async function modusStarten() {
     autoWartet = !!(cfg.gamepc.autoVerbinden && cfg.gamepc.regie.id && cfg.gamepc.passwort);
   }
   if (cfg.modus === 'standalone') { lokalAnmelden(); hinweisMelden(); }
+  if (istStatsPc()) discovery.start(); // Regie über die Session-Suche finden (Unicast, falls kein Multicast ankommt)
+  await statsSyncAnwenden();
   await stats.anwenden();
+  await statsPcFenster();
   statusMelden();
 }
 
 function gesamtStatus() {
   const s = { modus: cfg.modus, jetzt: Date.now(), app: { hotkeyFehler, plattform: process.platform } };
-  if (istRegie()) s.regie = { ...regie.snapshot(), session: session.status(), sim: regieSim.status(), armed: cfg.regie.armed, spielAufRegie, stats: stats.status(), lokal: lokalPc };
+  if (istRegie()) s.regie = { ...regie.snapshot(), session: session.status(), sim: regieSim.status(), armed: cfg.regie.armed, spielAufRegie, stats: stats.status(), lokal: lokalPc, statsSync: statsSender.info() };
+  if (istStatsPc()) {
+    // regie: Stand der Regie für die Stats-Fenster; statspc: Empfang und Screens für das Hauptfenster
+    s.regie = fern.status ? { ...fern.status, stats: stats.status() } : null;
+    s.statspc = { ...statsEmpfaenger.info(), session: fern.cfg?.regie?.session?.name || '', aktivesSpiel: fern.cfg?.regie?.aktivesSpiel || '',
+      screens: fernStats().screens.map(({ id, name, b, h }) => ({ id, name, b, h })), ausgabe: stats.status() };
+  }
   if (hatSpiele()) s.gamepc = { spieler: cfg.gamepc.spieler, vollbild: vollbild.art, nameWartet: !!nameWartet, spielerAnzeige: cfg.gamepc.spieler || anzeigePcId(), client: client.info(), sessions: discovery.liste(), discoveryFehler: discovery.fehler, gsi: gsi.status(), letzte: gp.letzte, status: gp.status, stand: gp.stand, fremd: gp.fremd, sim: { ...gpSim.status(), spiel: gpSimSpiel }, rl: { ...rlClient.status(), letzte: rl.letzte, stand: rl.stand }, daten, bild: bild.status(), overdrive: overdrive.status(), shotsfired: shotsfired.status(), lol: lolClient.status(), quelleAktiv: Object.fromEntries(BILD_SPIELE.map((d) => [d.id, vorrang.aktiv(d.id)])), riot: riot.status() };
   return s;
 }
@@ -772,11 +870,13 @@ ipcMain.handle('feedback-oeffnen', () => {
 /* ── IPC ──────────────────────────────────────────────────────────────── */
 ipcMain.handle('app-version', () => app.getVersion());
 const updates = einrichtenUpdates({ app, ipcMain, shell, getWin: () => mainWin });
-ipcMain.handle('config-get', () => cfg);
+ipcMain.handle('config-get', () => (istStatsPc() ? fernKonfig() : cfg));
 ipcMain.handle('config-set', (_, neu) => konfigUebernehmen(neu));
 // Neue Einstellungen übernehmen und anwenden (aus der Oberfläche oder beim Laden einer Show)
 async function konfigUebernehmen(neu) {
   const alt = cfg;
+  // Stats-PC: die Oberfläche sieht die Einstellungen der Regie, übernommen werden nur die eigenen
+  if (istStatsPc()) neu = { ...alt, app: neu?.app || alt.app, statspc: neu?.statspc || alt.statspc };
   cfg = { ...migrateKonfig(neu), modus: alt.modus };
   cfg.regie.armed = !!neu.regie?.armed;
   cfg.regie.session.offen = alt.regie.session.offen; // offen/zu steuern nur die Session-Knöpfe
@@ -806,6 +906,7 @@ async function konfigUebernehmen(neu) {
     for (const wc of stats.webContents()) wc.send('stats-config', cfg);
     await stats.anwenden();
   }
+  await statsSyncAnwenden(); // Senden an die Stats-PCs (Layout, Karte, Gruppe) oder eigener Empfang
   if (cfg.modus === 'gamepc' && cfg.gamepc.netz !== alt.gamepc.netz) {
     // Andere Karte: Sessions dort neu suchen und eine bestehende Verbindung darüber neu aufbauen
     discovery.stop(); discovery.start();
@@ -898,7 +999,7 @@ ipcMain.handle('status', () => gesamtStatus());
 ipcMain.handle('netz-adressen', () => karten());
 
 // Regie
-ipcMain.handle('regie-log', () => regie.alleLogs());
+ipcMain.handle('regie-log', () => (istStatsPc() ? fern.log : regie.alleLogs()));
 ipcMain.handle('zaehler-zuruecksetzen', () => { regie.zuruecksetzen(); return true; });
 ipcMain.handle('session-oeffnen', async () => { const ok = await session.oeffnen(); cfg.regie.session.offen = ok; speichereKonfig(); return gesamtStatus(); });
 ipcMain.handle('session-schliessen', async () => { await session.schliessen(); cfg.regie.session.offen = false; speichereKonfig(); return gesamtStatus(); });
@@ -988,7 +1089,7 @@ ipcMain.handle('signal-testen', (_, spiel, type, zuweisung) => regie.testeZuweis
 ipcMain.handle('ziel-testen', async (_, zielId) => {
   const ziel = cfg.regie.targets.find((t) => t.id === zielId);
   if (!ziel) return { fehler: 'Ziel nicht gefunden' };
-  try { const n = testNachricht(ziel); await oscSenden({ ziel, ...n }); return { ok: true, nachricht: zeigeNachricht(n) }; }
+  try { const n = testNachricht(ziel); await oscSenden({ ziel, ...n }); return { ok: true, nachricht: zeigeNachricht(n), lokal: istLokal(ziel) }; }
   catch (e) { return { fehler: e.message }; }
 });
 ipcMain.handle('sim-start', (_, modus) => { regieSim.start(modus, cfg.regie.aktivesSpiel); return regieSim.status(); });
@@ -996,7 +1097,18 @@ ipcMain.handle('sim-stop', () => { regieSim.stop(); return regieSim.status(); })
 ipcMain.handle('sim-neu', () => { regieSim.neu(); return regieSim.status(); });
 // Game-Stats-Screen
 // id: Screen (ohne Angabe der erste); offen === false schließt, ohne id alle Fenster
-ipcMain.handle('stats-fenster', (_, offen, id) => { if (offen === false) stats.fensterSchliessen(id); else stats.fensterOeffnen(id); statusMelden(); return stats.status(); });
+ipcMain.handle('stats-fenster', (_, offen, id) => {
+  if (offen === false) stats.fensterSchliessen(id); else stats.fensterOeffnen(id, istStatsPc() ? { vollbild: cfg.statspc.vollbild } : undefined);
+  // Stats-PC: offene Fenster merken, beim nächsten Start gehen sie wieder auf
+  if (istStatsPc() && id) {
+    const l = new Set(cfg.statspc.fenster);
+    if (offen === false) l.delete(id); else l.add(id);
+    cfg.statspc.fenster = [...l]; speichereKonfig(); an('config', cfg);
+  }
+  statusMelden(); return stats.status();
+});
+// Neu starten, damit eine andere NDI-Karte gilt (das SDK liest sie nur beim Start)
+ipcMain.handle('app-neustart', async () => { speichereKonfigSofort(); await stats.beenden(); neuStarten(app, path.join(app.getPath('userData'), 'ndi')); });
 ipcMain.handle('stats-vollbild', (e) => stats.vollbild(e.sender));
 ipcMain.handle('ndi-pruefen', () => stats.ndiVerfuegbar());
 
@@ -1088,8 +1200,10 @@ ipcMain.handle('open-external', (_, url) => { if (/^https?:\/\//i.test(url)) she
 // Windows ordnet Fenster, Taskleisten-Icon und Verknüpfungen über diese ID zu. Sie muss der appId in
 // package.json entsprechen, sonst zeigt die Taskleiste ein zweites Icon neben der angehefteten Verknüpfung
 if (process.platform === 'win32') app.setAppUserModelId('dev.advancedlan');
-const gotLock = app.requestSingleInstanceLock();
-if (!gotLock) app.quit();
+// NDI auf der gewählten Karte: NDI_CONFIG_DIR muss schon beim Prozessstart gesetzt sein, sonst einmal neu starten
+const ndiNeustart = ndiUmgebungBeimStart({ app, konfigDatei: KONFIG_DATEI(), ordner: path.join(app.getPath('userData'), 'ndi') });
+const gotLock = !ndiNeustart && app.requestSingleInstanceLock();
+if (ndiNeustart) { /* startet neu */ } else if (!gotLock) app.quit();
 else {
   app.on('second-instance', () => { if (mainWin) { if (mainWin.isMinimized()) mainWin.restore(); mainWin.focus(); } });
   app.whenReady().then(async () => {
@@ -1111,7 +1225,7 @@ else {
     discovery.stop();
     vollbild.stop();
     riot.stop();
-    await Promise.allSettled([session.schliessen(), gsi.stop(), overdrive.stop(), shotsfired.stop(), (lolClient.stop(), null), stats.beenden(), bild.beenden()]);
+    await Promise.allSettled([statsSender.stop(), statsEmpfaenger.stop(), session.schliessen(), gsi.stop(), overdrive.stop(), shotsfired.stop(), (lolClient.stop(), null), stats.beenden(), bild.beenden()]);
     osc.close();
     app.quit();
   });

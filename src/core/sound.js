@@ -1,24 +1,19 @@
 "use strict";
-// Sound-Player der Regie: spielt beim Auslösen eines Events eine Audiodatei auf einem wählbaren Ausgabegerät
-// (z. B. Dante Virtual Soundcard). Die Dateien liegen auf dem Regie-PC und werden nicht mit der App ausgeliefert.
-// Einstellungen im Tab „Stats-Screen“ unter „Sound“. Reine Funktionen ohne Node-Abhängigkeiten.
+// Sound-Bibliothek der Regie und das Ziel „Local Sound“ (core/ziel-typen.js). Sounds laufen wie OSC-Befehle:
+// Tab „Ziele“ → Local Sound (Ausgabegerät, Lautstärke, Bibliothek), Tab „Signale“ → je Event „Sound abspielen“ mit Datei(en).
+// Die Dateien liegen auf dem Regie-PC und werden nicht mit der App ausgeliefert. Reine Funktionen ohne Node-Abhängigkeiten.
 //
 // regie.sound = {
-//   an,                  // Sounds überhaupt abspielen
-//   nurScharf,           // nur wenn die Ausgabe scharf ist (wie die OSC-Befehle)
-//   geraet,              // deviceId des Ausgabegeräts, "" = Standardgerät von Windows/macOS
-//   geraetName,          // Name dazu (zur Anzeige, falls das Gerät gerade fehlt)
-//   lautstaerke,         // 0 … 1
-//   abbrechen,           // ein neuer Sound beendet den laufenden
-//   beimTest,            // Tab „Signale“: der Test-Knopf spielt die Sounds des Events mit
-//   dateien: [{ id, spiel, event, pfad, url, name, an }]  // event "" = keinem Event zugeordnet
+//   dateien: [{ id, spiel, event, pfad, url, name }]  // Bibliothek; event: Ordner-Zuordnung, Vorschlag im Tab „Signale“
+//   umgezogen,           // alte Einstellungen (bis 1.0.7: Sounds direkt am Event) sind ins Ziel „Local Sound“ übernommen
+//   an, nurScharf, geraet, geraetName, lautstaerke, abbrechen, beimTest  // bis 1.0.7, nur noch für den Umzug gelesen
 // }
 const { SPIEL_BY_ID } = require("./spiele");
 
 const SOUND_ENDUNGEN = ["wav", "mp3", "ogg", "oga", "m4a", "aac", "flac", "opus", "webm"];
 const MAX_DATEIEN = 500;
 
-const standardSound = () => ({ an: false, nurScharf: true, geraet: "", geraetName: "", lautstaerke: 1, abbrechen: true, beimTest: true, dateien: [] });
+const standardSound = () => ({ an: false, nurScharf: true, geraet: "", geraetName: "", lautstaerke: 1, abbrechen: true, beimTest: true, umgezogen: true, dateien: [] });
 
 const istSound = (name) => SOUND_ENDUNGEN.includes(String(name || "").split(".").pop().toLowerCase());
 const norm = (s) => String(s ?? "").trim().toLowerCase().replace(/[\s\-.]+/g, "_");
@@ -61,27 +56,56 @@ function nachEvent(sound, spiel) {
   return [...gruppen.entries()].sort((a, b) => rang(a[0]) - rang(b[0])).map(([event, liste]) => ({ event, dateien: liste }));
 }
 
-// Event → Datei, die gespielt wird, oder null. Mehrere eingeschaltete Dateien: zufällig eine (rnd 0 … 1).
-// eintrag: Log-Eintrag der Regie ({ ev, scharf, verworfen }).
-function soundFuer(sound, eintrag, rnd = Math.random()) {
-  const s = sound;
-  const ev = eintrag?.ev;
-  if (!s?.an || !ev?.type || eintrag.verworfen) return null;
-  if (s.nurScharf !== false && !eintrag.scharf) return null;
-  const passend = (s.dateien || []).filter((d) => d.an && d.spiel === ev.spiel && d.event === ev.type && d.url);
-  if (!passend.length) return null;
-  return passend[Math.min(passend.length - 1, Math.floor(rnd * passend.length))];
+// Wert des Parameters „datei“ (eine Datei je Zeile) ↔ Liste der Pfade
+const dateiListe = (wert) => String(wert ?? "").split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
+const dateiWert = (pfade) => [...new Set(pfade)].join("\n");
+
+// Nachricht des Ziels Local Sound → was zu tun ist: { art: "spielen", datei } | { art: "stopp" } | { art: "test" } | { art: "fehler", text }
+// Bei mehreren Dateien eine zufällig (rnd 0 … 1). Die Datei muss in der Bibliothek stehen (dort steht ihre URL).
+function soundAktion(sound, nachricht, rnd = Math.random()) {
+  const a = String(nachricht?.address || "");
+  if (a === "/sound/stop") return { art: "stopp" };
+  if (a === "/sound/test") return { art: "test" };
+  if (a !== "/sound/play") return { art: "fehler", text: `Unbekannter Sound-Befehl ${a}` };
+  const pfade = dateiListe(nachricht.args?.[0]?.value);
+  if (!pfade.length) return { art: "fehler", text: "Keine Datei gewählt" };
+  const bib = sound?.dateien || [];
+  const da = pfade.map((p) => bib.find((d) => d.pfad === p)).filter((d) => d && d.url);
+  if (!da.length) return { art: "fehler", text: `Datei nicht in der Sound-Bibliothek: ${pfade[0].split(/[\\/]/).pop()}` };
+  return { art: "spielen", datei: da[Math.min(da.length - 1, Math.floor(rnd * da.length))] };
 }
 
-// Eingeschaltete Sounds eines Events (unabhängig von „Sounds an“ und scharfer Ausgabe)
-const soundsVon = (sound, spiel, event) => (sound?.dateien || []).filter((d) => d.an && d.spiel === spiel && d.event === event && d.url);
+// Optionen des Ziels → Einstellungen für den Player { geraet, lautstaerke 0 … 1, abbrechen }
+function zielEinstellung(ziel) {
+  const o = ziel?.optionen || {};
+  const n = Number(String(o.lautstaerke ?? "100").replace(",", "."));
+  return { geraet: String(o.geraet || ""), geraetName: String(o.geraetName || ""), lautstaerke: Number.isFinite(n) ? Math.max(0, Math.min(100, n)) / 100 : 1, abbrechen: o.abbrechen !== "nein" };
+}
 
-// Test im Tab „Signale“: ein eingeschalteter Sound des Events, auch wenn „Sounds an“ aus oder die Ausgabe nicht scharf ist.
-// Mit „beimTest“ aus: null.
-function soundZumTest(sound, spiel, event, rnd = Math.random()) {
-  if (!sound || sound.beimTest === false) return null;
-  const l = soundsVon(sound, spiel, event);
-  return l.length ? l[Math.min(l.length - 1, Math.floor(rnd * l.length))] : null;
+// Vorschlag für „Sound abspielen“ an einem Event: die Dateien, deren Ordner zu diesem Event gehört
+const vorschlagFuer = (sound, spiel, event) => (sound?.dateien || []).filter((d) => d.spiel === spiel && d.event === event).map((d) => d.pfad);
+
+// Bis 1.0.7 hingen Sounds direkt an den Events. Einmalig: Ziel „Local Sound“ mit Gerät und Lautstärke anlegen und
+// je Event mit eingeschalteten Dateien eine Zuweisung „Sound abspielen“ (mehrere Dateien: zufällig eine, wie vorher).
+// Waren die Sounds aus, entsteht nur das Ziel. r: regie-Einstellungen (wird geändert), uidFn: neue IDs.
+function soundUmziehen(r, uidFn) {
+  const s = r.sound;
+  if (!s || s.umgezogen) return r;
+  s.umgezogen = true;
+  if (!s.dateien?.length || (r.targets || []).some((t) => t.typ === "sound")) return r;
+  const ziel = { id: uidFn(), typ: "sound", name: "Local Sound", host: "", port: 0, netz: "",
+    optionen: { geraet: s.geraet || "", geraetName: s.geraetName || "", lautstaerke: String(Math.round((s.lautstaerke ?? 1) * 100)), abbrechen: s.abbrechen === false ? "nein" : "ja" } };
+  r.targets = [...(r.targets || []), ziel];
+  if (!s.an) return r;
+  const gruppen = new Map();
+  for (const d of s.dateien) if (d.an && d.event) { const k = `${d.spiel}\t${d.event}`; if (!gruppen.has(k)) gruppen.set(k, []); gruppen.get(k).push(d.pfad); }
+  r.signale = r.signale || {};
+  for (const [k, pfade] of gruppen) {
+    const [spiel, event] = k.split("\t");
+    const sp = (r.signale[spiel] = r.signale[spiel] || {});
+    (sp[event] = Array.isArray(sp[event]) ? sp[event] : []).push({ id: uidFn(), ziel: ziel.id, befehl: "abspielen", werte: { datei: dateiWert(pfade) }, pc: "", team: "" });
+  }
+  return r;
 }
 
 function migrateSound(s) {
@@ -96,9 +120,10 @@ function migrateSound(s) {
     lautstaerke: Number.isFinite(zahl) ? Math.max(0, Math.min(1, zahl)) : 1,
     abbrechen: s.abbrechen !== false,
     beimTest: s.beimTest !== false,
+    umgezogen: s.umgezogen === true,
     dateien: (Array.isArray(s.dateien) ? s.dateien : []).filter((x) => x && typeof x.pfad === "string" && typeof x.spiel === "string").slice(0, MAX_DATEIEN)
       .map((x) => ({ id: typeof x.id === "string" && x.id ? x.id : uid(), spiel: x.spiel, event: typeof x.event === "string" ? x.event : "", pfad: x.pfad, url: typeof x.url === "string" ? x.url : "", name: typeof x.name === "string" && x.name ? x.name : x.pfad.split(/[\\/]/).pop(), an: x.an === true })),
   };
 }
 
-module.exports = { SOUND_ENDUNGEN, MAX_DATEIEN, standardSound, migrateSound, istSound, eventVonOrdner, dateienAufnehmen, nachEvent, soundFuer, soundsVon, soundZumTest };
+module.exports = { dateiListe, dateiWert, soundAktion, zielEinstellung, vorschlagFuer, soundUmziehen, SOUND_ENDUNGEN, MAX_DATEIEN, standardSound, migrateSound, istSound, eventVonOrdner, dateienAufnehmen, nachEvent };

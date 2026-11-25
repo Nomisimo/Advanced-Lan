@@ -5,6 +5,7 @@ import { migrateKonfig } from "../core/defaults.js";
 import { gsiCfg, CFG_DATEI } from "../core/cfg.js";
 import { rlIni, RL_INI_DATEI } from "../core/rl-ini.js";
 import { testNachricht, zeigeNachricht } from "../core/signal.js";
+import { istLokal } from "../core/ziel-typen.js";
 import { SimRunner } from "../core/sim-runner.js";
 import { SimMatch } from "../core/gsi-sim.js";
 import { CsQuelle } from "../core/cs-quelle.js";
@@ -42,7 +43,7 @@ function browserApi() {
   let cfg;
   try { cfg = migrateKonfig(JSON.parse(localStorage.getItem(KEY))); } catch { cfg = migrateKonfig(null); }
   const speichern = () => { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch {} };
-  const hoerer = { status: new Set(), meldung: new Set(), regieEvent: new Set(), gamePcEvent: new Set(), config: new Set() };
+  const hoerer = { status: new Set(), meldung: new Set(), regieEvent: new Set(), soundAusgabe: new Set(), gamePcEvent: new Set(), config: new Set() };
   // Game-Stats-Screen der Vorschau: eigener Tab (index.html#stats), bekommt Status und Events über einen BroadcastChannel
   const istStats = typeof location !== "undefined" && /^#stats(=|&|$)/.test(location.hash);
   const kanal = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("advancedlan-vorschau") : null;
@@ -62,6 +63,9 @@ function browserApi() {
     const screens = Object.fromEntries(scr.map((x) => [x.id, { fenster: offen(x.id), ndi: { laeuft: false, name: "", verbindungen: 0, bilder: 0, fehler: "", aufloesung: `${x.b}×${x.h}`, fps: 30 } }]));
     if (cfg.modus === "regie" || cfg.modus === "standalone") s.regie = { ...regie.snapshot(), session: { offen: sessionOffen, port: cfg.regie.session.port, ip: "", fehler: "", verbunden: regie.snapshot().pcs.filter((p) => p.verbunden && !p.sim).length }, sim: sim.status(), armed: cfg.regie.armed, spielAufRegie: "",
       stats: { fenster: offen(scr[0]?.id), offen: scr.filter((x) => offen(x.id)).length, ndi: { verfuegbar: false, laeuft: false, sender: 0, fps: 30 }, screens }, lokal: cfg.modus === "standalone" ? cfg.gamepc.pcId.trim() || "Dieser PC" : null };
+    // Stats-Screen-PC: in der Vorschau kein UDP, die Screens kommen aus den eigenen Einstellungen
+    if (cfg.modus === "stats") s.statspc = { laeuft: false, fehler: "Nur in der App: die Browser-Vorschau kann kein UDP empfangen.", verbunden: false, weg: "", regie: null, layout: false, letztes: null,
+      session: "", screens: scr.map(({ id, name, b, h }) => ({ id, name, b, h })), ausgabe: { screens } };
     if (cfg.modus === "gamepc" || cfg.modus === "standalone") s.gamepc = {
       spieler: cfg.gamepc.spieler, spielerAnzeige: cfg.gamepc.spieler || cfg.gamepc.pcId.trim() || "Dieser PC",
       client: { zustand: gp.zustand, grund: "", session: gp.zustand === "verbunden" ? cfg.gamepc.regie.session : "", aktivesSpiel: "cs2", ziel: null, gesendet: gp.log.filter((e) => e.gesendet).length, verworfen: 0 },
@@ -76,7 +80,8 @@ function browserApi() {
   const statusMelden = () => melde("status", status());
   const regie = new Regie({
     getConfig: () => cfg.regie,
-    send: () => Promise.resolve(),
+    // Vorschau: Local Sound spielt im Browser, OSC geht nirgends hin
+    send: (s) => { if (istLokal(s.ziel)) melde("soundAusgabe", { ziel: s.ziel, address: s.address, args: s.args }); return Promise.resolve(); },
     emit: (typ, d) => { if (typ === "event") melde("regieEvent", d); statusMelden(); },
   });
   const sim = new RegieSim({ regie, onChange: statusMelden });
@@ -265,11 +270,18 @@ function browserApi() {
     eventAusloesen: async (ev) => { const pc = ev?.pcId && regie.pcs.get(ev.pcId)?.verbunden ? ev.pcId : null; return regie.fire({ round: regie.stand?.runde, map: regie.stand?.map, ...ev, spiel: cfg.regie.aktivesSpiel, pc: pc || "Regie", pcId: pc || "regie" }, "manuell"); },
     signalTesten: async (spiel, type, z) => regie.testeZuweisung(spiel, type, z),
     overlayZuruecksetzen: async () => {},
-    zielTesten: async (id) => { const z = cfg.regie.targets.find((t) => t.id === id); return z ? { ok: true, nachricht: zeigeNachricht(testNachricht(z)) } : { fehler: "Ziel nicht gefunden" }; },
+    zielTesten: async (id) => {
+      const z = cfg.regie.targets.find((t) => t.id === id);
+      if (!z) return { fehler: "Ziel nicht gefunden" };
+      const n = testNachricht(z);
+      if (istLokal(z)) melde("soundAusgabe", { ziel: z, ...n });
+      return { ok: true, nachricht: zeigeNachricht(n), lokal: istLokal(z) };
+    },
     simStart: async (m) => { sim.start(m, cfg.regie.aktivesSpiel); return sim.status(); },
     simStop: async () => { sim.stop(); return sim.status(); },
     simNeu: async () => { sim.neu(); return sim.status(); },
     onRegieEvent: abo("regieEvent"),
+    onSoundAusgabe: abo("soundAusgabe"),
     // id: Screen, ohne Angabe der erste (Schließen ohne id: alle)
     statsFenster: async (offen, id) => {
       const sc = screenVon(cfg.regie.stats, id);

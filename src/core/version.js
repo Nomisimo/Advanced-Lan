@@ -6,6 +6,13 @@ const REPO = "Nomisimo/Advanced-Lan";
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
+  "1.0.8": [
+    "Sound als Ziel „Local Sound“ (Tab „Ziele“): Ausgabegerät und Lautstärke je Ziel, darunter die Sound-Bibliothek. Im Tab „Signale“ je Event „Sound abspielen“ mit einer oder mehreren Dateien (mehrere: zufällig eine), wie die OSC-Befehle nur bei scharfer Ausgabe, Test immer",
+    "Signale (Valorant): Filter nach Seite „Angriff“ oder „Verteidigung“ in der Team-Auswahl, z. B. eigene Sounds oder Cues für „Attackers win“ und „Defenders win“. Berücksichtigt den Seitenwechsel zur Halbzeit. Platzhalter {seite}",
+    "Bisherige Sound-Einstellungen werden beim ersten Start ins Ziel „Local Sound“ und in die Signale übernommen",
+    "Neuer Modus „Stats-Screen“: ein PC zeigt nur die Stats-Screens der Regie (Beamer, zweiter Bildschirm). Die Regie schickt Layouts, Spielstand und Events per UDP (Multicast, sonst Unicast), Events in rund 10 ms. Einstellungen in Regie → Setup → „Stats-Screen-PCs“",
+    "NDI: die gewählte Netzwerkkarte greift jetzt wirklich (die App startet dafür einmal neu). Die Ausgabe zeigt, ob sie wirkt",
+  ],
   "1.0.7": [
     "Valorant: neues Event „Team steht fest“. Jeder Game-PC meldet es einmal je Match, sobald sein Team automatisch erkannt ist: mit dem Riot Client schon in der Agentenwahl (vor „Match startet“), sonst mit der ersten Runde aus Shots Fired. Je Team eine Zuweisung mit Team-Filter, Werte wie immer mit {nr} oder {plan}",
     "Shots Fired (Valorant): match_id bzw. pseudo_match_id (match_info) trennt die PCs nach Match, auch ohne Riot Client. Das Setup zeigt die Match-ID",

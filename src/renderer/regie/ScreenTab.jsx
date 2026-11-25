@@ -5,7 +5,6 @@ import { uiConfirm } from "../dialog.jsx";
 import { StatsBuehne } from "../StatsScreen.jsx";
 import StatsAusgabe from "./StatsAusgabe.jsx";
 import ScreenLeiste from "./ScreenLeiste.jsx";
-import SoundEinstellungen from "./SoundEinstellungen.jsx";
 import { screenVon } from "../../core/stats-screens.js";
 import { SPIEL_BY_ID } from "../../core/spiele.js";
 import { WERTE } from "../../core/stats-screen.js";
@@ -65,7 +64,6 @@ export default function ScreenTab({ cfg, mutate, status, log, notify }) {
         {screen && <Editor key={screen.id} cfg={cfg} mutate={mutate} status={status} log={log} screen={screen} />}
       </Section>
       <StatsAusgabe cfg={cfg} mutate={mutate} status={status} />
-      <SoundEinstellungen cfg={cfg} mutate={mutate} notify={notify} />
     </>
   );
 }

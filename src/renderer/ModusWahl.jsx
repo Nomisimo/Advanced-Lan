@@ -1,7 +1,7 @@
 import React from "react";
 import { S, ACCENT, ACCENT_HI, LINE, SUB, MUTED, GLOW } from "./theme.js";
 import { APP_ICON } from "./Kopf.jsx";
-import { Clapperboard, Gamepad2, MonitorPlay } from "lucide-react";
+import { Clapperboard, Gamepad2, MonitorPlay, Tv } from "lucide-react";
 
 const Karte = ({ icon: Ic, titel, text, onClick }) => (
   <button className="glow-hover" onClick={onClick}
@@ -29,6 +29,10 @@ export default function ModusWahl({ onWahl, version }) {
         <button onClick={() => onWahl("standalone")} title="Regie und Spiel auf diesem PC: die Spiele hier melden ihre Events direkt an die Regie, ohne Session"
           style={{ background: "transparent", border: "none", color: SUB, cursor: "pointer", fontSize: 13, display: "inline-flex", alignItems: "center", gap: 7, padding: "6px 10px", textDecoration: "underline", textUnderlineOffset: 4, textDecorationColor: ACCENT + "88" }}>
           <MonitorPlay size={14} color={ACCENT_HI} /> Standalone: Regie und Spiel auf diesem PC
+        </button>
+        <button onClick={() => onWahl("stats")} data-testid="modus-stats" title="Dieser PC zeigt nur die Stats-Screens der Regie (Beamer, zweiter Bildschirm). Daten kommen per UDP von der Regie"
+          style={{ background: "transparent", border: "none", color: SUB, cursor: "pointer", fontSize: 13, display: "inline-flex", alignItems: "center", gap: 7, padding: "6px 10px", textDecoration: "underline", textUnderlineOffset: 4, textDecorationColor: ACCENT + "88" }}>
+          <Tv size={14} color={ACCENT_HI} /> Stats-Screen: nur die Stats-Screens der Regie zeigen
         </button>
         {version && <div style={{ color: MUTED, fontSize: 11 }}>v{version}</div>}
       </div>

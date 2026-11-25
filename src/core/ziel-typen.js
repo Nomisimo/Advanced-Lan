@@ -36,7 +36,22 @@ const GENERISCH = [
   { id: "event", label: "Ereignis mit Daten", params: [P("adresse", "OSC-Adresse", "/lan/{spiel}/{event}")], osc: [{ address: "{adresse}", args: [{ type: "s", value: "{team}" }, { type: "s", value: "{spieler}" }, { type: "s", value: "{pc}" }, { type: "i", value: "{runde}" }] }] },
 ];
 
+// Local Sound: kein OSC-Gerät, sondern dieser Regie-PC. Die Nachrichten (/sound/play, /sound/stop) gehen nicht ins Netz,
+// die Regie-Oberfläche spielt sie ab (renderer/regie/sound-player.js). Die Dateien liegen in der Sound-Bibliothek (core/sound.js).
+// datei: Pfade aus der Bibliothek, eine je Zeile; bei mehreren spielt zufällig eine.
+const LOCAL_SOUND = {
+  id: "sound", lokal: true, quelle: "Spielt Audiodateien auf diesem Regie-PC ab, auf dem gewählten Ausgabegerät (z. B. Dante Virtual Soundcard).", name: "Local Sound", hersteller: "Dieser Regie-PC", kategorie: "audio", port: 0, protokoll: "lokal",
+  einrichten: "Kein Netzwerk nötig. Beim Ziel Ausgabegerät und Lautstärke wählen und darunter die Sound-Bibliothek füllen (Ordner wählen). Im Tab „Signale“ dann je Event „Sound abspielen“ mit einer oder mehreren Dateien.",
+  optionen: [P("geraet", "Ausgabegerät", ""), P("geraetName", "Name des Geräts", ""), P("lautstaerke", "Lautstärke %", "100", "zahl"), P("abbrechen", "Neuer Sound beendet den laufenden", "ja")],
+  test: { address: "/sound/test" },
+  befehle: [
+    { id: "abspielen", label: "Sound abspielen", params: [P("datei", "Datei", "", "sound")], osc: [{ address: "/sound/play", args: [{ type: "s", value: "{datei}" }] }] },
+    { id: "stopp", label: "Alle Sounds stoppen", params: [], osc: [{ address: "/sound/stop" }] },
+  ],
+};
+
 const ZIEL_TYPEN = [
+  LOCAL_SOUND,
   {
     id: "qlab", quelle: "Alle Befehle aus dem offiziellen OSC Dictionary von QLab 5.", name: "QLab 5", hersteller: "Figure 53", kategorie: "show", port: 53000, protokoll: "UDP",
     doku: "https://qlab.app/docs/v5/scripting/osc-dictionary-v5/",
@@ -260,7 +275,9 @@ const OHNE_OSC = [
 
 const BY_ID = Object.fromEntries(ZIEL_TYPEN.map((t) => [t.id, t]));
 const zielTyp = (id) => BY_ID[id] || BY_ID.osc;
-const befehleVon = (typId) => [...zielTyp(typId).befehle, EIGENE];
+const befehleVon = (typId) => (zielTyp(typId).lokal ? [...zielTyp(typId).befehle] : [...zielTyp(typId).befehle, EIGENE]);
+// Lokale Ziele (Local Sound) senden nichts ins Netz
+const istLokal = (ziel) => !!zielTyp(ziel?.typ).lokal;
 const befehlVon = (typId, befehlId) => befehleVon(typId).find((b) => b.id === befehlId) || null;
 
-module.exports = { ZIEL_TYPEN, KATEGORIEN, OHNE_OSC, zielTyp, befehleVon, befehlVon, EIGENE };
+module.exports = { istLokal, ZIEL_TYPEN, KATEGORIEN, OHNE_OSC, zielTyp, befehleVon, befehlVon, EIGENE };

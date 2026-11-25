@@ -58,6 +58,7 @@ contextBridge.exposeInMainWorld('regieAPI', {
   onRegieEvent:    abo('regie-event'),
   onSoundAusgabe:  abo('sound-ausgabe'),
   statsFenster:    call('stats-fenster'),
+  appNeustart:     call('app-neustart'),
   statsVollbild:   call('stats-vollbild'),
   ndiPruefen:      call('ndi-pruefen'),
   onStatsConfig:   abo('stats-config'),

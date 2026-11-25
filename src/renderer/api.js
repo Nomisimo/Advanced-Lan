@@ -63,6 +63,9 @@ function browserApi() {
     const screens = Object.fromEntries(scr.map((x) => [x.id, { fenster: offen(x.id), ndi: { laeuft: false, name: "", verbindungen: 0, bilder: 0, fehler: "", aufloesung: `${x.b}×${x.h}`, fps: 30 } }]));
     if (cfg.modus === "regie" || cfg.modus === "standalone") s.regie = { ...regie.snapshot(), session: { offen: sessionOffen, port: cfg.regie.session.port, ip: "", fehler: "", verbunden: regie.snapshot().pcs.filter((p) => p.verbunden && !p.sim).length }, sim: sim.status(), armed: cfg.regie.armed, spielAufRegie: "",
       stats: { fenster: offen(scr[0]?.id), offen: scr.filter((x) => offen(x.id)).length, ndi: { verfuegbar: false, laeuft: false, sender: 0, fps: 30 }, screens }, lokal: cfg.modus === "standalone" ? cfg.gamepc.pcId.trim() || "Dieser PC" : null };
+    // Stats-Screen-PC: in der Vorschau kein UDP, die Screens kommen aus den eigenen Einstellungen
+    if (cfg.modus === "stats") s.statspc = { laeuft: false, fehler: "Nur in der App: die Browser-Vorschau kann kein UDP empfangen.", verbunden: false, weg: "", regie: null, layout: false, letztes: null,
+      session: "", screens: scr.map(({ id, name, b, h }) => ({ id, name, b, h })), ausgabe: { screens } };
     if (cfg.modus === "gamepc" || cfg.modus === "standalone") s.gamepc = {
       spieler: cfg.gamepc.spieler, spielerAnzeige: cfg.gamepc.spieler || cfg.gamepc.pcId.trim() || "Dieser PC",
       client: { zustand: gp.zustand, grund: "", session: gp.zustand === "verbunden" ? cfg.gamepc.regie.session : "", aktivesSpiel: "cs2", ziel: null, gesendet: gp.log.filter((e) => e.gesendet).length, verworfen: 0 },

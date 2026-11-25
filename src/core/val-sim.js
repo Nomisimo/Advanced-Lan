@@ -24,7 +24,7 @@ class ValSimMatch {
     this.runde = 0;
     this.score = [0, 0];
     this.ende = false;
-    this.spieler = clients.map((c, i) => ({ token: c.token, name: NAMEN[i % NAMEN.length], team: i < clients.length / 2 ? 0 : 1, lebt: true, kills: 0 }));
+    this.spieler = clients.map((c, i) => ({ token: c.token, name: c.name || NAMEN[i % NAMEN.length], team: c.team ?? (i < clients.length / 2 ? 0 : 1), lebt: true, kills: 0 }));
   }
 
   vorbei() { return this.ende; }

@@ -7,7 +7,17 @@ import { SPIELE, SPIEL_BY_ID } from "../../core/spiele.js";
 import { zielTyp, befehleVon, befehlVon } from "../../core/ziel-typen.js";
 import { baueNachrichten, zeigeNachricht, nutztPlan } from "../../core/signal.js";
 import { ALLGEMEIN, AKTIONEN, aktionVon, geerbt, modus } from "../../core/aktionen.js";
-import { Send, Plus, Trash2, Layers } from "lucide-react";
+import { migrateSound, soundsVon, soundZumTest } from "../../core/sound.js";
+import { abspielen } from "./sound-player.js";
+import { Send, Plus, Trash2, Layers, Volume2 } from "lucide-react";
+
+// Sound eines Events zum Test abspielen (Tab „Stats-Screen“ → Sound). Fehler als Meldung.
+function soundTesten(cfg, spiel, event, notify) {
+  const sound = migrateSound(cfg.sound);
+  const d = soundZumTest(sound, spiel, event);
+  if (d) abspielen(d, sound).catch((f) => notify(`Sound: ${f.message}`, "err"));
+  return d;
+}
 
 // Bereich „Allgemein“: wie ein Spiel, dessen Events die allgemeinen Aktionen sind (core/aktionen.js). Kein Team-Filter, die Teams sind je Spiel anders.
 const ALLGEMEIN_SPIEL = { id: ALLGEMEIN, name: "Allgemein", teams: [], events: AKTIONEN.map(({ id, label, gruppe, spieler }) => ({ id, label, gruppe, spieler })) };
@@ -43,8 +53,9 @@ function Zuweisung({ spiel, ev, z, cfg, pcs, aendern, loeschen, notify }) {
   const befehl = ziel && befehlVon(ziel.typ, z.befehl);
   const v = ziel && befehl ? vorschau(ziel, z, cfg.plan) : { text: "", fehler: ziel ? "Befehl wählen" : "Ziel fehlt" };
   const testen = async () => {
+    const d = soundTesten(cfg, spiel.id, ev.id, notify);
     const k = await api.signalTesten(spiel.id, ev.id, z);
-    k.fehler?.length ? notify(k.fehler.join(", "), "err") : notify(`${k.nachrichten.join(" · ")} → ${k.ziel}`);
+    k.fehler?.length ? notify(k.fehler.join(", "), "err") : notify(`${k.nachrichten.join(" · ")} → ${k.ziel}${d ? ` · Sound ${d.name}` : ""}`);
   };
   return (
     <div style={{ padding: "8px 0 8px 30px", borderTop: `1px dashed ${LINE}` }}>
@@ -121,6 +132,7 @@ function EventZeile({ spiel, ev, cfg, mutate, pcs, notify }) {
     if (!d.ersetzt[spiel.id].length) delete d.ersetzt[spiel.id];
   });
   const aktiv = zuw.length > 0 || (m !== "ersetzt" && nGeerbt > 0);
+  const sounds = soundsVon(cfg.sound, spiel.id, ev.id);
   const aendereListe = (fn) => mutate((d) => {
     d.signale = d.signale || {};
     d.signale[spiel.id] = d.signale[spiel.id] || {};
@@ -140,6 +152,8 @@ function EventZeile({ spiel, ev, cfg, mutate, pcs, notify }) {
         <span style={{ flex: 1 }} />
         {aktion && <span title={`${MODUS[m].title}. Allgemeine Aktion „${aktion.label}“.`} style={{ ...S.badge, background: "transparent", border: `1px solid ${MODUS[m].farbe}55`, color: MODUS[m].farbe, display: "inline-flex", alignItems: "center", gap: 4 }}><Layers size={10} /> {MODUS[m].text(nGeerbt)}</span>}
         {aktion && <button style={S.smallBtn} onClick={() => ersetzen(m !== "ersetzt")} title={m === "ersetzt" ? "Allgemeine Befehle wieder gelten lassen" : "Allgemeine Befehle hier nicht senden, nur die eigenen"}>{m === "ersetzt" ? "Allgemein nutzen" : "Ersetzen"}</button>}
+        {sounds.length > 0 && <button style={{ ...S.smallBtn, color: "#9be7b4" }} data-testid={`signal-sound-${ev.id}`} onClick={() => abspielen(sounds[Math.floor(Math.random() * sounds.length)], migrateSound(cfg.sound)).catch((f) => notify(`Sound: ${f.message}`, "err"))}
+          title={`${sounds.length} Sound(s) aus Tab „Stats-Screen“ → Sound: ${sounds.map((d) => d.name).join(", ")}. Klick spielt einen.`}><Volume2 size={12} /> {sounds.length}</button>}
         {zuw.length > 0 && <span style={{ ...S.badge, background: ACCENT + "33", color: "#d9c6ff" }}>{zuw.length} {zuw.length === 1 ? "Befehl" : "Befehle"}</span>}
         <button style={S.smallBtn} disabled={!cfg.targets.length} onClick={neu}><Plus size={12} /> Befehl</button>
       </div>
@@ -213,7 +227,11 @@ export default function SignaleTab(props) {
       )}
       <SpielSignale spiel={ALLGEMEIN_SPIEL} {...props} />
       <div style={{ display: "flex", justifyContent: "flex-end", margin: "-8px 0 12px" }}>
-        <Toggle checked={nurAbweichungen} onChange={setNurAbweichungen} label="In den Spielen nur Abweichungen von „Allgemein“ zeigen" />
+        <span style={{ display: "inline-flex", gap: 16 }}>
+          <Toggle checked={cfg.sound?.beimTest !== false} onChange={(v) => props.mutate((d) => { d.sound = { ...migrateSound(d.sound), beimTest: v }; })}
+            title="Der Test-Knopf eines Befehls spielt auch einen eingeschalteten Sound des Events (Tab „Stats-Screen“ → Sound), auf dem gewählten Ausgabegerät" label="Beim Test auch den Sound spielen" />
+          <Toggle checked={nurAbweichungen} onChange={setNurAbweichungen} label="In den Spielen nur Abweichungen von „Allgemein“ zeigen" />
+        </span>
       </div>
       {genutzt.map((s) => <SpielSignale key={s.id} spiel={s} {...props} nurAbweichungen={nurAbweichungen} />)}
     </>

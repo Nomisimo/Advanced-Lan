@@ -8,7 +8,8 @@ const NAMEN = [["Momo", "Kira", "Jax"], ["Rex", "Vex", "Zed"]];
 const DAUER = 300; // Sekunden Spielzeit
 
 class RlSimMatch {
-  constructor({ seed = Date.now() } = {}) {
+  // namen: [[Blau …], [Orange …]], ohne: 3 gegen 3 mit Namen aus der Liste
+  constructor({ seed = Date.now(), namen = NAMEN } = {}) {
     this.rnd = zufall(seed);
     this.guid = `SIM-${(seed >>> 0).toString(16).toUpperCase()}`; // wie die MatchGuid echter Matches
     this.score = [0, 0];
@@ -17,7 +18,8 @@ class RlSimMatch {
     this.gestartet = false;
     this.ende = false;
     this.runde = 0; // Anstöße
-    this.spieler = NAMEN.flatMap((team, t) => team.map((Name, i) => ({ Name, Shortcut: t * 3 + i + 1, TeamNum: t, Goals: 0, Shots: 0, Saves: 0, Assists: 0, Score: 0 })));
+    let nr = 0;
+    this.spieler = namen.flatMap((team, t) => team.map((Name) => ({ Name, Shortcut: ++nr, TeamNum: t, Goals: 0, Shots: 0, Saves: 0, Assists: 0, Score: 0 })));
   }
 
   vorbei() { return this.ende; }

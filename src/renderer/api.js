@@ -262,7 +262,7 @@ function browserApi() {
     // Vorschau: Dateien über den Browser wählen, abgespielt über Object-URLs (gelten nur bis zum Neuladen)
     soundOrdner: () => soundWahl(true),
     soundDateien: () => soundWahl(false),
-    eventAusloesen: async (ev) => regie.fire({ round: regie.stand?.runde, map: regie.stand?.map, ...ev, spiel: cfg.regie.aktivesSpiel, pc: "Regie", pcId: "regie" }, "manuell"),
+    eventAusloesen: async (ev) => { const pc = ev?.pcId && regie.pcs.get(ev.pcId)?.verbunden ? ev.pcId : null; return regie.fire({ round: regie.stand?.runde, map: regie.stand?.map, ...ev, spiel: cfg.regie.aktivesSpiel, pc: pc || "Regie", pcId: pc || "regie" }, "manuell"); },
     signalTesten: async (spiel, type, z) => regie.testeZuweisung(spiel, type, z),
     overlayZuruecksetzen: async () => {},
     zielTesten: async (id) => { const z = cfg.regie.targets.find((t) => t.id === id); return z ? { ok: true, nachricht: zeigeNachricht(testNachricht(z)) } : { fehler: "Ziel nicht gefunden" }; },

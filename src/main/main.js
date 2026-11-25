@@ -965,7 +965,9 @@ ipcMain.handle('sound-dateien', async () => {
   if (r.canceled || !r.filePaths?.length) return { abbruch: true };
   return { dateien: r.filePaths.filter(istSound).map((p) => soundEintrag(p, '')) };
 });
-ipcMain.handle('event-ausloesen', (_, ev) => regie.fire({ round: regie.stand?.runde, map: regie.stand?.map, ...ev, spiel: cfg.regie.aktivesSpiel, pc: 'Regie', pcId: 'regie' }, 'manuell'));
+// ev.pcId: im Namen eines verbundenen Game-PCs auslösen (Platz und Signale mit PC-Filter wie bei echten Events), sonst als Regie
+const manuellerPc = (id) => (id && regie.pcs.get(id)?.verbunden ? id : null);
+ipcMain.handle('event-ausloesen', (_, ev) => { const pc = manuellerPc(ev?.pcId); return regie.fire({ round: regie.stand?.runde, map: regie.stand?.map, ...ev, spiel: cfg.regie.aktivesSpiel, pc: pc || 'Regie', pcId: pc || 'regie' }, 'manuell'); });
 ipcMain.handle('signal-testen', (_, spiel, type, zuweisung) => regie.testeZuweisung(spiel, type, zuweisung));
 ipcMain.handle('ziel-testen', async (_, zielId) => {
   const ziel = cfg.regie.targets.find((t) => t.id === zielId);

@@ -1,6 +1,6 @@
 import React, { useRef, useState } from "react";
 import { S, ACCENT, ACCENT_HI, LINE, SUB, MUTED, FELD, GLOW } from "../theme.js";
-import { Field, Toggle } from "../ui.jsx";
+import { Field } from "../ui.jsx";
 import { HINTERGRUENDE, VERLAUF_LAGEN, VERLAUF_ARTEN, VERLAUF_VORLAGEN, MAX_STOPPS, verlaufCss, farbeBei, rgba } from "../../core/stats-layout.js";
 import { Palette, ImagePlus, Trash2, ArrowLeftRight, Plus } from "lucide-react";
 

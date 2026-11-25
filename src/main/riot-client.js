@@ -72,7 +72,8 @@ class RiotClient {
     this.s = { ...vorher, team: '', teamId: '', match: '', phase: '', detail: '', ...neu };
     if (this.s.team) this.s.letzte = Date.now();
     if (this.s.team && this.s.team !== vorher.team) this.onTeam(this.s.team);
-    if (this.s.match !== vorher.match) this.onMatch(this.s.match);
+    // neu: das Spiel lädt gerade nach Agentenwahl oder ohne Match davor (nicht, wenn die App mitten im Match startet)
+    if (this.s.match !== vorher.match) this.onMatch(this.s.match, { neu: !!this.s.match && (vorher.phase === 'Agentenwahl' || (vorher.zustand === 'kein-match' && !vorher.match)) });
     if (JSON.stringify({ ...this.s, letzte: 0 }) !== JSON.stringify({ ...vorher, letzte: 0 })) this.onChange();
     // Im Match ändert sich das Team nicht: dann seltener fragen
     this.timer = setTimeout(() => this.runde(lauf), this.s.team ? 15000 : 5000);

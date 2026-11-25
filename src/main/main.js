@@ -236,7 +236,12 @@ let quellen = {};
 // Neue MatchID: sofort an die Regie, damit sie diesen PC dem richtigen Match zuordnet (auch vor dem ersten Event)
 const riot = new RiotClient({
   onTeam: () => { if (quellen.valorant) quellen.valorant.team = teamVon('valorant'); teamPruefen(); statusMelden(); },
-  onMatch: () => { if (quellen.valorant) statusAnRegie('valorant', quellen.valorant.status(), quellen.valorant.stand()); teamPruefen(); },
+  onMatch: (_, { neu } = {}) => {
+    if (quellen.valorant) statusAnRegie('valorant', quellen.valorant.status(), quellen.valorant.stand());
+    teamPruefen();
+    // Match startet, sobald das Spiel nach der Agentenwahl lädt: früher als Shots Fired und Bilderkennung, die dann nicht doppelt auslösen
+    if (neu) bildNachricht('valorant', { bild: true, event: 'match_start', neu: true, seite: 'eigen', aktion: 'Riot Client', quelle: 'api' });
+  },
   onChange: statusMelden,
 });
 // Der Riot Client wird nur gefragt, wenn „Automatisch (Riot Client)“ an ist

@@ -19,6 +19,7 @@ const AKTIONEN = [
   { id: "round_start", label: "Runde startet", gruppe: "Runde", events: { cs2: ["round_live"], valorant: ["round_start"], finals: ["round_start"], rl: ["kickoff"] } },
   { id: "round_end", label: "Runde vorbei", gruppe: "Runde", events: { cs2: ["round_end"], valorant: ["round_end"], finals: ["round_end"] } },
   { id: "match_start", label: "Match startet", gruppe: "Match", events: { cs2: ["match_live"], valorant: ["match_start"], rl: ["match_start"], dota2: ["match_start"], finals: ["match_start"], fortnite: ["match_start"], lol: ["match_start"] } },
+  { id: "overtime", label: "Verlängerung", gruppe: "Match", events: { valorant: ["overtime"], rl: ["overtime"] } },
   { id: "win", label: "Sieg / Match vorbei", gruppe: "Match", events: { cs2: ["match_end"], valorant: ["match_won"], rl: ["match_end"], dota2: ["match_end"], finals: ["match_won"], fortnite: ["match_won"], lol: ["match_won"] } },
 ];
 

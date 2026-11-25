@@ -17,6 +17,7 @@ const NAMEN = ["Blitz", "Nova", "Raptor", "Echo", "Viper", "Ghost", "Tank", "Pix
 const SIEG = 13; // MR12
 
 class SimMatch {
+  // clients: [{ token, name?, team? (0 = CT, 1 = T) }], ohne name/team: Namen aus der Liste, Teams abwechselnd
   constructor({ clients, seed = Date.now(), map = "de_mirage" }) {
     this.rnd = zufall(seed);
     this.map = map;
@@ -27,8 +28,8 @@ class SimMatch {
     this.bombe = undefined;
     this.sieger = undefined;
     this.spieler = clients.map((c, i) => ({
-      token: c.token, steamid: `765611980000000${String(i).padStart(2, "0")}`, name: NAMEN[i % NAMEN.length],
-      team: i % 2 ? "T" : "CT", health: 100, flashed: 0, roundKills: 0, roundHs: 0, kills: 0, deaths: 0, mvps: 0,
+      token: c.token, steamid: `765611980000000${String(i).padStart(2, "0")}`, name: c.name || NAMEN[i % NAMEN.length],
+      team: c.team != null ? ["CT", "T"][c.team] : i % 2 ? "T" : "CT", health: 100, flashed: 0, roundKills: 0, roundHs: 0, kills: 0, deaths: 0, mvps: 0,
     }));
   }
 

@@ -122,6 +122,9 @@ const neueRunde = () => ({ kills: 0, tot: false, mitspielerTot: 0, ace: false })
 
 // Zustand je Game-PC: letzter Spielstand, ob das Match schon entschieden ist, und die laufende Runde
 // Zähler: letzter Stand von kills, deaths und round_number. Kommen echte kill- oder death-Events, gelten die (keine Doppelten).
+// Sind beide in Shots Fired angelegt (kill und kills), kann der Zähler vor dem ersten echten Event ankommen. Dann hat er den
+// Cue schon ausgelöst, und das echte Event kurz danach (ZAEHLER_FENSTER) wird geschluckt.
+const ZAEHLER_FENSTER = 3000;
 const neueZaehler = () => ({ kills: null, deaths: null, headshots: null, runde: null });
 const neueEcht = () => ({ kill: false, death: false, headshot: false });
 // info: Seite und Spieler aus team und ui_team_order (nur zur Anzeige und für das Team dieses PCs)
@@ -174,7 +177,8 @@ const MAX_SPRUNG = 5;
 const wahr = (v) => v === true || v === "true" || v === 1 || v === "1";
 
 // Anfrage → Nachrichten für die Valorant-Quelle: [{ event, seite }]. seite: eigen = Team dieses PCs, gegner = das andere, keins = ohne Team.
-function shotsfiredEvents(body, z = sfZustand()) {
+// jetzt: Zeit in ms (für Tests), sonst Date.now()
+function shotsfiredEvents(body, z = sfZustand(), jetzt = Date.now()) {
   const { events, infos } = zerlegen(body, VAL);
   const raus = [];
   const matchSieg = (seite) => { if (!z.entschieden) { z.entschieden = true; raus.push({ event: "match_won", seite }); } };
@@ -188,7 +192,19 @@ function shotsfiredEvents(body, z = sfZustand()) {
   };
   const tod = () => { z.r.tot = true; raus.push({ event: "death", seite: "eigen" }); };
   // Echte Events zuerst merken: dann zählen die Zähler nur noch mit und lösen nichts aus
-  for (const { name: n } of events) { const id = eventName(n); if (id in z.echt) z.echt[id] = true; }
+  z.zaehlerZeit = z.zaehlerZeit || {};
+  // Erstes echtes Event je Art: hat der Zähler gerade eben denselben Cue ausgelöst, wird es einmal geschluckt
+  const schlucken = {};
+  // Liefert das Event eine Zahl (Overwolf: Stand im Match), entscheidet die: gleich dem Zähler = derselbe Kill.
+  const ZAEHLER_VON = { kill: "kills", death: "deaths", headshot: "headshots" };
+  for (const { name: n, data } of events) {
+    const id = eventName(n);
+    if (!(id in z.echt)) continue;
+    const nr = zahlVon(data, ZAEHLER_VON[id]), stand = z.z?.[ZAEHLER_VON[id]];
+    const gleich = nr != null && stand != null ? nr <= stand : jetzt - (z.zaehlerZeit[id] ?? -Infinity) < ZAEHLER_FENSTER;
+    if (!z.echt[id] && z.zaehlerZeit[id] != null && gleich) schlucken[id] = 1;
+    z.echt[id] = true;
+  }
   const rundeStart = () => { z.r = neueRunde(); raus.push({ event: "round_start", seite: "eigen" }); };
   // Rundenende: bei Sieg des eigenen Teams Clutch prüfen, danach zählt die nächste Runde neu
   const rundeEnde = (seite) => {
@@ -205,7 +221,10 @@ function shotsfiredEvents(body, z = sfZustand()) {
       const ev = ZAEHLER[key];
       // Erster Wert: ab 0 oder 1 zählt er (Match läuft gerade an), ein höherer Stand ist nur der Ausgangswert (App mitten im Match gestartet)
       const neu = alt == null ? (n <= 1 ? n : 0) : n > alt ? n - alt : 0;
-      if (!z.echt[ev]) for (let i = 0; i < Math.min(neu, MAX_SPRUNG); i++) ev === "kill" ? kill() : ev === "death" ? tod() : raus.push({ event: ev, seite: "eigen" });
+      if (!z.echt[ev] && neu > 0) {
+        z.zaehlerZeit[ev] = jetzt;
+        for (let i = 0; i < Math.min(neu, MAX_SPRUNG); i++) ev === "kill" ? kill() : ev === "death" ? tod() : raus.push({ event: ev, seite: "eigen" });
+      }
       continue;
     }
     if (key === "team") { const s = seiteVon(value); if (s) z.info.seite = s; continue; }
@@ -253,6 +272,7 @@ function shotsfiredEvents(body, z = sfZustand()) {
   }
   for (const { name: n } of events) {
     const id = eventName(n);
+    if (schlucken[id]) { schlucken[id]--; continue; }
     if (id === "match_start") { z.score = null; z.entschieden = false; z.phase = ""; z.r = neueRunde(); z.z = neueZaehler(); z.info = neueInfo(); raus.push({ event: id, seite: "eigen" }); }
     else if (id === "kill") kill();
     else if (id === "death") tod();

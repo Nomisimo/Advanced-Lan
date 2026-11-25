@@ -4,20 +4,26 @@ import { Section, Field, Toggle } from "../ui.jsx";
 import { uiConfirm } from "../dialog.jsx";
 import { StatsBuehne } from "../StatsScreen.jsx";
 import StatsAusgabe from "./StatsAusgabe.jsx";
+import ScreenLeiste from "./ScreenLeiste.jsx";
+import { screenVon } from "../../core/stats-screens.js";
 import { SPIEL_BY_ID } from "../../core/spiele.js";
-import { B, H, MIN, MAX_TEXTE, MAX_BILDER, ZOOM_MIN, ZOOM_MAX, OPTIONEN, OPTION_TEXT_MAX, ANZEIGE, HINTERGRUENDE, PASSUNGEN, PLATZHALTER, standardLayout, migrateLayout, neuerText, neuesBild, einrasten, bilderAufraeumen, neueId, inhaltsSkala } from "../../core/stats-layout.js";
+import { MIN, MAX_TEXTE, MAX_BILDER, ZOOM_MIN, ZOOM_MAX, OPTIONEN, OPTION_TEXT_MAX, ANZEIGE, HINTERGRUENDE, PASSUNGEN, PLATZHALTER, standardLayout, migrateLayout, neuerText, neuesBild, einrasten, bilderAufraeumen, neueId, inhaltsSkala } from "../../core/stats-layout.js";
 import { statsBeispiel } from "../../core/stats-beispiel.js";
 import HintergrundEditor, { Regler, durchscheinend } from "./HintergrundEditor.jsx";
 import { bildWaehlen, bildVorbereiten } from "./bild-laden.js";
 import { Type, Eye, EyeOff, Undo2, Redo2, RotateCcw, Copy, Trash2, ArrowUpToLine, ArrowDownToLine, AlignLeft, AlignCenter, AlignRight, Cast, Move, ImagePlus, Image as ImageIcon, Scaling } from "lucide-react";
 
-// Editor des Game-Stats-Screens: Anzeigen und Texte per Drag and Drop auf der 1920×1080-Fläche anordnen,
-// Größe an den Griffen ändern, Texte schreiben. Gespeichert in cfg.regie.stats.layout; Pop-out-Fenster und NDI zeigen es sofort.
+// Editor der Game-Stats-Screens: mehrere Screens, jeder mit eigener Größe in Pixeln (Standard 1920×1080) und eigener NDI-Quelle.
+// Anzeigen und Texte per Drag and Drop auf der Fläche anordnen, Größe an den Griffen ändern, Texte schreiben.
+// Gespeichert in cfg.regie.stats.screens[].layout; Pop-out-Fenster und NDI des Screens zeigen es sofort.
 const RASTER = [[0, "Aus"], [10, "10 px"], [20, "20 px"], [40, "40 px"]];
 const GRIFFE = [["o", "l"], ["o"], ["o", "r"], ["r"], ["u", "r"], ["u"], ["u", "l"], ["l"]];
 const CURSOR = { o: "ns-resize", u: "ns-resize", l: "ew-resize", r: "ew-resize", ol: "nwse-resize", ur: "nwse-resize", or: "nesw-resize", ul: "nesw-resize" };
 const FARBEN = ["#ffffff", "#c39bff", "#9d5cff", "#2ecc71", "#f2b33d", "#ff5d5d", "#4ea1ff", "#a39eb3"];
 const UNDO_MAX = 60;
+const MAX_HOEHE = 620; // höchste Höhe der Arbeitsfläche in Bildschirm-Pixeln (Hochkant-Screens)
+const MAX_ZOOM = 4; // kleine Screens werden höchstens vierfach vergrößert gezeigt
+const KARO = "repeating-conic-gradient(#3a3647 0% 25%, #23212c 0% 50%) 0 0 / 16px 16px"; // durchsichtiger Hintergrund
 
 const elLabel = (e) => (e.typ === "text" ? (e.text || "").split("\n")[0].slice(0, 28) || "Leerer Text" : e.typ === "bild" ? e.name || "Bild" : ANZEIGE[e.typ]?.label || e.typ);
 const eigen = (e) => e?.typ === "text" || e?.typ === "bild"; // eigene Blöcke: löschen statt ausblenden
@@ -42,7 +48,23 @@ const Zahl = ({ label, wert, onChange, min = 0, max = 9999 }) => (
 );
 
 export default function ScreenTab({ cfg, mutate, status, log }) {
-  const gespeichert = useMemo(() => migrateLayout(cfg.stats?.layout), [cfg.stats?.layout]);
+  const screen = screenVon(cfg.stats, cfg.stats?.aktiv);
+  return (
+    <>
+      <Section title="Screen-Editor" subtitle="Mehrere Game-Stats-Screens, jeder mit eigener Größe in Pixeln und eigener NDI-Quelle. Anzeigen und Texte anordnen: ziehen zum Verschieben, an den Griffen die Größe ändern. Jede Änderung wird gespeichert und gilt sofort im Pop-out-Fenster und im NDI-Stream des Screens.">
+        {screen && <ScreenLeiste cfg={cfg} mutate={mutate} status={status} screen={screen} />}
+        {/* Eigener Editor je Screen: Rückgängig, Auswahl und Ziehen gelten nur für diesen Screen */}
+        {screen && <Editor key={screen.id} cfg={cfg} mutate={mutate} status={status} log={log} screen={screen} />}
+      </Section>
+      <StatsAusgabe cfg={cfg} mutate={mutate} status={status} />
+    </>
+  );
+}
+
+function Editor({ cfg, mutate, status, log, screen }) {
+  const F = useMemo(() => ({ b: screen.b, h: screen.h }), [screen.b, screen.h]);
+  const B = F.b, H = F.h;
+  const gespeichert = useMemo(() => migrateLayout(screen.layout, F), [screen.layout, F]);
   const [layout, setLayout] = useState(gespeichert);
   const [auswahl, setAuswahl] = useState(null);
   const [raster, setRaster] = useState(() => { try { return Number(localStorage.getItem("advancedlan_screen_raster") ?? 10); } catch { return 10; } });
@@ -53,9 +75,12 @@ export default function ScreenTab({ cfg, mutate, status, log }) {
   const zug = useRef(null); // laufendes Ziehen
   const textPunkt = useRef(null); // Stand vor dem Tippen in ein Textfeld, für Rückgängig
   const saveTimer = useRef(null);
+  const ausstehend = useRef(null); // Speichern, das noch auf den Timer wartet
   const flaeche = useRef(null);
-  const breite = useBreite(flaeche);
-  const s = breite ? breite / B : 0.5;
+  const rahmen = useRef(null);
+  const breite = useBreite(rahmen);
+  // Maßstab der Arbeitsfläche: volle Breite, aber nicht zu hoch (Hochkant) und kleine Screens nicht riesig
+  const s = breite ? Math.min(breite / B, MAX_HOEHE / H, MAX_ZOOM) : 0.5;
   useEffect(() => { try { localStorage.setItem("advancedlan_screen_raster", String(raster)); } catch {} }, [raster]);
 
   // Von außen geändert (anderes Fenster, Import): übernehmen, solange hier nicht gezogen wird
@@ -65,10 +90,13 @@ export default function ScreenTab({ cfg, mutate, status, log }) {
 
   const speichern = useCallback((neu, sofort) => {
     clearTimeout(saveTimer.current);
-    const los = () => { saveTimer.current = null; mutate((d) => { d.stats = { ...d.stats, layout: neu }; }); };
+    const id = screen.id;
+    const los = () => { saveTimer.current = null; ausstehend.current = null; mutate((d) => { d.stats = { ...d.stats, screens: d.stats.screens.map((x) => (x.id === id ? { ...x, layout: neu } : x)) }; }); };
+    ausstehend.current = los;
     if (sofort) los(); else saveTimer.current = setTimeout(los, 250);
-  }, [mutate]);
-  useEffect(() => () => { if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null; } }, []);
+  }, [mutate, screen.id]);
+  // Beim Wechsel des Screens: ausstehende Änderung noch speichern
+  useEffect(() => () => { if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null; ausstehend.current?.(); } }, []);
 
   // Änderung übernehmen: vorher = Stand für Rückgängig (null: kein neuer Schritt)
   const setzen = useCallback((neu, vorher = layoutRef.current, sofort = false) => {
@@ -102,7 +130,7 @@ export default function ScreenTab({ cfg, mutate, status, log }) {
     const r = await bildLaden(f);
     if (!r) return;
     const l = layoutRef.current;
-    const el = neuesBild(r.id, { b0: r.b, h0: r.h, name: (f?.name || "").replace(/\.[^.]+$/, "").slice(0, 60) || undefined });
+    const el = neuesBild(r.id, { b0: r.b, h0: r.h, flaeche: F, name: (f?.name || "").replace(/\.[^.]+$/, "").slice(0, 60) || undefined });
     if (mitte) { el.x = Math.round(Math.max(0, Math.min(B - el.b, mitte.x - el.b / 2))); el.y = Math.round(Math.max(0, Math.min(H - el.h, mitte.y - el.h / 2))); }
     if (!el.name) delete el.name;
     setzen({ ...l, bilder: { ...l.bilder, [r.id]: r.url }, elemente: [...l.elemente, el] }, l, true);
@@ -134,7 +162,7 @@ export default function ScreenTab({ cfg, mutate, status, log }) {
   };
   const textNeu = (over) => {
     if (texte >= MAX_TEXTE) return;
-    const t = neuerText(over);
+    const t = neuerText(over, F);
     setzen({ ...layout, elemente: [...layout.elemente, t] });
     setAuswahl(t.id);
   };
@@ -160,7 +188,7 @@ export default function ScreenTab({ cfg, mutate, status, log }) {
   };
   const zuruecksetzen = async () => {
     if (!(await uiConfirm("Layout auf den Standard zurücksetzen? Eigene Texte werden gelöscht. Mit „Rückgängig“ holst du es zurück."))) return;
-    setzen(standardLayout(), layout, true); setAuswahl(null);
+    setzen(standardLayout(F), layout, true); setAuswahl(null);
   };
 
   // Ziehen und Größe ändern
@@ -200,7 +228,7 @@ export default function ScreenTab({ cfg, mutate, status, log }) {
     }
     const andere = layoutRef.current.elemente.filter((x) => x.sichtbar && x.id !== z.id);
     const frei = ev.altKey || seitenFest;
-    const r = einrasten(k, andere, { raster: frei ? 0 : raster, abstand: frei ? 0 : 8 / s, kanten: z.kanten });
+    const r = einrasten(k, andere, { raster: frei ? 0 : raster, abstand: frei ? 0 : 8 / s, kanten: z.kanten, flaeche: F });
     setLinien(r.linien);
     // Texte: an den Ecken wächst die Schrift mit dem Block
     const extra = ecke && z.typ === "text" && z.skalieren !== false ? { groesse: Math.max(10, Math.min(400, Math.round(z.groesse * Math.min(r.b / z.kasten.b, r.h / z.kasten.h)))) } : {};
@@ -238,14 +266,13 @@ export default function ScreenTab({ cfg, mutate, status, log }) {
 
   return (
     <>
-      <Section title="Screen-Editor" subtitle="Anzeigen und Texte des Game-Stats-Screens anordnen: ziehen zum Verschieben, an den Griffen die Größe ändern. Jede Änderung wird gespeichert und gilt sofort im Pop-out-Fenster und im NDI-Stream."
-        right={<div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+        <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end", marginBottom: 10 }}>
           <button style={S.secondaryBtn} disabled={!undo.length} onClick={rueckgaengig} title="Rückgängig (Strg+Z)"><Undo2 size={14} /> Rückgängig</button>
           <button style={S.secondaryBtn} disabled={!redo.length} onClick={wiederholen} title="Wiederholen (Strg+Y)"><Redo2 size={14} /></button>
           <button style={S.secondaryBtn} onClick={zuruecksetzen} title="Standard-Layout"><RotateCcw size={14} /> Standard</button>
           <button style={S.secondaryBtn} disabled={bildBloecke >= MAX_BILDER} onClick={() => bildNeu()} title={`Bild als eigenen Block (höchstens ${MAX_BILDER}), auch per Drag and Drop auf die Fläche`}><ImagePlus size={14} /> Bild hinzufügen</button>
           <button style={S.primaryBtn} disabled={texte >= MAX_TEXTE} onClick={() => textNeu()}><Type size={14} /> Text hinzufügen</button>
-        </div>}>
+        </div>
         <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", fontSize: 12, color: SUB, marginBottom: 10 }}>
           {!cfg.stats?.an && <span style={{ color: WARN }}>Stats-Screen ist aus: unten unter „Ausgabe“ einschalten</span>}
           {bildFehler && <span style={{ color: WARN }} data-testid="bild-fehler">{bildFehler}</span>}
@@ -260,15 +287,15 @@ export default function ScreenTab({ cfg, mutate, status, log }) {
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 300px", gap: 16, alignItems: "start" }}>
-          <div>
-            {/* Arbeitsfläche: Bühne skaliert, Rahmen und Griffe in Bildschirm-Pixeln darüber */}
+          <div ref={rahmen} style={{ minWidth: 0 }}>
+            {/* Arbeitsfläche in der Größe des Screens: Bühne skaliert, Rahmen und Griffe in Bildschirm-Pixeln darüber */}
             <div ref={flaeche} tabIndex={0} data-testid="screen-flaeche" onKeyDown={taste} onPointerMove={ziehen} onPointerUp={loslassen} onPointerCancel={loslassen}
               onDragOver={(ev) => { if ([...(ev.dataTransfer?.items || [])].some((i) => i.kind === "file")) ev.preventDefault(); }}
               onDrop={(ev) => { const f = [...(ev.dataTransfer?.files || [])].find((x) => /^image\//.test(x.type)); if (!f) return; ev.preventDefault(); bildNeu(f, punkt(ev)); }}
               onPointerDown={(ev) => { if (ev.target === ev.currentTarget || ev.target.dataset.leer) setAuswahl(null); }}
-              style={{ position: "relative", width: "100%", aspectRatio: "16 / 9", borderRadius: 8, overflow: "hidden", border: `1px solid ${LINE}`, outline: "none", background: "#000", touchAction: "none", userSelect: "none" }}>
+              style={{ position: "relative", width: Math.round(B * s), height: Math.round(H * s), boxSizing: "content-box", margin: "0 auto", borderRadius: 8, overflow: "hidden", border: `1px solid ${LINE}`, outline: "none", background: layout.hintergrund === "transparent" ? KARO : "#000", touchAction: "none", userSelect: "none" }}>
               <div data-leer="1" style={{ position: "absolute", left: 0, top: 0, width: B, height: H, transform: `scale(${s})`, transformOrigin: "0 0", pointerEvents: "none" }}>
-                <StatsBuehne status={vStatus} cfg={{ regie: cfg }} log={vLog} layout={layout} />
+                <StatsBuehne status={vStatus} cfg={{ regie: cfg }} log={vLog} layout={layout} screen={screen} />
               </div>
               {layout.elemente.filter((e) => e.sichtbar).map((e) => {
                 const an = e.id === auswahl;
@@ -290,6 +317,7 @@ export default function ScreenTab({ cfg, mutate, status, log }) {
               {linien.map((l, i) => <div key={i} style={{ position: "absolute", pointerEvents: "none", zIndex: 3, background: "#ff4fd8", boxShadow: "0 0 4px #ff4fd8", ...(l.achse === "x" ? { left: l.pos * s, top: 0, bottom: 0, width: 1 } : { top: l.pos * s, left: 0, right: 0, height: 1 }) }} />)}
             </div>
             <div style={{ ...S.hint, display: "flex", gap: 14, flexWrap: "wrap" }}>
+              <span><b>{screen.name}</b>: {B}×{H} px{Math.abs(s - 1) > 0.005 ? `, hier ${Math.round(s * 100)} % groß` : ""}{layout.hintergrund === "transparent" ? " · Hintergrund transparent: NDI sendet mit Alpha-Kanal" : ""}</span>
               <span><Move size={11} style={{ verticalAlign: -1 }} /> Ziehen: verschieben · Griffe: Größe · rastet an Kanten und Mitten ein, <b>Alt</b> gedrückt halten = frei</span>
               <span>Inhalt skaliert mit der Blockgröße · Bilder halten an den Ecken ihr Format, <b>Umschalt</b> = frei · Bilder per Drag and Drop auf die Fläche</span>
               <span>Pfeiltasten: 1 px, mit Umschalt 10 px · Entf: ausblenden/löschen · Strg+D: duplizieren · Strg+Z: rückgängig</span>
@@ -298,7 +326,7 @@ export default function ScreenTab({ cfg, mutate, status, log }) {
 
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <Elemente layout={layout} auswahl={auswahl} setAuswahl={setAuswahl} sichtbar={(e, v) => elAendern(e.id, { sichtbar: v })} />
-            {gewaehlt ? <Eigenschaften e={gewaehlt} bilder={layout.bilder} aendern={(patch) => elAendern(gewaehlt.id, patch)} tippen={(patch) => {
+            {gewaehlt ? <Eigenschaften e={gewaehlt} F={F} bilder={layout.bilder} aendern={(patch) => elAendern(gewaehlt.id, patch)} tippen={(patch) => {
               // Tippen: ein Rückgängig-Schritt pro Feldbesuch, nicht pro Taste
               elAendern(gewaehlt.id, patch, punktNehmen(null));
             }} fokus={fokus} stilAlle={stilAlle} bildErsetzen={() => bildErsetzen(gewaehlt)} originalFormat={() => originalFormat(gewaehlt)}
@@ -309,8 +337,6 @@ export default function ScreenTab({ cfg, mutate, status, log }) {
               </>}
           </div>
         </div>
-      </Section>
-      <StatsAusgabe cfg={cfg} mutate={mutate} status={status} />
     </>
   );
 }
@@ -407,7 +433,8 @@ function Darstellung({ e, tippen, aendern, fokus, stilAlle }) {
   );
 }
 
-function Eigenschaften({ e, bilder, aendern, tippen, fokus, duplizieren, entfernen, ebene, bildErsetzen, originalFormat, stilAlle }) {
+function Eigenschaften({ e, F, bilder, aendern, tippen, fokus, duplizieren, entfernen, ebene, bildErsetzen, originalFormat, stilAlle }) {
+  const { b: B, h: H } = F;
   const ta = useRef(null);
   const text = e.typ === "text", bild = e.typ === "bild", anzeige = !!ANZEIGE[e.typ];
   const skala = inhaltsSkala(e);
@@ -480,6 +507,8 @@ function Eigenschaften({ e, bilder, aendern, tippen, fokus, duplizieren, entfern
         <Zahl label="Breite" wert={e.b} min={MIN} max={B} onChange={(v) => { const b = Math.max(MIN, Math.min(B, v)); aendern({ b, x: Math.min(e.x, B - b) }); }} />
         <Zahl label="Höhe" wert={e.h} min={MIN} max={H} onChange={(v) => { const h = Math.max(MIN, Math.min(H, v)); aendern({ h, y: Math.min(e.y, H - h) }); }} />
       </div>
+      {(e.x !== 0 || e.y !== 0 || e.b !== B || e.h !== H) && <button style={{ ...S.smallBtn, alignSelf: "flex-start" }} data-testid="fuellen" onClick={() => aendern({ x: 0, y: 0, b: B, h: H })}
+        title="Element auf die ganze Fläche des Screens setzen, z. B. um nur dieses Element zu streamen"><Scaling size={12} /> Ganzen Screen füllen</button>}
       <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
         <button style={S.smallBtn} onClick={() => ebene(1)} title="Vor alle anderen"><ArrowUpToLine size={12} /> Nach vorne</button>
         <button style={S.smallBtn} onClick={() => ebene(-1)} title="Hinter alle anderen"><ArrowDownToLine size={12} /> Nach hinten</button>

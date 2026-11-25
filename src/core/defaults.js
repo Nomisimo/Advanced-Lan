@@ -2,7 +2,7 @@
 // Einstellungen der App. Eine Datei für beide Modi: Regie und Game-PC.
 const { STANDARD_HOTKEY, gueltigerHotkey } = require("./app-info");
 const { standardBild, migrateBild } = require("./bild-spiele");
-const { standardLayout, migrateLayout } = require("./stats-layout");
+const { standardStats, migrateStats } = require("./stats-screens");
 const { standardNamensAbfrage, migrateNamensAbfrage } = require("./namen");
 const { leseSpieler } = require("./protokoll");
 const { standardPlan, migratePlan } = require("./plan");
@@ -35,8 +35,9 @@ function standardRegie() {
     ersetzt: {}, // { [spiel]: [event] } hier gelten die allgemeinen Befehle nicht (core/aktionen.js)
     // Tab „Plan“: Plätze der Game-PCs, je Ziel eine Spalte, Game-PC-Vorlage (core/plan.js)
     plan: standardPlan(),
-    // Tab „Stats-Screen“: Game-Stats-Screen (Spielstand, beste Spieler, letzte Events) als Pop-out-Fenster oder NDI-Stream
-    stats: { an: false, ndi: false, ndiName: "Advanced LAN Stats", layout: standardLayout() },
+    // Tab „Stats-Screen“: Game-Stats-Screens (Spielstand, beste Spieler, letzte Events) als Pop-out-Fenster oder NDI-Stream.
+    // Mehrere Screens, jeder mit eigener Größe, eigenem Layout und eigener NDI-Quelle (core/stats-screens.js)
+    stats: standardStats(),
   };
 }
 
@@ -112,11 +113,6 @@ function migrateSignale(s) {
 // Modi: Regie, Game-PC und Standalone (Regie und Spiel auf einem PC)
 const MODI = ["regie", "gamepc", "standalone"];
 
-function migrateStats(s, std) {
-  if (!s || typeof s !== "object") return { ...std };
-  const name = typeof s.ndiName === "string" && s.ndiName.trim() ? s.ndiName.trim().slice(0, 60) : std.ndiName;
-  return { an: !!s.an, ndi: !!s.ndi, ndiName: name, layout: migrateLayout(s.layout) };
-}
 
 // Gespeicherte Einstellungen einlesen, fehlende Felder ergänzen
 function migrateKonfig(k) {
@@ -140,7 +136,7 @@ function migrateKonfig(k) {
       ersetzt: migrateErsetzt(r.ersetzt),
       plan: migratePlan(r.plan),
       spiele: genutzteSpiele(r.spiele, d.regie.spiele),
-      stats: migrateStats(r.stats, d.regie.stats),
+      stats: migrateStats(r.stats),
     },
     gamepc: { ...d.gamepc, ...g, regie: { ...d.gamepc.regie, ...(g.regie || {}) }, overlay: { ...d.gamepc.overlay, ...(g.overlay && typeof g.overlay === "object" ? g.overlay : {}) }, bild: migrateBild(g.bild), spieler: leseSpieler(g.spieler), namensAbfrage: migrateNamensAbfrage(g.namensAbfrage), gsiToken: g.gsiToken || d.gamepc.gsiToken, verwaltet: g.verwaltet !== false },
   };

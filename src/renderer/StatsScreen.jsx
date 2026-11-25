@@ -6,18 +6,18 @@ import { EventIcon, eventLabel, zeit } from "./ui.jsx";
 import { SPIEL_BY_ID } from "../core/spiele.js";
 import { statsDaten, statsEvents } from "../core/stats-screen.js";
 import { migrateLayout, textEinsetzen, verlaufCss, inhaltsSkala } from "../core/stats-layout.js";
+import { screenVon, leseStatsHash } from "../core/stats-screens.js";
 import { Crown, Trophy } from "lucide-react";
 
-// Game-Stats-Screen für Publikum und Stream: immer 1920×1080 gestaltet, auf die Fenstergröße skaliert.
-// Läuft im Pop-out-Fenster und im unsichtbaren NDI-Fenster der Regie (index.html#stats).
-const B = 1920, H = 1080;
+// Game-Stats-Screen für Publikum und Stream: in der Größe des Screens gestaltet (Standard 1920×1080), auf die Fenstergröße skaliert.
+// Läuft im Pop-out-Fenster und im unsichtbaren NDI-Fenster der Regie (index.html#stats=<id>, NDI mit „&ndi“).
 const FRISCH = 15000;
 const FONT = "'Segoe UI',system-ui,sans-serif";
 
-function useSkalierung() {
+function useSkalierung(B, H) {
   const mass = () => Math.min(window.innerWidth / B, window.innerHeight / H);
   const [s, setS] = useState(mass);
-  useEffect(() => { const f = () => setS(mass()); window.addEventListener("resize", f); return () => window.removeEventListener("resize", f); }, []);
+  useEffect(() => { const f = () => setS(mass()); f(); window.addEventListener("resize", f); return () => window.removeEventListener("resize", f); }, [B, H]);
   return s;
 }
 
@@ -225,6 +225,7 @@ const HINTERGRUND = {
   verlauf: (spiel) => `radial-gradient(1200px 700px at 8% -10%, rgba(157,92,255,.28), transparent 60%), radial-gradient(1000px 600px at 105% 110%, ${spiel?.farbe || ACCENT}33, transparent 60%), ${BG}`,
   schwarz: () => "#000",
   gruen: () => "#00b140",
+  transparent: () => "transparent",
   farbe: (_, l) => l.hg.farbe,
   eigen: (_, l) => verlaufCss(l.hg.verlauf),
   bild: (_, l) => {
@@ -265,9 +266,11 @@ export function buehnenDaten({ status, cfg, log, jetzt }) {
   return { spiel, d, live, log, cfg, namen: status?.namen || {}, werte: textWerte({ spiel, d, cfg, jetzt }), bilder: {} };
 }
 
-// layout: wenn nicht angegeben, das gespeicherte aus cfg.regie.stats.layout
-export function StatsBuehne({ status, cfg, log, jetzt = Date.now(), layout }) {
-  const l = layout || migrateLayout(cfg?.regie?.stats?.layout);
+// screen: Eintrag aus cfg.regie.stats.screens (Größe und Layout), layout: statt des gespeicherten (Editor)
+export function StatsBuehne({ status, cfg, log, jetzt = Date.now(), layout, screen }) {
+  const sc = screen || screenVon(cfg?.regie?.stats, "");
+  const B = sc?.b || 1920, H = sc?.h || 1080;
+  const l = layout || migrateLayout(sc?.layout, { b: B, h: H });
   const ctx = { ...buehnenDaten({ status, cfg, log, jetzt }), bilder: l.bilder };
   return (
     <div style={{ width: B, height: H, position: "relative", overflow: "hidden", fontFamily: FONT, color: "#ece9f2", background: hintergrundCss(l, ctx.spiel) }}>
@@ -281,9 +284,18 @@ export default function StatsScreen() {
   const [cfg, setCfg] = useState(null);
   const [log, setLog] = useState([]);
   const [jetzt, setJetzt] = useState(Date.now());
-  const s = useSkalierung();
+  // Welcher Screen: aus dem Hash (#stats=<id>), ohne ID der erste; im NDI-Fenster ohne eigenen Hintergrund (Alpha)
+  const wahl = leseStatsHash(window.location.hash) || { id: "", ndi: false };
+  const screen = cfg ? screenVon(cfg.regie?.stats, wahl.id) : null;
+  const B = screen?.b || 1920, H = screen?.h || 1080;
+  const s = useSkalierung(B, H);
+  const durchsichtig = wahl.ndi && screen?.layout?.hintergrund === "transparent";
   useEffect(() => {
-    document.title = "Advanced LAN · Game Stats";
+    // NDI mit Alpha: auch Seite und html ohne Hintergrund
+    for (const el of [document.documentElement, document.body]) el.style.background = durchsichtig ? "transparent" : "";
+  }, [durchsichtig]);
+  useEffect(() => { document.title = `Advanced LAN · ${screen?.name || "Game Stats"}`; }, [screen?.name]);
+  useEffect(() => {
     const laden = () => api.getConfig().then(setCfg);
     laden();
     api.status().then((st) => setStatus(st?.regie || null));
@@ -295,9 +307,9 @@ export default function StatsScreen() {
     return () => { ab.forEach((f) => f && f()); clearInterval(t); };
   }, []);
   return (
-    <div onDoubleClick={() => api.statsVollbild?.()} title="Doppelklick: Vollbild" style={{ position: "fixed", inset: 0, background: "#000", overflow: "hidden" }}>
+    <div onDoubleClick={() => api.statsVollbild?.()} title="Doppelklick: Vollbild" style={{ position: "fixed", inset: 0, background: durchsichtig ? "transparent" : "#000", overflow: "hidden" }}>
       <div style={{ position: "absolute", left: "50%", top: "50%", width: B, height: H, transform: `translate(-50%, -50%) scale(${s})`, transformOrigin: "center" }}>
-        <StatsBuehne status={status} cfg={cfg} log={log} jetzt={jetzt} />
+        {cfg && <StatsBuehne status={status} cfg={cfg} log={log} jetzt={jetzt} screen={screen} />}
       </div>
     </div>
   );

@@ -83,7 +83,8 @@ class ScreenAusgabe {
 
   webContents() { return [this.fenster, this.ndiWin].filter((w) => w && !w.isDestroyed()).map((w) => w.webContents); }
 
-  fensterOeffnen() {
+  // vollbild: gleich als Vollbild (Stats-Screen-PC)
+  fensterOeffnen({ vollbild } = {}) {
     const s = this.cfg();
     if (!s) return false;
     if (this.fenster && !this.fenster.isDestroyed()) { if (this.fenster.isMinimized()) this.fenster.restore(); this.fenster.show(); this.fenster.focus(); return true; }
@@ -95,6 +96,7 @@ class ScreenAusgabe {
     this.e.seite(this.fenster, statsHash(this.id));
     this.fenster.on('page-title-updated', (ev) => ev.preventDefault());
     this.fenster.on('closed', () => { this.fenster = null; this.e.onChange(); this.e.onFensterZu(); });
+    if (vollbild) this.fenster.setFullScreen(true);
     this.e.onChange();
     return true;
   }
@@ -245,9 +247,9 @@ class StatsAusgabe {
   }
 
   // id: Screen, ohne Angabe der erste
-  fensterOeffnen(id) {
+  fensterOeffnen(id, opts) {
     if (!this.aktiv() || !this.getStats().an) return false;
-    return this.screen(id)?.fensterOeffnen() || false;
+    return this.screen(id)?.fensterOeffnen(opts) || false;
   }
 
   fensterSchliessen(id) {

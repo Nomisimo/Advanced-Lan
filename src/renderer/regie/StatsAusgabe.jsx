@@ -32,10 +32,13 @@ export default function StatsAusgabe({ cfg, mutate, status }) {
           ))}
         </div>
         <div style={{ display: "flex", alignItems: "flex-end", gap: 12, flexWrap: "wrap", marginTop: 10 }}>
-          <Field label="Netzwerkkarte für NDI" style={{ width: 320 }} hint={st.ndi?.karteFehler ? "" : st.ndi?.karte ? `NDI sendet über ${st.ndi.karte} (${st.ndi.ip})` : "Automatisch: NDI nutzt alle Karten"}>
+          <Field label="Netzwerkkarte für NDI" style={{ width: 320 }} hint={st.ndi?.karteFehler ? "" : st.ndi?.karte && st.ndi?.umgebung ? `NDI sendet nur über ${st.ndi.karte} (${st.ndi.ip})` : st.ndi?.karte ? "Noch nicht wirksam, Neustart nötig" : "Automatisch: NDI nutzt alle Karten"}>
             <div data-testid="ndi-karte"><KartenWahl karten={karten} wert={cfg.netz?.ndi} leer="Automatisch (alle Karten)" onChange={(v) => mutate((d) => { d.netz = { ...d.netz, ndi: v }; })} /></div>
           </Field>
-          {st.ndi?.neustart && <div style={{ fontSize: 11, color: WARN, paddingBottom: 6, maxWidth: 380, lineHeight: 1.4 }} data-testid="ndi-neustart">Die neue Karte gilt nach einem Neustart der App: das NDI SDK liest sie nur beim Start.</div>}
+          {st.ndi?.neustart && <div style={{ display: "flex", alignItems: "center", gap: 10, paddingBottom: 4 }} data-testid="ndi-neustart">
+            <span style={{ fontSize: 11, color: WARN, maxWidth: 340, lineHeight: 1.4 }}>Die Karte gilt erst nach einem Neustart der App: das NDI SDK liest sie nur beim Start.</span>
+            {api.appNeustart && <button style={S.smallBtn} onClick={() => api.appNeustart()}>App neu starten</button>}
+          </div>}
           {st.ndi?.karteFehler && <div style={{ fontSize: 11, color: WARN, paddingBottom: 6, maxWidth: 380, lineHeight: 1.4 }}>{st.ndi.karteFehler}</div>}
         </div>
         {ohneEmpfaenger && <div style={{ fontSize: 11, color: WARN, marginTop: 8, lineHeight: 1.5 }}>{MAC ? "Kein Empfänger sieht eine Quelle? Unter Systemeinstellungen → Datenschutz & Sicherheit → Lokales Netzwerk muss Advanced LAN erlaubt sein. Ist der Schalter schon an, einmal aus- und wieder einschalten und die App neu starten. Sender und Empfänger müssen im selben Netz sein." : "Kein Empfänger sieht eine Quelle? Die Windows-Firewall muss Advanced LAN im privaten Netz erlauben (Windows-Sicherheit → Firewall → App zulassen), und Sender und Empfänger müssen im selben Netz sein."}</div>}

@@ -4,35 +4,15 @@
 // (Paket @stagetimerio/grandiose, optional: fehlt es, ist NDI nicht verfügbar). Transparenter Hintergrund = NDI mit Alpha-Kanal.
 const { BrowserWindow } = require('electron');
 const path = require('path');
-const fs = require('fs');
-const os = require('os');
-const { kartenListe, karteFuer, ndiKonfig } = require('../core/netzwerk');
+const { ndiKonfigSchreiben, umgebungAktiv } = require('./ndi-umgebung');
 const { screenVon, statsHash, alphaGerade } = require('../core/stats-screens');
 
 const NDI_FPS = 30;
 
-// Netzwerkkarte für NDI: das SDK liest beim Start eine ndi-config.v1.json (Verzeichnis aus NDI_CONFIG_DIR).
-// Wir schreiben eine eigene Datei mit der gewählten Karte (adapters.allowed) und übernehmen die Einstellungen
-// des PCs (z. B. Discovery-Server). Das SDK liest sie nur einmal: eine andere Karte gilt nach einem Neustart der App.
+// Netzwerkkarte für NDI: eigene ndi-config.v1.json mit der gewählten Karte (main/ndi-umgebung.js).
+// Das SDK liest sie nur beim Start: eine andere Karte gilt nach einem Neustart der App.
 let ndiNetz = { karte: () => '', ordner: () => '' };
-const NDI_SYSTEM_KONFIG = () => (process.platform === 'win32'
-  ? path.join(process.env.ProgramData || 'C:\\ProgramData', 'NDI', 'ndi-config.v1.json')
-  : path.join(os.homedir(), '.ndi', 'ndi-config.v1.json'));
-function ndiKarteSetzen() {
-  const name = ndiNetz.karte() || '';
-  const k = name ? karteFuer(kartenListe(os.networkInterfaces()), name) : null;
-  const aktiv = { gewaehlt: name, name: k ? name : '', ip: k?.ip || '', fehler: name && !k ? `Netzwerkkarte „${name}“ nicht verbunden, NDI nutzt alle Karten` : '' };
-  const ordner = ndiNetz.ordner();
-  if (!ordner) return aktiv;
-  try {
-    let basis = {};
-    try { basis = JSON.parse(fs.readFileSync(NDI_SYSTEM_KONFIG(), 'utf8')); } catch { /* keine Konfiguration auf dem PC */ }
-    fs.mkdirSync(ordner, { recursive: true });
-    fs.writeFileSync(path.join(ordner, 'ndi-config.v1.json'), JSON.stringify(ndiKonfig(basis, aktiv.ip), null, 2));
-    process.env.NDI_CONFIG_DIR = ordner;
-  } catch (e) { aktiv.fehler = `NDI-Konfiguration nicht geschrieben: ${e.message}`; }
-  return aktiv;
-}
+const ndiKarteSetzen = () => ndiKonfigSchreiben(ndiNetz.ordner(), ndiNetz.karte());
 
 // NDI-Bibliothek erst bei Bedarf laden: native Erweiterung, wird beim Installieren gebaut und kann fehlen
 let ndiModul;
@@ -279,7 +259,10 @@ class StatsAusgabe {
       fenster: !!erster?.fenster, offen: alle.filter((s) => s.fenster).length,
       ndi: { verfuegbar: m ? !!m.lib : null, laeuft: alle.some((s) => s.ndi.laeuft), sender: alle.filter((s) => s.ndi.laeuft).length, fps: NDI_FPS, version: m?.version || '',
         // Karte, mit der NDI gestartet ist; neustart: in den Einstellungen steht inzwischen eine andere
-        karte: m?.karte?.name || '', ip: m?.karte?.ip || '', karteFehler: m?.karte?.fehler || '', neustart: !!m?.karte && m.karte.gewaehlt !== (ndiNetz.karte() || '') },
+        karte: m?.karte?.name || '', ip: m?.karte?.ip || '', karteFehler: m?.karte?.fehler || '',
+        // umgebung: das SDK liest unsere Datei (NDI_CONFIG_DIR stand schon beim Start). neustart: Karte gewählt, aber noch nicht wirksam
+        umgebung: umgebungAktiv(ndiNetz.ordner()), datei: m?.karte?.datei || '',
+        neustart: (!!m?.karte && m.karte.gewaehlt !== (ndiNetz.karte() || '')) || (!!ndiNetz.karte() && !umgebungAktiv(ndiNetz.ordner())) },
       screens,
     };
   }

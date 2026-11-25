@@ -42,6 +42,7 @@ const { ValSimMatch } = require('../core/val-sim');
 const { einrichtenUpdates } = require('./updates');
 const { restoreFocus, mitFokus } = require('./fokus');
 const { StatsAusgabe } = require('./stats-ausgabe');
+const { ndiUmgebungBeimStart, neuStarten } = require('./ndi-umgebung');
 const { StatsSender, StatsEmpfaenger } = require('./stats-sync');
 const { cfgAuszug, statusAuszug } = require('../core/stats-sync');
 const { NamensAbfrage, obenHalten } = require('./name-abfrage');
@@ -67,6 +68,10 @@ function ladeKonfig() {
   catch { cfg = migrateKonfig(null); }
 }
 let speicherTimer = null;
+function speichereKonfigSofort() {
+  clearTimeout(speicherTimer);
+  try { fs.mkdirSync(path.dirname(KONFIG_DATEI()), { recursive: true }); fs.writeFileSync(KONFIG_DATEI(), JSON.stringify(cfg, null, 1)); } catch {}
+}
 function speichereKonfig() {
   clearTimeout(speicherTimer);
   speicherTimer = setTimeout(() => {
@@ -1090,6 +1095,8 @@ ipcMain.handle('stats-fenster', (_, offen, id) => {
   }
   statusMelden(); return stats.status();
 });
+// Neu starten, damit eine andere NDI-Karte gilt (das SDK liest sie nur beim Start)
+ipcMain.handle('app-neustart', async () => { speichereKonfigSofort(); await stats.beenden(); neuStarten(app, path.join(app.getPath('userData'), 'ndi')); });
 ipcMain.handle('stats-vollbild', (e) => stats.vollbild(e.sender));
 ipcMain.handle('ndi-pruefen', () => stats.ndiVerfuegbar());
 
@@ -1181,8 +1188,10 @@ ipcMain.handle('open-external', (_, url) => { if (/^https?:\/\//i.test(url)) she
 // Windows ordnet Fenster, Taskleisten-Icon und Verknüpfungen über diese ID zu. Sie muss der appId in
 // package.json entsprechen, sonst zeigt die Taskleiste ein zweites Icon neben der angehefteten Verknüpfung
 if (process.platform === 'win32') app.setAppUserModelId('dev.advancedlan');
-const gotLock = app.requestSingleInstanceLock();
-if (!gotLock) app.quit();
+// NDI auf der gewählten Karte: NDI_CONFIG_DIR muss schon beim Prozessstart gesetzt sein, sonst einmal neu starten
+const ndiNeustart = ndiUmgebungBeimStart({ app, konfigDatei: KONFIG_DATEI(), ordner: path.join(app.getPath('userData'), 'ndi') });
+const gotLock = !ndiNeustart && app.requestSingleInstanceLock();
+if (ndiNeustart) { /* startet neu */ } else if (!gotLock) app.quit();
 else {
   app.on('second-instance', () => { if (mainWin) { if (mainWin.isMinimized()) mainWin.restore(); mainWin.focus(); } });
   app.whenReady().then(async () => {

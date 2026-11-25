@@ -28,6 +28,7 @@ const ANZEIGEN = [
   { typ: "events", label: "Letzte Events", x: 1116, y: 636, b: 760, h: 410, titel: "Letzte Events" },
   // Optionale Anzeigen: im Standard-Layout ausgeblendet
   { typ: "teams", label: "Teams und Spieler", x: 44, y: 636, b: 1046, h: 410, titel: "Teams", aus: true },
+  { typ: "mvp", label: "MVP und Ranking (Endscreen)", x: 44, y: 138, b: 1832, h: 908, titel: "MVP", aus: true },
 ];
 const ANZEIGE = Object.fromEntries(ANZEIGEN.map((a) => [a.typ, a]));
 const HINTERGRUENDE = [["verlauf", "Verlauf (Standard)"], ["schwarz", "Schwarz"], ["gruen", "Grün (Chroma-Key)"], ["transparent", "Transparent (Alpha)"], ["farbe", "Eigene Farbe"], ["eigen", "Eigener Verlauf"], ["bild", "Eigenes Bild"]];
@@ -71,6 +72,7 @@ const OPTIONEN = {
   bestenliste: { zeilen: 0, kopf: true, textLeer: "Noch keine Spielerdaten." },
   events: { anzahl: 0, spieler: true, zeit: true, textLeer: "Noch keine Events." },
   teams: { kopf: true, zahlen: true, textLeer: "Noch keine Spieler." },
+  mvp: { nurEnde: false, punkte: true, kd: true, headshots: true, team: true, zeilen: 0, textLeer: "Noch keine Spielerdaten.", textMvp: "MVP des Matches" },
 };
 // Spieler-Karte: welcher Spieler (quelle "rang" + rang oder PC-ID) und welche Zahlen
 const SPIELER_OPTIONEN = { team: true, seite: true, kills: true, tode: true, headshots: true, kd: true };

@@ -154,6 +154,22 @@ function teamListen(status, spiel) {
   return out;
 }
 
+// Ranking für den MVP-Endscreen: Punkte = Kills × 100 + Headshots × 30 + Assists × 40 + MVPs × 150 − Tode × 50 (nicht unter 0),
+// bei Gleichstand mehr Kills, dann weniger Tode. Rocket League: Tore, Vorlagen, Paraden, Schüsse (wie die Bestenliste).
+// → [{ ...spieler, punkte, kd, hsQuote }], MVP zuerst
+function ranking(status, spiel) {
+  const liste = spielerDaten(status, spiel?.id);
+  const st = status?.statistik?.spiel === spiel?.id ? status.statistik : null;
+  const extra = new Map((st?.alle || []).map((p) => [p.name, p]));
+  const rl = spiel?.id === "rl";
+  return liste.map((p) => {
+    const e = extra.get(p.name) || {};
+    const punkte = rl ? n(e.tore) * 100 + n(e.vorlagen) * 50 + n(e.paraden) * 50 + n(e.schuesse) * 20 + n(e.demos) * 10 + n(e.mvps) * 150
+      : Math.max(0, p.kills * 100 + p.headshots * 30 + p.assists * 40 + n(e.mvps) * 150 - p.tode * 50);
+    return { ...p, mvps: n(e.mvps), tore: n(e.tore), vorlagen: n(e.vorlagen), paraden: n(e.paraden), punkte, kd: kd(p), hsQuote: p.kills ? Math.round((p.headshots / p.kills) * 100) : 0 };
+  }).sort((a, b) => b.punkte - a.punkte || b.kills - a.kills || a.tode - b.tode || a.name.localeCompare(b.name));
+}
+
 // Einzelwerte für den Block „Wert“: [key, Bezeichnung, für einen Spieler?]
 const WERTE = [
   ["score1", "Punkte links"], ["score2", "Punkte rechts"], ["team1", "Team links"], ["team2", "Team rechts"], ["runde", "Runde"],
@@ -186,4 +202,4 @@ function wertVon(key, { d, statistik, stand, sp }) {
   }
 }
 
-module.exports = { statsDaten, statsEvents, spielerDaten, spielerWahl, teamListen, WERTE, WERT, WERT_KURZ, wertVon, kd };
+module.exports = { ranking, statsDaten, statsEvents, spielerDaten, spielerWahl, teamListen, WERTE, WERT, WERT_KURZ, wertVon, kd };

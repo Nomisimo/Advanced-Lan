@@ -395,6 +395,9 @@ const OPTION_INFO = {
   labels: "Beschriftung unter den Zahlen",
   zeilen: ["Zeilen", "0 = automatisch nach Höhe"], kopf: "Spaltenköpfe zeigen", textLeer: ["Text ohne Daten", "Leer = nichts"],
   anzahl: ["Anzahl Events", "0 = automatisch nach Höhe"], spieler: "Spieler/Team zeigen", zeit: "Uhrzeit zeigen",
+  zahlen: "Kills/Tode neben den Namen",
+  nurEnde: "Erst am Matchende zeigen", punkte: "Spalte Punkte", kd: "Spalte K/D", headshots: "Spalten Headshots und HS %", team: "Team zeigen",
+  textMvp: ["Text unter dem MVP", "Leer = nur das Team"],
 };
 function Optionen({ e, aendern, tippen, fokus }) {
   const o = OPTIONEN[e.typ];
@@ -424,7 +427,7 @@ function Optionen({ e, aendern, tippen, fokus }) {
 }
 
 // Darstellung, die jedes Element hat: Deckkraft, Kachel-Transparenz, Ecken, Rahmen, Farben
-const MIT_KACHEL = new Set(["spielstand", "zahlen", "bestenliste", "events", "teams", "spieler"]);
+const MIT_KACHEL = new Set(["spielstand", "zahlen", "bestenliste", "events", "teams", "spieler", "mvp"]);
 function Darstellung({ e, tippen, aendern, fokus, stilAlle }) {
   const kachel = MIT_KACHEL.has(e.typ) || ((e.typ === "text" || e.typ === "bild" || e.typ === "wert") && e.panel);
   const farbFeld = (k, label, std) => (

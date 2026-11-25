@@ -4,7 +4,7 @@ import { api } from "./api.js";
 import { APP_ICON } from "./Kopf.jsx";
 import { EventIcon, eventLabel, zeit } from "./ui.jsx";
 import { SPIEL_BY_ID } from "../core/spiele.js";
-import { statsDaten, statsEvents, spielerDaten, spielerWahl, teamListen, wertVon, WERT_KURZ, kd } from "../core/stats-screen.js";
+import { ranking, statsDaten, statsEvents, spielerDaten, spielerWahl, teamListen, wertVon, WERT_KURZ, kd } from "../core/stats-screen.js";
 import { migrateLayout, textEinsetzen, verlaufCss, inhaltsSkala } from "../core/stats-layout.js";
 import { screenVon, leseStatsHash } from "../core/stats-screens.js";
 import { Crown, Trophy } from "lucide-react";
@@ -194,6 +194,72 @@ function TeamsAnzeige({ teams, titel, o, tx }) {
   );
 }
 
+// MVP-Endscreen: der beste Spieler groß, darunter das Ranking aller Spieler (Punkte, K/D, Headshots).
+// nurEnde: erst zeigen, wenn das Match vorbei ist
+function MvpAnzeige({ el, liste, d, spiel, tx, h }) {
+  if (el.nurEnde && !d.vorbei) return null;
+  const titel = tx(el.titel || "");
+  if (!liste.length) return <Panel style={{ height: "100%", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 34, color: MUTED, fontStyle: "italic" }}>{tx(opt(el, "textLeer", "Noch keine Spielerdaten."))}</Panel>;
+  const [mvp, ...rest] = liste;
+  const rl = spiel?.id === "rl";
+  const f = mvp.team ? teamFarbe(mvp.team) : ACCENT;
+  const spalten = rl
+    ? [["tore", "Tore"], ["vorlagen", "Vorl."], ["paraden", "Parad."]]
+    : [["kills", "K"], ["tode", "D"], ...(el.kd !== false ? [["kd", "K/D"]] : []), ...(el.headshots !== false ? [["headshots", "HS"], ["hsQuote", "HS %"]] : [])];
+  if (el.punkte !== false) spalten.push(["punkte", "Punkte"]);
+  const mvpH = Math.min(320, h * 0.36);
+  const zeilen = el.zeilen || Math.max(1, Math.floor((h - mvpH - 150) / 54));
+  const zelle = { padding: "8px 14px", fontSize: 28, borderBottom: `1px solid ${LINE}`, fontVariantNumeric: "tabular-nums" };
+  const kopf = { ...zelle, fontSize: 20, color: SUB, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", borderBottom: `2px solid ${LINE}` };
+  const wert = (p, k) => (k === "hsQuote" ? `${p.hsQuote}%` : p[k] ?? 0);
+  return (
+    <div style={{ height: "100%", display: "flex", flexDirection: "column", gap: 22 }}>
+      <Panel style={{ height: mvpH, flexShrink: 0, boxSizing: "border-box", display: "flex", alignItems: "center", gap: 40, padding: "0 50px", position: "relative", overflow: "hidden", borderColor: f, boxShadow: `0 0 50px ${f}55` }}>
+        <div style={{ position: "absolute", inset: 0, background: `radial-gradient(600px 300px at 15% 50%, ${f}33, transparent 70%)` }} />
+        <Crown size={Math.min(150, mvpH * 0.5)} color="#f2b33d" style={{ filter: "drop-shadow(0 0 22px rgba(242,179,61,.8))", flexShrink: 0, position: "relative" }} />
+        <div style={{ flex: 1, minWidth: 0, position: "relative" }}>
+          {titel && <div style={{ fontSize: 30, fontWeight: 800, color: "#f2b33d", letterSpacing: 4, textTransform: "uppercase" }}>{titel}</div>}
+          <div style={{ fontSize: Math.min(110, mvpH * 0.36), fontWeight: 900, color: TXT, lineHeight: 1.05, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textShadow: `0 0 30px ${f}aa` }}>{mvp.name}</div>
+          <div style={{ fontSize: 28, color: f, fontWeight: 700, letterSpacing: 1, marginTop: 6, whiteSpace: "nowrap" }}>
+            {[el.team !== false && mvp.team, tx(opt(el, "textMvp", "MVP des Matches"))].filter(Boolean).join(" · ")}
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 34, position: "relative" }}>
+          {spalten.filter(([k]) => k !== "tode").map(([k, l]) => (
+            <div key={k} style={{ textAlign: "center" }}>
+              <div style={{ fontSize: Math.min(76, mvpH * 0.26), fontWeight: 800, lineHeight: 1, color: k === "punkte" ? "#f2b33d" : TXT, fontVariantNumeric: "tabular-nums" }}>{wert(mvp, k)}</div>
+              <div style={{ fontSize: 20, color: SUB, textTransform: "uppercase", letterSpacing: 1.5, marginTop: 8 }}>{l}</div>
+            </div>
+          ))}
+        </div>
+      </Panel>
+      {rest.length > 0 && (
+        <Panel style={{ flex: 1, minHeight: 0, boxSizing: "border-box", padding: "20px 32px", overflow: "hidden" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead><tr>
+              <th style={{ ...kopf, textAlign: "left", width: 60 }}>#</th>
+              <th style={{ ...kopf, textAlign: "left" }}>Spieler</th>
+              {el.team !== false && <th style={{ ...kopf, textAlign: "left" }}>Team</th>}
+              {spalten.map(([k, l]) => <th key={k} style={{ ...kopf, textAlign: "right" }}>{l}</th>)}
+            </tr></thead>
+            <tbody>{rest.slice(0, zeilen).map((p, i) => {
+              const tf = p.team ? teamFarbe(p.team) : ACCENT;
+              return (
+                <tr key={p.id}>
+                  <td style={{ ...zelle, color: i < 2 ? AKZ : MUTED, fontWeight: 800 }}>{i + 2}</td>
+                  <td style={{ ...zelle, fontWeight: 700, borderLeft: `5px solid ${tf}`, maxWidth: 520, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</td>
+                  {el.team !== false && <td style={{ ...zelle, color: tf, fontSize: 22, fontWeight: 700 }}>{p.team || ""}</td>}
+                  {spalten.map(([k], j) => <td key={k} style={{ ...zelle, textAlign: "right", fontWeight: k === "punkte" || j === 0 ? 800 : 400, color: k === "punkte" ? "#f2b33d" : j === 0 ? TXT : SUB }}>{wert(p, k)}</td>)}
+                </tr>
+              );
+            })}</tbody>
+          </table>
+        </Panel>
+      )}
+    </div>
+  );
+}
+
 // Spieler-Karte: Name, Team und Zahlen eines Spielers
 function SpielerKarte({ el, sp }) {
   const f = sp?.team ? teamFarbe(sp.team) : ACCENT;
@@ -287,6 +353,7 @@ export function ElementInhalt({ el, ctx }) {
     case "bestenliste": return <Bestenliste d={d} mitTeam={!!d.teams} titel={tx(el.titel || "")} o={el} tx={tx} zeilen={el.zeilen || Math.max(1, Math.floor((el.h - (el.titel ? 140 : 100)) / 54))} />;
     case "events": return <LetzteEvents titel={tx(el.titel || "")} o={el} tx={tx} events={statsEvents(log, spiel?.id, el.anzahl || Math.max(1, Math.min(12, Math.floor((el.h - (el.titel ? 100 : 60)) / 56))), namen)} />;
     case "text": return <TextElement el={el} werte={werte} />;
+    case "mvp": return <MvpAnzeige el={el} liste={ctx.ranking} d={d} spiel={spiel} tx={tx} h={el.h} />;
     case "teams": return <TeamsAnzeige teams={ctx.teams} titel={tx(el.titel || "")} o={el} tx={tx} />;
     case "spieler": return <SpielerKarte el={el} sp={spielerWahl(ctx.liste, el.quelle, el.rang)} />;
     case "wert": return <WertElement el={el} wert={wertVon(el.wert, { d, statistik: ctx.statistik, stand: ctx.stand, sp: WERT_SP(el.wert) ? spielerWahl(ctx.liste, el.quelle, el.rang) : null })} />;
@@ -339,7 +406,7 @@ export function buehnenDaten({ status, cfg, log, jetzt }) {
   const live = !!(status?.stand?.t && jetzt - status.stand.t < FRISCH);
   const statistik = status?.statistik?.spiel === spiel?.id ? status.statistik : null;
   return { spiel, d, live, log, cfg, namen: status?.namen || {}, werte: textWerte({ spiel, d, cfg, jetzt, statistik, stand: status?.stand }), bilder: {},
-    statistik, stand: status?.stand, liste: spielerDaten(status, spiel?.id), teams: teamListen(status, spiel) };
+    statistik, stand: status?.stand, liste: spielerDaten(status, spiel?.id), teams: teamListen(status, spiel), ranking: ranking(status, spiel) };
 }
 
 // screen: Eintrag aus cfg.regie.stats.screens (Größe und Layout), layout: statt des gespeicherten (Editor)

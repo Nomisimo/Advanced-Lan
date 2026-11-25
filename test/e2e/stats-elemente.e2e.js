@@ -66,6 +66,17 @@ const BILDER = process.argv[3] || require('os').tmpdir();
   assert.deepStrictEqual([w.wert, w.quelle], ['sp.kills', 'PC 01']);
   await page.screenshot({ path: BILDER + '/elemente-1.png' });
 
+  // 4) MVP-Endscreen einblenden: bester Spieler oben, darunter das Ranking
+  await page.getByTestId('liste-mvp').locator('button').click();
+  await page.getByTestId('liste-mvp').click();
+  await page.getByTestId('fuellen').click();
+  await page.waitForTimeout(300);
+  const mvp = (await layout()).elemente.find((e) => e.typ === 'mvp');
+  assert.ok(mvp.sichtbar && mvp.b === 1920 && mvp.h === 1080);
+  const t2 = await flaeche.textContent();
+  assert.ok(t2.includes('MVP des Matches') && t2.includes('Punkte'), 'MVP und Ranking sichtbar');
+  await page.screenshot({ path: BILDER + '/elemente-2-mvp.png' });
+
   assert.deepStrictEqual(fehler, [], 'keine Fehler auf der Seite');
   await browser.close();
   console.log('Stats-Elemente ok');

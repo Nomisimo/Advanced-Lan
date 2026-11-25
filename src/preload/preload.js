@@ -47,6 +47,8 @@ contextBridge.exposeInMainWorld('regieAPI', {
   planVorlageEigene: call('plan-vorlage-eigene'),
   planPaket:       call('plan-paket'),
   eventAusloesen:  call('event-ausloesen'),
+  soundOrdner:     call('sound-ordner'),
+  soundDateien:    call('sound-dateien'),
   signalTesten:    call('signal-testen'),
   zielTesten:      call('ziel-testen'),
   overlayZuruecksetzen: call('overlay-zuruecksetzen'),

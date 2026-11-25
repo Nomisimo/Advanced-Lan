@@ -25,6 +25,7 @@ const { QUELLEN, SPIEL_BY_ID } = require('../core/spiele');
 const { rlIni, leseRlIni, RL_INI_DATEI } = require('../core/rl-ini');
 const { OVERDRIVE_PORT } = require('../core/overdrive');
 const { SHOTSFIRED_PORT, SF_SPIELE, sfUrl } = require('../core/shotsfired');
+const { SOUND_ENDUNGEN, MAX_DATEIEN: MAX_SOUND_DATEIEN, istSound } = require('../core/sound');
 const { LOL_PORT } = require('../core/lol');
 const { migrateKonfig, MODI } = require('../core/defaults');
 const { gsiCfg, CFG_DATEI } = require('../core/cfg');
@@ -937,6 +938,32 @@ ipcMain.handle('plan-paket', async () => {
     for (const p of pcs) fs.writeFileSync(path.join(r.filePaths[0], showDateiName(p.pcId, 'gamepc')), JSON.stringify(paketDatei(vorlage, p.pcId, { appVersion: app.getVersion() }), null, 1));
   } catch (e) { return { fehler: e.message }; }
   return { ok: true, n: pcs.length, ordner: r.filePaths[0] };
+});
+// Sound-Player (Tab „Stats-Screen“ → Sound): Ordner oder einzelne Dateien wählen. Ein Ordner wird bis zu drei Ebenen tief
+// durchsucht; der Name des Unterordners (z. B. „kill“) ordnet die Datei einem Event zu (core/sound.js).
+function soundEintrag(pfad, ordner) {
+  return { pfad, url: require('url').pathToFileURL(pfad).href, name: path.basename(pfad), ordner };
+}
+function soundSuchen(ordner, tiefe = 0, aus = []) {
+  let eintraege = [];
+  try { eintraege = fs.readdirSync(ordner, { withFileTypes: true }); } catch { return aus; }
+  for (const e of eintraege.sort((a, b) => a.name.localeCompare(b.name))) {
+    if (aus.length >= MAX_SOUND_DATEIEN) break;
+    const p = path.join(ordner, e.name);
+    if (e.isDirectory() && tiefe < 3 && !e.name.startsWith('.')) soundSuchen(p, tiefe + 1, aus);
+    else if (e.isFile() && istSound(e.name)) aus.push(soundEintrag(p, path.basename(ordner)));
+  }
+  return aus;
+}
+ipcMain.handle('sound-ordner', async () => {
+  const r = await dialogMitFokus('showOpenDialog', { title: 'Sound-Ordner wählen (Unterordner je Event, z. B. kill, ace, spike_planted)', properties: ['openDirectory'] });
+  if (r.canceled || !r.filePaths?.[0]) return { abbruch: true };
+  return { ordner: r.filePaths[0], dateien: soundSuchen(r.filePaths[0]) };
+});
+ipcMain.handle('sound-dateien', async () => {
+  const r = await dialogMitFokus('showOpenDialog', { title: 'Sound-Dateien wählen', properties: ['openFile', 'multiSelections'], filters: [{ name: 'Audio', extensions: SOUND_ENDUNGEN }] });
+  if (r.canceled || !r.filePaths?.length) return { abbruch: true };
+  return { dateien: r.filePaths.filter(istSound).map((p) => soundEintrag(p, '')) };
 });
 ipcMain.handle('event-ausloesen', (_, ev) => regie.fire({ round: regie.stand?.runde, map: regie.stand?.map, ...ev, spiel: cfg.regie.aktivesSpiel, pc: 'Regie', pcId: 'regie' }, 'manuell'));
 ipcMain.handle('signal-testen', (_, spiel, type, zuweisung) => regie.testeZuweisung(spiel, type, zuweisung));

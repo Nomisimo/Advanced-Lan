@@ -6,6 +6,12 @@ const REPO = "Nomisimo/Advanced-Lan";
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
+  "1.0.5": [
+    "Sound-Player in der Regie: beim Event spielt automatisch ein Sound, auf einem wählbaren Ausgabegerät (z. B. Dante Virtual Soundcard). Einstellungen im Tab „Stats-Screen“ unter „Sound“",
+    "Sound-Ordner wählen: Unterordner mit dem Namen eines Events (kill, ace, spike_planted, victory …) werden automatisch zugeordnet. Sounds nach Event sortiert, jeder einzeln an/aus, Probehören, Lautstärke, Stopp. Mehrere Sounds je Event: einer zufällig. Standardmäßig nur bei scharfer Ausgabe",
+    "Die App liefert keine Sounds mit: die Dateien bleiben auf dem Regie-PC",
+    "Shots Fired (Valorant): kein doppelter Cue mehr, wenn kill und kills (oder death/deaths, headshot/headshots) beide angelegt sind",
+  ],
   "1.0.4": [
     "Stats-Screen: neues Element „MVP und Ranking“ als Endscreen. Der beste Spieler groß mit Krone, darunter alle Spieler mit Kills, Tode, K/D, Headshots, HS-Quote und Punkten. Auf Wunsch erst am Matchende sichtbar",
     "Stats-Screen: neue Elemente „Teams und Spieler“ (Valorant mit Shots Fired: Namen beider Teams aus ui_team_order), „Spieler-Karte“ (nach Platz oder fester PC) und „Wert“ (eine einzelne Zahl groß, z. B. Punkte, Runde oder Kills eines Spielers)",

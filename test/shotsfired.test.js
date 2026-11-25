@@ -252,3 +252,29 @@ test("Shots Fired: Server meldet das Team aus der Seite und hält es in der Verl
   assert.equal(sf.team(), "TEAM A");
   assert.equal(sf.status().valorant.seite, "Angriff");
 });
+
+test("Shots Fired: kill und kills beide angelegt, Zähler kommt zuerst: kein doppelter Cue", () => {
+  const z = sfZustand();
+  assert.deepEqual(shotsfiredEvents({ event: "kills", data: 1 }, z, 1000).map((n) => n.event), ["kill"]);
+  assert.deepEqual(shotsfiredEvents({ event: "kill", data: 1 }, z, 1200).map((n) => n.event), [], "echtes Event kurz danach wird geschluckt");
+  assert.deepEqual(shotsfiredEvents({ event: "kills", data: 2 }, z, 5000).map((n) => n.event), [], "ab jetzt zählt nur das echte Event");
+  assert.deepEqual(shotsfiredEvents({ event: "kill", data: 2 }, z, 5100).map((n) => n.event), ["kill"]);
+  // death: echtes Event zuerst, Zähler danach
+  assert.deepEqual(shotsfiredEvents({ event: "death", data: 1 }, z, 6000).map((n) => n.event), ["death"]);
+  assert.deepEqual(shotsfiredEvents({ event: "deaths", data: 1 }, z, 6100).map((n) => n.event), []);
+  // headshot ohne Zähler davor: zählt normal
+  assert.deepEqual(shotsfiredEvents({ event: "headshot" }, z, 7000).map((n) => n.event), ["headshot"]);
+  // match_score wird als Spielstand gelesen
+  const z2 = sfZustand();
+  shotsfiredEvents({ event: "match_score", data: JSON.stringify({ won: 0, lost: 0 }) }, z2);
+  assert.deepEqual(shotsfiredEvents({ event: "match_info.match_score", data: JSON.stringify({ won: 1, lost: 0 }) }, z2).map((n) => n.event), ["round_end"]);
+});
+
+test("Shots Fired: echtes Event mit höherer Zahl als der Zähler ist ein neuer Kill", () => {
+  const z = sfZustand();
+  assert.deepEqual(shotsfiredEvents({ event: "kills", data: 1 }, z, 1000).map((n) => n.event), ["kill"]);
+  assert.deepEqual(shotsfiredEvents({ event: "kill", data: 2 }, z, 1100).map((n) => n.event), ["kill"]);
+  const z2 = sfZustand();
+  shotsfiredEvents({ event: "kills", data: 1 }, z2, 1000);
+  assert.deepEqual(shotsfiredEvents({ event: "kill", data: 1 }, z2, 9000).map((n) => n.event), [], "gleiche Zahl: derselbe Kill, auch später");
+});

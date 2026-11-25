@@ -269,8 +269,8 @@ const ZieleEinrichten = () => (
         {ZIEL_TYPEN.map((t) => (
           <tr key={t.id}>
             <td style={td({ verticalAlign: "top", width: 170 })}><b>{t.name}</b><div style={{ fontSize: 11, color: SUB }}>{KAT_NAME[t.kategorie]}{t.hersteller ? ` · ${t.hersteller}` : ""}</div></td>
-            <td style={td({ ...S.mono, verticalAlign: "top" })}>{t.port}</td>
-            <td style={td({ verticalAlign: "top", fontSize: 12, lineHeight: 1.6 })}>{t.einrichten}<div><a href={t.doku} target="_blank" rel="noreferrer" style={{ color: ACCENT_HI, fontSize: 11 }}>Dokumentation</a></div></td>
+            <td style={td({ ...S.mono, verticalAlign: "top" })}>{t.lokal ? "–" : t.port}</td>
+            <td style={td({ verticalAlign: "top", fontSize: 12, lineHeight: 1.6 })}>{t.einrichten}{t.doku && <div><a href={t.doku} target="_blank" rel="noreferrer" style={{ color: ACCENT_HI, fontSize: 11 }}>Dokumentation</a></div>}</td>
             <td style={td({ verticalAlign: "top", fontSize: 12, color: SUB, lineHeight: 1.6 })}>{t.befehle.map((b) => b.label).join(", ") || "eigene Nachricht"}</td>
           </tr>
         ))}

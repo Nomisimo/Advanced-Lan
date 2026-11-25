@@ -1,6 +1,6 @@
-// Oberflächentest: Sound-Player in der Browser-Vorschau der gebauten App.
-// Prüft: Abschnitt „Sound“ im Tab Stats-Screen zeigt die Sounds nach Event, einzeln an/aus, ein ausgelöstes Event (Simulator)
-// spielt bei scharfer Ausgabe genau die eingeschaltete Datei, und im Tab Signale spielt der Test-Knopf den Sound mit (Checkbox).
+// Oberflächentest: Ziel „Local Sound“ in der Browser-Vorschau der gebauten App.
+// Prüft: alte Sound-Einstellungen ziehen ins Ziel und in die Signale um, Tab Ziele zeigt Ziel und Bibliothek, ein ausgelöstes
+// Event (Simulator) spielt nur bei scharfer Ausgabe, im Tab Signale entsteht ein Sound-Befehl mit Seiten-Filter und Dateiwahl.
 // Aufruf: npm run build:dev && node test/e2e/sound.e2e.js [dist-app/index.html] [Ordner für Screenshots]
 // Braucht Playwright mit Chromium (nicht in den Abhängigkeiten), z. B. global: npm i -g playwright, dann mit NODE_PATH=$(npm root -g)
 const { chromium } = require('playwright');
@@ -25,7 +25,7 @@ function wav(datei) {
   const url = (name) => wav(path.join(ordner, name));
   const dateien = [
     { id: 'k1', spiel: 'valorant', event: 'kill', pfad: '/kill/k1.wav', url: url('k1.wav'), name: 'k1.wav', an: false },
-    { id: 'k2', spiel: 'valorant', event: 'kill', pfad: '/kill/k2.wav', url: url('k2.wav'), name: 'k2.wav', an: false },
+    { id: 'k2', spiel: 'valorant', event: 'kill', pfad: '/kill/k2.wav', url: url('k2.wav'), name: 'k2.wav', an: true },
     { id: 'a1', spiel: 'valorant', event: 'ace', pfad: '/ace/a1.wav', url: url('a1.wav'), name: 'a1.wav', an: true },
     { id: 'r1', spiel: 'valorant', event: '', pfad: '/round_info/r1.wav', url: url('r1.wav'), name: 'r1.wav', an: false },
   ];
@@ -55,23 +55,27 @@ function wav(datei) {
     localStorage.setItem('advancedlan_konfig', JSON.stringify(c));
   }, dateien);
   await page.reload();
-  await page.getByRole('button', { name: 'Stats-Screen', exact: true }).click();
-  await page.getByTestId('sound-event-kill').waitFor();
+  // Alte Einstellungen (Sounds direkt am Event) sind ins Ziel „Local Sound“ umgezogen
+  const konfig = () => page.evaluate(() => JSON.parse(localStorage.getItem('advancedlan_konfig')).regie);
+  // (gespeichert wird beim ersten Ändern, geprüft unten)
+
+  await page.getByRole('button', { name: 'Ziele', exact: true }).click();
+  await page.getByTestId('sound-ziel').waitFor();
   const gruppen = await page.locator('[data-testid^=sound-event-]').evaluateAll((els) => els.map((e) => e.dataset.testid));
-  assert.deepStrictEqual(gruppen, ['sound-event-kill', 'sound-event-ace', 'sound-event-ohne'], 'nach Event sortiert, ohne Zuordnung am Ende');
-  // k2 einschalten
-  await page.getByTestId('sound-event-kill').locator('input[type=checkbox]').nth(1).check();
-  const sound = () => page.evaluate(() => JSON.parse(localStorage.getItem('advancedlan_konfig')).regie.sound);
-  assert.deepStrictEqual((await sound()).dateien.filter((d) => d.an).map((d) => d.id).sort(), ['a1', 'k2']);
-  await page.getByTestId('sound-event-kill').scrollIntoViewIfNeeded();
-  await page.screenshot({ path: path.join(BILDER, 'sound-einstellungen.png') });
+  assert.deepStrictEqual(gruppen, ['sound-event-kill', 'sound-event-ace', 'sound-event-ohne'], 'Bibliothek nach Event sortiert, ohne Zuordnung am Ende');
+  await page.getByTestId('sound-ziel').locator('button', { hasText: 'Test' }).click();
+  await page.waitForTimeout(300);
+  assert.strictEqual((await page.evaluate(() => window.__gespielt)).length, 1, 'Testton');
+  await page.evaluate(() => { window.__gespielt = []; });
+  await page.getByTestId('sound-ziel').scrollIntoViewIfNeeded();
+  await page.screenshot({ path: path.join(BILDER, 'local-sound-ziel.png') });
 
   // Nicht scharf: kein Sound
   await page.getByRole('button', { name: 'Simulator', exact: true }).click();
   await page.getByRole('button', { name: /^Kill/ }).first().click();
   await page.waitForTimeout(300);
   assert.deepStrictEqual(await page.evaluate(() => window.__gespielt), [], 'Ausgabe aus: still');
-  // Scharf: k2 spielt, Ace spielt a1, Event ohne Sound bleibt still
+  // Scharf: Kill spielt k2, Ace spielt a1, Event ohne Sound bleibt still
   await page.getByRole('button', { name: /AUSGABE AUS/ }).click();
   await page.getByRole('button', { name: /^Kill/ }).first().click();
   await page.waitForTimeout(300);
@@ -80,29 +84,34 @@ function wav(datei) {
   await page.getByRole('button', { name: /^Assist/ }).first().click();
   await page.waitForTimeout(300);
   assert.deepStrictEqual(await page.evaluate(() => window.__gespielt), ['k2.wav', 'a1.wav']);
-
-  // Tab Signale: Test-Knopf spielt den Sound des Events mit (Checkbox an), auch bei Ausgabe aus
   await page.getByRole('button', { name: /AUSGABE AN/ }).click();
   await page.evaluate(() => { window.__gespielt = []; });
+
+  // Tab Signale: „Sound“ an „Runde gewonnen“ mit Seite Angriff, Dateiwahl aus der Bibliothek
   await page.getByRole('button', { name: 'Signale', exact: true }).click();
-  await page.getByTestId('signal-sound-kill').waitFor();
-  await page.getByTestId('signal-sound-kill').scrollIntoViewIfNeeded();
-  const testKnopf = page.locator('button', { hasText: /^\s*Test$/ }).last();
-  await testKnopf.click();
+  await page.getByText('In den Spielen nur Abweichungen').click(); // alle Events der Spiele zeigen
+  await page.waitForFunction(() => document.querySelectorAll('[data-testid=signal-sound-round_end]').length > 1);
+  await page.getByTestId('signal-sound-round_end').last().scrollIntoViewIfNeeded();
+  await page.getByTestId('signal-sound-round_end').last().click();
+  const wahl = page.getByTestId('signal-sound-round_end').last().locator('xpath=../..').getByTestId('sound-wahl');
+  const zeile = wahl.locator('xpath=ancestor::div[contains(@class,"sig-zeile")]');
+  await zeile.getByTestId('signal-team').selectOption('seite:Angriff');
+  await wahl.locator('summary').click();
+  await wahl.getByLabel('r1.wav', { exact: true }).check();
+  const r = await konfig();
+  const snd = r.targets.find((t) => t.typ === 'sound');
+  assert.ok(snd, 'Ziel Local Sound angelegt');
+  assert.deepStrictEqual(r.signale.valorant.ace.map((z) => z.werte.datei), ['/ace/a1.wav']);
+  assert.deepStrictEqual(r.signale.valorant.kill.filter((z) => z.ziel === snd.id).map((z) => z.werte.datei), ['/kill/k2.wav']);
+  const rz = r.signale.valorant.round_end.find((z) => z.ziel === snd.id);
+  assert.deepStrictEqual([rz.befehl, rz.seite, rz.team, rz.werte.datei], ['abspielen', 'Angriff', '', '/round_info/r1.wav']);
+  await page.screenshot({ path: path.join(BILDER, 'signale-local-sound.png') });
+  // Test-Knopf dieses Befehls spielt die Datei, auch bei Ausgabe aus
+  await wahl.locator('summary').click();
+  await zeile.locator('button', { hasText: 'Test' }).click();
   await page.waitForTimeout(300);
-  assert.deepStrictEqual(await page.evaluate(() => window.__gespielt), ['k2.wav'], 'Test spielt den Sound');
-  await page.screenshot({ path: path.join(BILDER, 'signale-sound.png') });
-  // Checkbox aus: Test bleibt still
-  await page.getByText('Beim Test auch den Sound spielen').click();
-  assert.strictEqual((await sound()).beimTest, false);
-  await testKnopf.click();
-  await page.waitForTimeout(300);
-  assert.deepStrictEqual(await page.evaluate(() => window.__gespielt), ['k2.wav'], 'Checkbox aus: kein Sound');
-  // Lautsprecher-Knopf am Event spielt immer
-  await page.getByTestId('signal-sound-kill').click();
-  await page.waitForTimeout(300);
-  assert.deepStrictEqual(await page.evaluate(() => window.__gespielt), ['k2.wav', 'k2.wav']);
+  assert.deepStrictEqual(await page.evaluate(() => window.__gespielt), ['r1.wav'], 'Test spielt den Sound');
   assert.deepStrictEqual(fehler, []);
-  console.log('Sound-Player: OK');
+  console.log('Local Sound: OK');
   await browser.close();
 })().catch((e) => { console.error(e); process.exit(1); });

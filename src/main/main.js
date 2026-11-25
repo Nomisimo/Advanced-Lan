@@ -32,6 +32,7 @@ const { migrateKonfig, MODI } = require('../core/defaults');
 const { gsiCfg, CFG_DATEI } = require('../core/cfg');
 const { SHOW_ENDUNG, ART_NAME, arten: showArten, showDatei, leseShow, showAnwenden, leereShow, alsGespeichert, dateiName: showDateiName, showDaten, vorlageStand, vorlageAus, vorlageAnwenden, paketDatei, sauberName } = require('../core/show');
 const { testNachricht, zeigeNachricht } = require('../core/signal');
+const { istLokal } = require('../core/ziel-typen');
 const { overlayStatus } = require('../core/overlay-status');
 const { kartenListe, lokaleIp } = require('../core/netzwerk');
 const { SimRunner } = require('../core/sim-runner');
@@ -102,7 +103,9 @@ const regie = new Regie({
   },
 });
 // Absenderkarte: die des Ziels, sonst die für „Senden“, sonst automatisch
+// Local Sound geht nicht ins Netz: die Regie-Oberfläche spielt die Datei (renderer/regie/sound-player.js)
 function oscSenden(s) {
+  if (istLokal(s.ziel)) { an('sound-ausgabe', { ziel: s.ziel, address: s.address, args: s.args }); return Promise.resolve(); }
   const l = lokaleIp(karten(), s.ziel.netz || cfg.regie.netz?.senden);
   return l.fehler ? Promise.reject(new Error(l.fehler)) : osc.send({ ...s, lokal: l.ip });
 }
@@ -295,9 +298,18 @@ function quelleMelden(spiel, r, sim = false) {
   const d = daten[spiel] = daten[spiel] || { letzte: 0, statusGesendet: 0 };
   if (!sim) spielDaten();
   Object.assign(d, { letzte: Date.now(), stand: r.stand, status: r.status });
-  for (const ev of r.events) gamePcLog({ spiel, ev, gesendet: anRegie(spiel, ev), sim });
+  for (const ev of r.events) { seiteDazu(spiel, ev); gamePcLog({ spiel, ev, gesendet: anRegie(spiel, ev), sim }); }
   if (r.events.length || Date.now() - d.statusGesendet > 500) { statusAnRegie(spiel, r.status, r.stand); d.statusGesendet = Date.now(); }
   statusMelden();
+}
+
+// Valorant: Seite des Teams im Event (Angriff/Verteidigung) aus Shots Fired, für den Seiten-Filter in den Signalen.
+// Eigenes Team = Seite dieses PCs, das andere die Gegenseite. Ohne Shots Fired rechnet die Regie aus Team und Runde.
+function seiteDazu(spiel, ev) {
+  if (spiel !== 'valorant' || !ev?.team || ev.seiteTeam) return;
+  const sf = shotsfired.valorantInfo(), eigen = teamVon('valorant');
+  if (!sf.seite || !eigen) return;
+  ev.seiteTeam = ev.team === eigen ? sf.seite : sf.seite === 'Angriff' ? 'Verteidigung' : 'Angriff';
 }
 
 // Bild-Spiele: erkannte Aktionen auf diesem PC. Team und Name kommen aus dem Setup dieses PCs, auch im Simulator.
@@ -988,7 +1000,7 @@ ipcMain.handle('signal-testen', (_, spiel, type, zuweisung) => regie.testeZuweis
 ipcMain.handle('ziel-testen', async (_, zielId) => {
   const ziel = cfg.regie.targets.find((t) => t.id === zielId);
   if (!ziel) return { fehler: 'Ziel nicht gefunden' };
-  try { const n = testNachricht(ziel); await oscSenden({ ziel, ...n }); return { ok: true, nachricht: zeigeNachricht(n) }; }
+  try { const n = testNachricht(ziel); await oscSenden({ ziel, ...n }); return { ok: true, nachricht: zeigeNachricht(n), lokal: istLokal(ziel) }; }
   catch (e) { return { fehler: e.message }; }
 });
 ipcMain.handle('sim-start', (_, modus) => { regieSim.start(modus, cfg.regie.aktivesSpiel); return regieSim.status(); });

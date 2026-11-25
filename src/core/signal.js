@@ -4,7 +4,8 @@
 //
 //   cfg.signale = { [spiel]: { [event]: [ { id, ziel, befehl, werte: { cue: "3" }, pc: "", team: "" } ] } }
 //
-// Werte dürfen Platzhalter aus dem Ereignis enthalten: {spieler} {team} {pc} {runde} {spiel} {event},
+// seite: optional nur, wenn das Team des Ereignisses auf dieser Seite spielt (Valorant: „Angriff“ / „Verteidigung“, seiteVon).
+// Werte dürfen Platzhalter aus dem Ereignis enthalten: {spieler} {team} {seite} {pc} {runde} {spiel} {event},
 // aus dem Plan {nr} {nr2} {plan} (core/plan.js) und Rechnungen wie {100+nr} (core/platzhalter.js).
 // Allgemeine Befehle (cfg.signale.allgemein, core/aktionen.js) gelten zusätzlich für jedes passende Spiel-Event.
 
@@ -13,7 +14,18 @@ const { einsetzen, nutzt, zaehlen } = require("./platzhalter");
 const { planVars, PLAN_VARS } = require("./plan");
 const { geerbt } = require("./aktionen");
 
+// Seite des Teams im Ereignis (Valorant: Angriff oder Verteidigung). Vom Game-PC (Shots Fired), sonst aus Team und Runde:
+// TEAM A beginnt im Angriff, ab Runde 13 getauscht. In der Verlängerung ohne Angabe vom Game-PC unbekannt.
+const SEITEN = ["Angriff", "Verteidigung"];
+function seiteVon(ev = {}) {
+  if (SEITEN.includes(ev.seiteTeam)) return ev.seiteTeam;
+  const r = Number(ev.round);
+  if (ev.spiel !== "valorant" || !ev.team || !Number.isFinite(r) || r < 1 || r > 24) return "";
+  return (ev.team === "TEAM A") === (r <= 12) ? "Angriff" : "Verteidigung";
+}
+
 const EVENT_VARS = (ev) => ({
+  seite: seiteVon(ev),
   spieler: ev.player || "",
   team: ev.team || "",
   pc: ev.pcId || ev.pc || "",
@@ -97,7 +109,7 @@ function zuweisungen(cfg, spiel, type) {
   return [...geerbt(cfg, spiel, type), ...(Array.isArray(l) ? l : [])];
 }
 
-const passt = (z, ev) => (!z.pc || z.pc === (ev.pcId || ev.pc)) && (!z.team || z.team === ev.team) && z.aus !== true;
+const passt = (z, ev) => (!z.pc || z.pc === (ev.pcId || ev.pc)) && (!z.team || z.team === ev.team) && (!z.seite || z.seite === seiteVon(ev)) && z.aus !== true;
 
 // Ereignis → [{ zuweisung, ziel, nachrichten, fehler }]
 function befehleFuer(cfg, ev) {
@@ -116,4 +128,4 @@ function befehleFuer(cfg, ev) {
 const zeigeArg = (a) => (a.type === "s" ? JSON.stringify(a.value) : a.type === "T" || a.type === "F" ? a.type : String(a.value));
 const zeigeNachricht = (n) => [n.address, ...n.args.map(zeigeArg)].join(" ");
 
-module.exports = { baueNachrichten, nutztPlan, testNachricht, befehleFuer, zuweisungen, passt, parseArgs, einsetzen, zeigeNachricht, EVENT_VARS };
+module.exports = { seiteVon, SEITEN, baueNachrichten, nutztPlan, testNachricht, befehleFuer, zuweisungen, passt, parseArgs, einsetzen, zeigeNachricht, EVENT_VARS };

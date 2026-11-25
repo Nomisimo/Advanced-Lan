@@ -3,7 +3,7 @@
 const { STANDARD_HOTKEY, gueltigerHotkey } = require("./app-info");
 const { standardBild, migrateBild } = require("./bild-spiele");
 const { standardStats, migrateStats } = require("./stats-screens");
-const { standardSound, migrateSound } = require("./sound");
+const { standardSound, migrateSound, soundUmziehen } = require("./sound");
 const { standardNamensAbfrage, migrateNamensAbfrage } = require("./namen");
 const { leseSpieler } = require("./protokoll");
 const { standardPlan, migratePlan } = require("./plan");
@@ -39,7 +39,7 @@ function standardRegie() {
     // Tab „Stats-Screen“: Game-Stats-Screens (Spielstand, beste Spieler, letzte Events) als Pop-out-Fenster oder NDI-Stream.
     // Mehrere Screens, jeder mit eigener Größe, eigenem Layout und eigener NDI-Quelle (core/stats-screens.js)
     stats: standardStats(),
-    // Tab „Stats-Screen“ → Sound: spielt bei Events Audiodateien auf einem wählbaren Ausgabegerät (core/sound.js)
+    // Sound-Bibliothek für das Ziel „Local Sound“ (Tab „Ziele“, core/sound.js)
     sound: standardSound(),
   };
 }
@@ -107,7 +107,7 @@ function migrateSignale(s) {
     if (!evs || typeof evs !== "object") continue;
     for (const [ev, liste] of Object.entries(evs)) {
       if (!Array.isArray(liste)) continue;
-      (out[spiel] = out[spiel] || {})[ev] = liste.filter((z) => z && typeof z === "object").map((z) => ({ id: z.id || uid(), ziel: z.ziel || "", befehl: z.befehl || "eigene", werte: z.werte && typeof z.werte === "object" ? z.werte : {}, pc: z.pc || "", team: z.team || "" }));
+      (out[spiel] = out[spiel] || {})[ev] = liste.filter((z) => z && typeof z === "object").map((z) => ({ id: z.id || uid(), ziel: z.ziel || "", befehl: z.befehl || "eigene", werte: z.werte && typeof z.werte === "object" ? z.werte : {}, pc: z.pc || "", team: z.team || "", ...(typeof z.seite === "string" && z.seite ? { seite: z.seite } : {}), ...(z.aus === true ? { aus: true } : {}) }));
     }
   }
   return out;
@@ -144,6 +144,7 @@ function migrateKonfig(k) {
     },
     gamepc: { ...d.gamepc, ...g, regie: { ...d.gamepc.regie, ...(g.regie || {}) }, overlay: { ...d.gamepc.overlay, ...(g.overlay && typeof g.overlay === "object" ? g.overlay : {}) }, bild: migrateBild(g.bild), spieler: leseSpieler(g.spieler), namensAbfrage: migrateNamensAbfrage(g.namensAbfrage), gsiToken: g.gsiToken || d.gamepc.gsiToken, verwaltet: g.verwaltet !== false },
   };
+  soundUmziehen(m.regie, uid); // Sounds bis 1.0.7 → Ziel „Local Sound“ und Signale
   delete m.gamepc.spiel;
   // Das aktive Spiel muss ein genutztes Spiel sein
   if (!m.regie.spiele[m.regie.aktivesSpiel]) m.regie.aktivesSpiel = Object.keys(m.regie.spiele).find((k) => m.regie.spiele[k]);

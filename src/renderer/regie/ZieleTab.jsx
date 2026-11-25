@@ -5,7 +5,8 @@ import { Section, Field, th, td, ZielBadge, KAT_FARBE, KartenWahl, useKarten } f
 import { karteFuer, zielHinweis } from "../../core/netzwerk.js";
 import { api } from "../api.js";
 import { uid } from "../../core/defaults.js";
-import { ZIEL_TYPEN, KATEGORIEN, zielTyp, befehleVon } from "../../core/ziel-typen.js";
+import { ZIEL_TYPEN, KATEGORIEN, zielTyp, befehleVon, istLokal } from "../../core/ziel-typen.js";
+import LocalSound from "./SoundEinstellungen.jsx";
 import { Plus, Trash2, Send, BookOpen, Info, X, ExternalLink } from "lucide-react";
 
 // OSC-Vorlage lesbar: /{prefix}/cmd s "Goto Sequence {seq} Cue {cue}"
@@ -52,7 +53,7 @@ function ZielInfo({ typ, onClose }) {
         {t.vorab?.length > 0 && <div style={{ ...S.hint }}>Ist die Option „{t.optionen.find((o) => o.key === t.vorab[0].nurWenn)?.label}“ gesetzt, geht vor jedem Befehl <code style={S.mono}>{zeigeVorlage(t.vorab[0])}</code> raus.</div>}
         <H>Quelle</H>
         <div style={{ fontSize: 12, lineHeight: 1.6, color: "#d4d0de" }}>{t.quelle}</div>
-        <button style={{ ...S.secondaryBtn, marginTop: 12 }} onClick={() => api.openExternal(t.doku)}><ExternalLink size={13} /> Dokumentation des Herstellers</button>
+        {t.doku && <button style={{ ...S.secondaryBtn, marginTop: 12 }} onClick={() => api.openExternal(t.doku)}><ExternalLink size={13} /> Dokumentation des Herstellers</button>}
       </div>
     </div>
   );
@@ -71,12 +72,14 @@ function eindeutigerName(cfg, name) {
   for (let i = 2; ; i++) if (!namen.has(`${name} ${i}`)) return `${name} ${i}`;
 }
 
+const neuesZiel = (t, name) => ({ id: uid(), typ: t.id, name, host: "", port: t.port, optionen: Object.fromEntries((t.optionen || []).map((o) => [o.key, o.standard])) });
+
 function Datenbank({ cfg, mutate, notify, setInfo }) {
   const [kat, setKat] = useState("alle");
   const anlegen = (t) => {
     const name = eindeutigerName(cfg, t.name);
-    mutate((d) => { d.targets.push({ id: uid(), typ: t.id, name, host: "", port: t.port, optionen: Object.fromEntries((t.optionen || []).map((o) => [o.key, o.standard])) }); });
-    notify(`Ziel „${name}“ angelegt. IP-Adresse eintragen.`);
+    mutate((d) => { d.targets.push(neuesZiel(t, name)); });
+    notify(t.lokal ? `Ziel „${name}“ angelegt. Ausgabegerät wählen und Sounds in die Bibliothek holen.` : `Ziel „${name}“ angelegt. IP-Adresse eintragen.`);
   };
   const liste = ZIEL_TYPEN.filter((t) => kat === "alle" || t.kategorie === kat);
   return (
@@ -98,7 +101,7 @@ function Datenbank({ cfg, mutate, notify, setInfo }) {
               </div>
               <div style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 11, color: SUB }}>
                 <span style={{ ...S.badge, background: f + "22", color: f, whiteSpace: "nowrap" }}>{KATEGORIEN.find((k) => k.id === t.kategorie)?.name}</span>
-                <span style={{ ...S.mono, whiteSpace: "nowrap" }}>{t.protokoll} {t.port}</span>
+                <span style={{ ...S.mono, whiteSpace: "nowrap" }}>{t.lokal ? "dieser PC" : `${t.protokoll} ${t.port}`}</span>
                 <span style={{ flex: 1, textAlign: "right", whiteSpace: "nowrap" }}>{befehleVon(t.id).length} Befehle</span>
               </div>
               <button style={{ ...S.secondaryBtn, marginTop: 2 }} onClick={() => anlegen(t)}><Plus size={13} /> Anlegen</button>
@@ -122,14 +125,19 @@ export default function ZieleTab({ cfg, mutate, notify, goTab }) {
       for (const evs of Object.values(d.signale || {})) for (const k of Object.keys(evs || {})) if (Array.isArray(evs[k])) evs[k] = evs[k].filter((z) => z.ziel !== t.id);
     });
   };
+  const netzZiele = cfg.targets.filter((t) => !istLokal(t));
+  const soundAnlegen = () => {
+    const t = zielTyp("sound"), name = eindeutigerName(cfg, t.name);
+    mutate((d) => { d.targets.push(neuesZiel(t, name)); });
+  };
   return (
     <>
       <Section title="Ziele" right={goTab && <button style={S.smallBtn} onClick={() => goTab("hilfe")}><BookOpen size={12} /> Einrichtung der Ziele</button>}>
-        {cfg.targets.length === 0 ? <div style={S.empty}>Noch kein Ziel. Unten aus der Ziel-Datenbank anlegen.</div> : (
+        {netzZiele.length === 0 ? <div style={S.empty}>Noch kein Ziel im Netzwerk. Unten aus der Ziel-Datenbank anlegen.</div> : (
           <table style={{ ...S.table, marginTop: 0 }}>
             <thead><tr><th style={th()}>Typ</th><th style={th()}>Name</th><th style={th()}>IP-Adresse</th><th style={th()}>Port (UDP)</th><th style={th()}>Netzwerkkarte</th><th style={th()}>Optionen</th><th style={th()}>Signale</th><th style={th()}></th></tr></thead>
             <tbody>
-              {cfg.targets.map((t) => {
+              {netzZiele.map((t) => {
                 const typ = zielTyp(t.typ), n = nutzung(cfg, t.id);
                 return (
                   <tr key={t.id}>
@@ -164,6 +172,7 @@ export default function ZieleTab({ cfg, mutate, notify, goTab }) {
           <KartenWahl karten={karten} wert={cfg.netz?.senden} onChange={(v) => mutate((d) => { d.netz = { ...d.netz, senden: v }; })} />
         </Field>
       </Section>
+      <LocalSound cfg={cfg} mutate={mutate} notify={notify} setZiel={setZiel} loeschen={loeschen} nutzung={nutzung} anlegen={soundAnlegen} />
       <Datenbank cfg={cfg} mutate={mutate} notify={notify} setInfo={setInfo} />
       {info && <ZielInfo typ={info} onClose={() => setInfo(null)} />}
     </>

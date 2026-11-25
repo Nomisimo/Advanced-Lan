@@ -1,8 +1,8 @@
-// Sound-Player der Regie (Hauptfenster): spielt bei jedem neuen Event die passende Datei auf dem gewählten Ausgabegerät.
-// Welche Datei, entscheidet core/sound.js. Das Gerät wird über HTMLMediaElement.setSinkId gewählt (Chromium/Electron).
+// Sound-Player der Regie (Hauptfenster) für das Ziel „Local Sound“: spielt Dateien auf dem Ausgabegerät des Ziels.
+// Welche Datei, entscheidet core/sound.js (soundAktion). Das Gerät wird über HTMLMediaElement.setSinkId gewählt (Chromium/Electron).
 import { useEffect, useRef } from "react";
 import { api } from "../api.js";
-import { soundFuer } from "../../core/sound.js";
+import { soundAktion, zielEinstellung } from "../../core/sound.js";
 
 const laufend = new Set();
 
@@ -35,18 +35,29 @@ export async function ausgabeGeraete() {
   } catch { return []; }
 }
 
-// Hört auf die Events der Regie und spielt pro Log-Eintrag höchstens einmal (Fehler-Nachmeldungen haben dieselbe ID)
-export function useSoundPlayer(sound, notify) {
-  const ref = useRef(sound);
-  ref.current = sound;
-  useEffect(() => {
-    const gespielt = new Set();
-    return api.onRegieEvent((e) => {
-      if (!e?.id || gespielt.has(e.id)) return;
-      gespielt.add(e.id);
-      if (gespielt.size > 500) gespielt.delete(gespielt.values().next().value);
-      const datei = soundFuer(ref.current, e);
-      if (datei) abspielen(datei, ref.current).catch((f) => notify?.(`Sound: ${f.message}`, "err"));
-    });
-  }, []);
+// Kurzer Testton (440 Hz, 0,4 s) als WAV, damit „Test“ beim Ziel ohne Datei etwas auf dem Gerät hörbar macht
+let testUrl = "";
+function testton() {
+  if (testUrl) return testUrl;
+  const rate = 22050, n = Math.round(rate * 0.4), buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+  const txt = (o, t) => [...t].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+  txt(0, "RIFF"); v.setUint32(4, 36 + n * 2, true); txt(8, "WAVEfmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); txt(36, "data"); v.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) v.setInt16(44 + i * 2, Math.sin((2 * Math.PI * 440 * i) / rate) * 12000 * Math.min(1, (n - i) / 2000), true);
+  testUrl = URL.createObjectURL(new Blob([buf], { type: "audio/wav" }));
+  return testUrl;
+}
+
+// Ziel „Local Sound“: die Regie schickt jede Nachricht dieses Ziels hierher (sound-ausgabe). Was gespielt wird, sagt core/sound.js.
+// bibliothek: cfg.sound (Dateien mit URL). Nur im Hauptfenster der Regie, nicht im Pop-out oder NDI.
+export function useLocalSound(bibliothek, notify) {
+  const ref = useRef(bibliothek);
+  ref.current = bibliothek;
+  useEffect(() => api.onSoundAusgabe?.((m) => {
+    const a = soundAktion(ref.current, m), e = zielEinstellung(m?.ziel);
+    if (a.art === "stopp") return stoppen();
+    if (a.art === "fehler") return notify?.(`Sound: ${a.text}`, "err");
+    const datei = a.art === "test" ? { url: testton(), name: "Testton" } : a.datei;
+    abspielen(datei, e).catch((f) => notify?.(`Sound: ${f.message}`, "err"));
+  }), []);
 }

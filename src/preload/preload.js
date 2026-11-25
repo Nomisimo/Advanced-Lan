@@ -56,6 +56,7 @@ contextBridge.exposeInMainWorld('regieAPI', {
   simStop:         call('sim-stop'),
   simNeu:          call('sim-neu'),
   onRegieEvent:    abo('regie-event'),
+  onSoundAusgabe:  abo('sound-ausgabe'),
   statsFenster:    call('stats-fenster'),
   statsVollbild:   call('stats-vollbild'),
   ndiPruefen:      call('ndi-pruefen'),

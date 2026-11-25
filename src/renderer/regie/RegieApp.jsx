@@ -11,7 +11,7 @@ import ZieleTab from "./ZieleTab.jsx";
 import SimTab from "./SimTab.jsx";
 import SessionTab from "./SessionTab.jsx";
 import ScreenTab from "./ScreenTab.jsx";
-import { useSoundPlayer } from "./sound-player.js";
+import { useLocalSound } from "./sound-player.js";
 import PlanTab from "./PlanTab.jsx";
 import AnleitungTab from "../AnleitungTab.jsx";
 import AppEinstellungen from "../AppEinstellungen.jsx";
@@ -39,8 +39,8 @@ export default function RegieApp({ cfg: alles, mutate: mutateAlles, ersetzen, st
   const status = st.regie;
   const mutate = useCallback((fn) => mutateAlles((d) => fn(d.regie)), [mutateAlles]);
   const [log, setLog] = useState([]);
-  // Sounds bei Events (Tab „Stats-Screen“ → Sound): nur im Hauptfenster, nicht in Pop-out oder NDI
-  useSoundPlayer(cfg.sound, notify);
+  // Ziel „Local Sound“ (Tab „Ziele“): nur im Hauptfenster, nicht in Pop-out oder NDI
+  useLocalSound(cfg.sound, notify);
   const [tab, setTab] = useTab("advancedlan_regie_tab", TABS, standalone ? "spiele" : "control");
   useEffect(() => {
     api.regieLog().then(setLog);

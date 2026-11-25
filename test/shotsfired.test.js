@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const http = require("http");
-const { shotsfiredEvents, sfZustand, eventName } = require("../src/core/shotsfired");
+const { shotsfiredEvents, sfZustand, eventName, sfInfo, spielerVon, seiteVon, teamAusSeite } = require("../src/core/shotsfired");
 const { ShotsFiredServer } = require("../src/main/shotsfired-server");
 const { BildQuelle } = require("../src/core/bild-spiele");
 
@@ -163,4 +163,92 @@ test("Shots Fired: echtes Format { gameId, event: feature.name, data } für alle
   assert.equal(n("/finals", { event: "match_info.match_end", data: "" }), "finals:match_end");
   assert.equal(n("/lol", { gameId: 5426, event: "kill.kill", data: "" }), "lol:kill");
   assert.equal(n("/lol", { gameId: 5426, event: "announcer.penta_kill", data: "" }), "lol:penta_kill");
+});
+
+test("Shots Fired: Zähler kills, deaths und round_number (wenn es keine Einzel-Events gibt)", () => {
+  const z = sfZustand();
+  const sf = (event, data) => ev({ gameId: 21640, event, data }, z);
+  assert.deepEqual(sf("match_info.round_number", 1), ["round_start"]);
+  assert.deepEqual(sf("round_number", 1), [], "gleiche Runde löst nichts aus");
+  assert.deepEqual(sf("kills", 1), ["kill"]);
+  assert.deepEqual(sf("kills", "3"), ["kill", "kill"]);
+  assert.deepEqual(sf("deaths", 0), []);
+  assert.deepEqual(sf("deaths", 1), ["death"]);
+  assert.deepEqual(sf("round_number", "2"), ["round_start"]);
+  // Ace: 5 Kills in Runde 2
+  assert.deepEqual(sf("kills", 7), ["kill", "kill", "kill", "kill"]);
+  assert.deepEqual(sf("kills", 8), ["kill", "ace"]);
+  // Stand fällt zurück: neues Match, nur neuer Ausgangswert
+  assert.deepEqual(sf("kills", 0), []);
+  assert.deepEqual(sf("kills", 1), ["kill"]);
+});
+
+test("Shots Fired: Zähler mitten im Match und neben echten Events", () => {
+  const z = sfZustand();
+  // App startet mitten im Match: hoher Stand ist nur der Ausgangswert
+  assert.deepEqual(ev({ event: "kills", data: 9 }, z), []);
+  assert.deepEqual(ev({ event: "kills", data: 10 }, z), ["kill"]);
+  // Kommen echte kill-Events, zählt der Zähler nicht doppelt
+  assert.deepEqual(ev({ event: "kill.kill", data: 11 }, z), ["kill"]);
+  assert.deepEqual(ev({ event: "kills", data: 11 }, z), []);
+  // Rundennummer nach der Kaufphase aus round_phase: kein zweiter Rundenstart
+  const z2 = sfZustand();
+  assert.deepEqual(ev({ info: { match_info: { round_phase: "shopping" } } }, z2), ["round_start"]);
+  assert.deepEqual(ev({ event: "round_number", data: 4 }, z2), []);
+  // Unsinn wird ignoriert
+  assert.deepEqual(ev({ event: "kills", data: "abc" }, sfZustand()), []);
+});
+
+test("Shots Fired: round_number vor der Kaufphase startet die Runde nur einmal", () => {
+  const z = sfZustand();
+  const phase = (p) => ({ info: { match_info: { round_phase: p } } });
+  assert.deepEqual(ev({ event: "round_number", data: 1 }, z), ["round_start"]);
+  assert.deepEqual(ev(phase("shopping"), z), []);
+  assert.deepEqual(ev(phase("combat"), z), []);
+  assert.deepEqual(ev(phase("shopping"), z), ["round_start"]);
+  assert.deepEqual(ev({ event: "round_number", data: 2 }, z), []);
+  assert.deepEqual(ev({ event: "round_number", data: 3 }, z), ["round_start"]);
+});
+
+test("Shots Fired: headshots-Zähler, team und ui_team_order", () => {
+  const z = sfZustand();
+  assert.deepEqual(ev({ event: "headshots", data: 1 }, z), ["headshot"]);
+  assert.deepEqual(ev({ event: "match_info.headshots", data: 3 }, z), ["headshot", "headshot"]);
+  assert.deepEqual(ev({ event: "team", data: "attack" }, z), []);
+  assert.deepEqual(ev({ event: "round_number", data: 3 }, z), ["round_start"]);
+  assert.deepEqual(ev({ event: "ui_team_order_allies", data: JSON.stringify([{ name: "Momo" }, { name: "Ben" }]) }, z), []);
+  assert.deepEqual(ev({ event: "ui team order enemies", data: "Ana, Tom" }, z), []);
+  assert.deepEqual(sfInfo(z), { seite: "Angriff", team: "TEAM A", verbuendete: ["Momo", "Ben"], gegner: ["Ana", "Tom"] });
+  ev({ event: "round_number", data: 13 }, z);
+  assert.equal(sfInfo(z).team, "TEAM B", "Seitenwechsel nach Runde 12: im Angriff ist jetzt Blau");
+  ev({ event: "team", data: "defense" }, z);
+  assert.equal(sfInfo(z).team, "TEAM A");
+  ev({ event: "round_number", data: 25 }, z);
+  assert.equal(sfInfo(z).team, "", "Verlängerung: zu unsicher");
+  // match_start setzt alles zurück
+  ev({ event: "match_start" }, z);
+  assert.deepEqual(sfInfo(z), { seite: "", team: "", verbuendete: [], gegner: [] });
+});
+
+test("Shots Fired: Formen von team und ui_team_order", () => {
+  assert.equal(seiteVon("Attacker"), "Angriff");
+  assert.equal(seiteVon({ team: "defender" }), "Verteidigung");
+  assert.equal(seiteVon("blau"), "");
+  assert.deepEqual(spielerVon(["A", { player_name: "B" }, { agent: "Sage" }, null, ""]), ["A", "B", "Sage"]);
+  assert.deepEqual(spielerVon({ players: ["X", "Y"] }), ["X", "Y"]);
+  assert.deepEqual(spielerVon('{"0":"P1","1":"P2"}'), ["P1", "P2"]);
+  assert.deepEqual(spielerVon(42), []);
+  assert.equal(teamAusSeite("Verteidigung", 1), "TEAM B");
+  assert.equal(teamAusSeite("Angriff", null), "");
+});
+
+test("Shots Fired: Server meldet das Team aus der Seite und hält es in der Verlängerung", () => {
+  const teams = [];
+  const sf = new ShotsFiredServer({ onEvent: () => {}, onTeam: (t) => teams.push(t) });
+  sf.verarbeiten({ event: "team", data: "attack" }, { pfad: "/valorant" });
+  sf.verarbeiten({ event: "round_number", data: 1 }, { pfad: "/valorant" });
+  sf.verarbeiten({ event: "round_number", data: 25 }, { pfad: "/valorant" });
+  assert.deepEqual(teams, ["TEAM A"]);
+  assert.equal(sf.team(), "TEAM A");
+  assert.equal(sf.status().valorant.seite, "Angriff");
 });

@@ -6,6 +6,13 @@ const REPO = "Nomisimo/Advanced-Lan";
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
+  "1.0.3": [
+    "Mehrere Stats-Screens (bis zu 8): jeder mit eigener Größe in Pixeln (Full HD, 4K, Hochkant, Bauchbinde, Spielstand-Leiste, kleines Element oder frei), eigenem Layout, eigenem Pop-out-Fenster und eigener NDI-Quelle",
+    "Einzelne Elemente streamen: neuer Screen mit Inhalt „Nur: Spielstand“ (oder ein anderes Element), „Ganzen Screen füllen“ und Hintergrund „Transparent (Alpha)“. Die NDI-Quelle sendet dann mit Alpha-Kanal, vMix und OBS brauchen keinen Key",
+    "Größe eines Screens ändern: die Elemente bleiben in der Fläche, mit „Inhalt mitskalieren“ wachsen und schrumpfen Positionen, Größen und Schrift mit",
+    "Shots Fired (Valorant): versteht jetzt auch die Zähler kills, deaths und headshots (Kill mit Ace, Tod, Headshot) und round_number (Rundenstart), wenn Shots Fired keine Einzel-Events anbietet",
+    "Shots Fired (Valorant): team (Angriff oder Verteidigung) und ui_team_order_allies / _enemies stehen im Game-PC-Setup. Mit „Team automatisch“ folgt aus der Seite das Team dieses PCs, wenn der Riot Client keins liefert",
+  ],
   "1.0.2": [
     "Exklusives Vollbild: der Game-PC erkennt, wenn ein Spiel im exklusiven Vollbild läuft. Dort zeichnet Windows keine Fenster darüber, Mini-Overlay und Namens-Popup sind unsichtbar",
     "Das Namens-Popup wartet dann, bis das Spiel das Vollbild verlässt (Alt+Tab oder Spiel beendet), statt ungesehen abzulaufen",

@@ -160,10 +160,12 @@ const riot = new RiotClient({
 const riotAnwenden = () => { if (hatSpiele() && cfg.gamepc.bild.spiele.valorant?.teamAuto) riot.start(); else riot.stop(); };
 // Team eines Bild-Spiels: vom Riot Client erkannt (Valorant, wenn „automatisch“ an ist), sonst aus dem Setup
 let lolTeam = ''; // vom LoL-Client (Live Client Data API) erkanntes Team
+let sfTeam = ''; // Valorant: aus Shots Fired (Seite + Rundennummer) erkanntes Team
 const teamVon = (id) => {
   const sc = cfg?.gamepc.bild.spiele[id];
   if (id === 'lol' && lolTeam) return lolTeam; // LoL: Team kommt aus dem Spiel
-  return (sc?.teamAuto && id === 'valorant' && riot.status().team) || sc?.team;
+  // Valorant automatisch: Riot Client zuerst, sonst die Seite aus Shots Fired (team + round_number)
+  return (sc?.teamAuto && id === 'valorant' && (riot.status().team || sfTeam)) || sc?.team;
 };
 const bildQuelle = (id) => new BildQuelle(id, { team: teamVon(id), name: cfg?.gamepc.pcId || '' });
 const neueQuellen = () => { quellen = { dota2: new DotaQuelle(), ...Object.fromEntries(BILD_SPIELE.map((d) => [d.id, bildQuelle(d.id)])) }; };
@@ -183,7 +185,11 @@ const rlClient = new RlClient({ onNachricht: (m) => rlNachricht(m), onChange: st
 // Valorant über die Overwolf-App „Automation Overdrive“: läuft durch dieselbe Quelle wie die Bilderkennung
 const overdrive = new OverdriveServer({ onEvent: (event) => bildNachricht('valorant', { bild: true, event, seite: 'eigen', aktion: 'Automation Overdrive', quelle: 'overdrive' }), onChange: statusMelden });
 // Valorant, Fortnite, LoL und The Finals über die Overwolf-App „Shots Fired“ (Webhook): alle Overwolf-Events, dieselbe Quelle
-const shotsfired = new ShotsFiredServer({ onEvent: ({ spiel, event, seite }) => bildNachricht(spiel, { bild: true, event, seite, aktion: 'Shots Fired', quelle: 'shotsfired' }), onChange: statusMelden });
+const shotsfired = new ShotsFiredServer({
+  onEvent: ({ spiel, event, seite }) => bildNachricht(spiel, { bild: true, event, seite, aktion: 'Shots Fired', quelle: 'shotsfired' }),
+  onTeam: (team) => { sfTeam = team; if (quellen.valorant) quellen.valorant.team = teamVon('valorant'); statusMelden(); },
+  onChange: statusMelden,
+});
 // League of Legends über Riots Live Client Data API (https://127.0.0.1:2999): beste Quelle für LoL, Team kommt aus dem Spiel
 const lolClient = new LolClient({
   onNachricht: (n) => bildNachricht('lol', { bild: true, ...n, aktion: 'Live Client Data API', quelle: 'api' }),

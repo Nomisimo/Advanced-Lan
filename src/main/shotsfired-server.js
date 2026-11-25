@@ -2,15 +2,16 @@
 // Lauscht nur lokal (127.0.0.1 und ::1) auf Port 44207 und nimmt jede Anfrage an. Das Spiel steht im Pfad (/fortnite) oder in gameId.
 // Die letzten Anfragen bleiben im Speicher (status().roh), damit man im Setup sieht, was Shots Fired wirklich schickt.
 const http = require('http');
-const { shotsfiredNachrichten, sfZustaende } = require('../core/shotsfired');
+const { shotsfiredNachrichten, sfZustaende, sfInfo } = require('../core/shotsfired');
 
 const MAX_ROH = 30;
 const MAX_BODY = 64 * 1024;
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS', 'Access-Control-Allow-Headers': '*' };
 
 class ShotsFiredServer {
-  constructor({ onEvent, onChange }) {
+  constructor({ onEvent, onChange, onTeam }) {
     this.onEvent = onEvent;
+    this.onTeam = onTeam || (() => {});
     this.onChange = onChange || (() => {});
     this.server = [];
     this.port = null;
@@ -65,12 +66,15 @@ class ShotsFiredServer {
   }
 
   verarbeiten(daten, { methode = 'POST', pfad = '/' } = {}) {
+    const teamVorher = this.team();
     const { spiel, nachrichten } = shotsfiredNachrichten(daten, pfad, this.z);
     this.anfragen++;
     const text = typeof daten === 'string' ? daten : JSON.stringify(daten);
     this.roh.unshift({ t: Date.now(), methode, pfad: String(pfad).slice(0, 200), body: text.slice(0, 2000), spiel, events: nachrichten.map((n) => n.event + (n.seite === 'gegner' ? ' (Gegner)' : '')) });
     this.roh.length = Math.min(this.roh.length, MAX_ROH);
     if (nachrichten.length) { this.letzte = Date.now(); this.spiele[spiel] = this.letzte; }
+    // Neues Team zuerst, damit die Events schon mit dem richtigen Team laufen
+    if (this.team() !== teamVorher) this.onTeam(this.team());
     for (const n of nachrichten) this.onEvent({ spiel, ...n });
     this.onChange();
   }
@@ -81,8 +85,17 @@ class ShotsFiredServer {
     await Promise.all(alle.map((s) => new Promise((r) => { s.close(() => r()); s.closeAllConnections?.(); })));
   }
 
+  // Valorant-Team dieses PCs aus der Seite (team) und der Rundennummer, sonst ""
+  // In der Verlängerung bleibt das zuletzt erkannte Team, ein neues Match (keine Seite mehr) setzt es zurück.
+  team() {
+    const i = sfInfo(this.z.valorant);
+    if (!i.seite) this.letztesTeam = '';
+    else if (i.team) this.letztesTeam = i.team;
+    return this.letztesTeam || '';
+  }
+
   status() {
-    return { laeuft: this.server.length > 0, port: this.port, fehler: this.fehler, letzte: this.letzte, spiele: { ...this.spiele }, anfragen: this.anfragen, roh: this.roh.slice(0, 10) };
+    return { valorant: { ...sfInfo(this.z.valorant), team: this.team() }, laeuft: this.server.length > 0, port: this.port, fehler: this.fehler, letzte: this.letzte, spiele: { ...this.spiele }, anfragen: this.anfragen, roh: this.roh.slice(0, 10) };
   }
 }
 

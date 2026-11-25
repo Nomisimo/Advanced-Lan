@@ -38,3 +38,20 @@ test('Valorant: Team automatisch ist Standard, abschaltbar, nur für Riot-Spiele
   assert.strictEqual(migrateBild({ spiele: { valorant: { team: 'TEAM B', teamAuto: false } } }).spiele.valorant.teamAuto, false);
   assert.strictEqual(migrateBild({ spiele: { valorant: { team: 'TEAM B' } } }).spiele.valorant.teamAuto, true);
 });
+
+test("teamMeldung: Team steht fest, einmal je Match und Team", () => {
+  const { teamMeldung } = require("../src/core/riot-team");
+  let z = { team: "", match: "" };
+  const schritt = (team, match) => { const r = teamMeldung(z, { team, match }); z = r.zustand; return r.melden; };
+  assert.equal(schritt("", ""), false); // noch nichts erkannt
+  assert.equal(schritt("TEAM A", ""), true); // Agentenwahl: Team kommt vor dem Match
+  assert.equal(schritt("TEAM A", ""), false);
+  assert.equal(schritt("TEAM A", "m1"), false); // MatchID des laufenden Spiels dazu: dasselbe Match
+  assert.equal(schritt("", "m1"), false); // Riot Client kurz weg
+  assert.equal(schritt("TEAM A", "m1"), false); // wieder da, gleiches Match
+  assert.equal(schritt("TEAM B", "m1"), true); // Team gewechselt
+  assert.equal(schritt("", ""), false); // Match vorbei
+  assert.equal(schritt("TEAM B", ""), true); // nächste Agentenwahl, auch mit demselben Team
+  assert.equal(schritt("TEAM B", "m2"), false);
+  assert.equal(schritt("TEAM B", "m3"), true); // neues Match ohne Pause dazwischen
+});

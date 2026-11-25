@@ -444,7 +444,7 @@ function AktionBearbeiten({ def, a, aendern, entfernen, bereich: b, waehleBereic
       <div style={{ display: "grid", gridTemplateColumns: mitSeite ? "1fr 120px" : "1fr", gap: 8, marginBottom: 10 }}>
         <Field label="Event an die Regie">
           <select style={S.selectSm} value={a.event} onChange={(e) => aendern((x) => { x.event = e.target.value; })}>
-            {gruppen.map((gr) => <optgroup key={gr} label={gr}>{def.events.filter((e) => e.gruppe === gr && e.id !== "match_start").map((e) => <option key={e.id} value={e.id}>{e.label}</option>)}</optgroup>)}
+            {gruppen.map((gr) => <optgroup key={gr} label={gr}>{def.events.filter((e) => e.gruppe === gr && e.id !== "match_start" && !e.auto).map((e) => <option key={e.id} value={e.id}>{e.label}</option>)}</optgroup>)}
           </select>
         </Field>
         {mitSeite && <Field label="Team">

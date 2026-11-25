@@ -25,7 +25,8 @@ const BILD_SPIELE = [
     id: "valorant", name: "Valorant", kurz: "VAL", farbe: "#ff4655", teams: ["TEAM A", "TEAM B"],
     exe: "valorant-win64-shipping.exe", fenster: "VALORANT", riot: true, // riot: Team kann der Riot Client liefern (riot-team.js)
     events: [
-      M("match_start", "Match startet"), M("match_won", "Match gewonnen", { team: true, art: "matchende" }),
+      // team: kommt nicht aus der Bilderkennung, sondern vom Game-PC, sobald das Team automatisch erkannt ist (vor match_start)
+      M("team", "Team steht fest", { team: true, auto: true }), M("match_start", "Match startet"), M("match_won", "Match gewonnen", { team: true, art: "matchende" }),
       R("round_start", "Kaufphase (Runde startet)", { art: "start" }), R("round_end", "Runde gewonnen", { team: true, art: "ende" }),
       R("spike_planted", "Spike gelegt"), R("spike_defused", "Spike entschärft"), R("spike_detonated", "Spike explodiert"),
       P("kill", "Kill"), P("death", "Spieler stirbt"), P("ace", "Ace"), P("clutch", "Clutch"), P("thrifty", "Thrifty"),

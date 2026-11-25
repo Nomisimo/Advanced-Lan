@@ -52,7 +52,9 @@ const ZAEHLER = { kills: "kill", deaths: "death", headshots: "headshot" };
 const ZAEHLER_KEYS = Object.keys(ZAEHLER);
 // Dazu Infos ohne eigenen Cue: team (Seite: Angriff oder Verteidigung) und ui_team_order_allies / _enemies (Spieler beider Teams)
 const TEAM_KEYS = ["team", "ui_team_order_allies", "ui_team_order_enemies"];
-const VAL = { events: SF_EVENTS, infos: [...SCORE_KEYS, "round_phase", "kill_feed", ...ZAEHLER_KEYS, "round_number", ...TEAM_KEYS] };
+// Match-ID aus GEP match_info: gleiche ID = gleiches Match, damit die Regie die PCs nach Match trennt (ohne Riot Client)
+const MATCH_KEYS = ["match_id", "pseudo_match_id"];
+const VAL = { events: SF_EVENTS, infos: [...SCORE_KEYS, "round_phase", "kill_feed", ...ZAEHLER_KEYS, "round_number", ...TEAM_KEYS, ...MATCH_KEYS] };
 const SIEG_RUNDEN = 13;
 
 const norm = (s) => String(s ?? "").trim().toLowerCase().replace(/[\s\-.]+/g, "_");
@@ -128,7 +130,7 @@ const ZAEHLER_FENSTER = 3000;
 const neueZaehler = () => ({ kills: null, deaths: null, headshots: null, runde: null });
 const neueEcht = () => ({ kill: false, death: false, headshot: false });
 // info: Seite und Spieler aus team und ui_team_order (nur zur Anzeige und für das Team dieses PCs)
-const neueInfo = () => ({ seite: "", verbuendete: [], gegner: [] });
+const neueInfo = (match = "", pseudo = "") => ({ seite: "", verbuendete: [], gegner: [], match, pseudo });
 const sfZustand = () => ({ score: null, entschieden: false, phase: "", r: neueRunde(), z: neueZaehler(), echt: neueEcht(), info: neueInfo() });
 
 // team → "Angriff", "Verteidigung" oder "" (Overwolf schreibt attack/attacker/defense/defender, sicherheitshalber auch Deutsch)
@@ -163,7 +165,7 @@ function teamAusSeite(seite, runde) {
 // Was Shots Fired über die Teams weiß: { seite, team, verbuendete, gegner }
 function sfInfo(z) {
   const i = z?.info || neueInfo();
-  return { seite: i.seite, team: teamAusSeite(i.seite, z?.z?.runde), verbuendete: [...i.verbuendete], gegner: [...i.gegner] };
+  return { seite: i.seite, team: teamAusSeite(i.seite, z?.z?.runde), verbuendete: [...i.verbuendete], gegner: [...i.gegner], match: i.match || i.pseudo || "" };
 }
 // Zahl aus einem Wert: 3, "3", { kills: 3 } oder JSON-Text
 function zahlVon(v, key) {
@@ -228,6 +230,11 @@ function shotsfiredEvents(body, z = sfZustand(), jetzt = Date.now()) {
       continue;
     }
     if (key === "team") { const s = seiteVon(value); if (s) z.info.seite = s; continue; }
+    if (MATCH_KEYS.includes(key)) {
+      const v = json(value), id = String((v && typeof v === "object" ? v[key] : v) ?? "").trim().slice(0, 100);
+      if (id && id !== "null") z.info[key === "match_id" ? "match" : "pseudo"] = id;
+      continue;
+    }
     if (key === "ui_team_order_allies" || key === "ui_team_order_enemies") {
       const liste = spielerVon(value);
       if (liste.length) z.info[key.endsWith("allies") ? "verbuendete" : "gegner"] = liste;
@@ -273,7 +280,7 @@ function shotsfiredEvents(body, z = sfZustand(), jetzt = Date.now()) {
   for (const { name: n } of events) {
     const id = eventName(n);
     if (schlucken[id]) { schlucken[id]--; continue; }
-    if (id === "match_start") { z.score = null; z.entschieden = false; z.phase = ""; z.r = neueRunde(); z.z = neueZaehler(); z.info = neueInfo(); raus.push({ event: id, seite: "eigen" }); }
+    if (id === "match_start") { z.score = null; z.entschieden = false; z.phase = ""; z.r = neueRunde(); z.z = neueZaehler(); z.info = neueInfo(z.info?.match, z.info?.pseudo); raus.push({ event: id, seite: "eigen" }); }
     else if (id === "kill") kill();
     else if (id === "death") tod();
     else if (id === "match_end") {

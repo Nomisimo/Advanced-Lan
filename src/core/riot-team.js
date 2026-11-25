@@ -48,4 +48,20 @@ const appTeam = (teamId) => RIOT_TEAMS[teamId] || "";
 // Plattform-Header, den die GLZ-Server erwarten (base64 von JSON)
 const CLIENT_PLATFORM = { platformType: "PC", platformOS: "Windows", platformOSVersion: "10.0.19042.1.256.64bit", platformChipset: "Unknown" };
 
-module.exports = { RIOT_TEAMS, RIOT_FARBE, parseLockfile, parseGlz, valorantVersion, eigeneTeamId, appTeam, CLIENT_PLATFORM };
+
+// Event „Team steht fest“ (valorant/team): einmal je Match und Team, sobald das Team dieses PCs automatisch erkannt ist.
+// Riot Client: schon in der Agentenwahl (vor match_start), Shots Fired: mit der ersten Seite (team) und Rundennummer.
+// vorher/jetzt: { team, match }. team "" = gerade unbekannt (zwischen zwei Matches, Riot Client kurz weg).
+// Gemeldet wird, wenn das Team wechselt oder ein neues Match anfängt. Kommt zur Agentenwahl (ohne MatchID) nur die
+// MatchID des laufenden Spiels dazu, ist es dasselbe Match. → { melden, zustand }
+function teamMeldung(vorher = { team: "", match: "" }, jetzt = { team: "", match: "" }) {
+  const team = String(jetzt.team || ""), match = String(jetzt.match || "");
+  const alt = { team: String(vorher?.team || ""), match: String(vorher?.match || "") };
+  if (!team) return { melden: false, zustand: { team: "", match } }; // ohne MatchID (Match vorbei) zählt das nächste Team neu
+  const zustand = { team, match: match || alt.match };
+  if (alt.team === team && (match === alt.match || !match || !alt.match)) return { melden: false, zustand };
+  if (!alt.team && match && match === alt.match) return { melden: false, zustand }; // dasselbe Match, Team war kurz weg
+  return { melden: true, zustand };
+}
+
+module.exports = { teamMeldung, RIOT_TEAMS, RIOT_FARBE, parseLockfile, parseGlz, valorantVersion, eigeneTeamId, appTeam, CLIENT_PLATFORM };

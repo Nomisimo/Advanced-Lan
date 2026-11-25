@@ -24,7 +24,7 @@ class DotaSimMatch {
     this.ereignisse = [];
     this.runde = 0; // Abschnitte
     this.gestartet = false;
-    this.spieler = clients.map((c, i) => ({ token: c.token, steamid: `7656119800000${String(i).padStart(4, "0")}`, name: NAMEN[i % NAMEN.length], seite: SEITE[i < 5 ? 0 : 1], held: HELDEN[i % HELDEN.length], kills: 0, deaths: 0, assists: 0, streak: 0 }));
+    this.spieler = clients.map((c, i) => ({ token: c.token, steamid: `7656119800000${String(i).padStart(4, "0")}`, name: c.name || NAMEN[i % NAMEN.length], seite: SEITE[c.team ?? (i < 5 ? 0 : 1)], held: HELDEN[i % HELDEN.length], kills: 0, deaths: 0, assists: 0, streak: 0 }));
     this.gebaeude = { radiant: new Set(TUERME("radiant")), dire: new Set(TUERME("dire")) };
   }
 

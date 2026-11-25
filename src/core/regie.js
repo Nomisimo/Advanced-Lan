@@ -127,10 +127,11 @@ class Regie {
   }
 
   // Ereignis eines Game-PCs. Nur das aktive Spiel erzeugt Signale, alles andere wird verworfen.
-  pcEvent(pcId, spiel, ev) {
+  // sim: vom Simulator der Regie im Namen dieses PCs erzeugt
+  pcEvent(pcId, spiel, ev, { sim = false } = {}) {
     const p = this.pcs.get(pcId);
     if (p) { p.t = this.now(); p.spiel = spiel; }
-    const e = { ...ev, spiel, pc: pcId, pcId }, quelle = p?.sim ? "sim" : "pc";
+    const e = { ...ev, spiel, pc: pcId, pcId }, quelle = sim || p?.sim ? "sim" : "pc";
     if (spiel !== this.aktiv()) return this.verwerfen(e, "anderes Spiel", quelle);
     this.matchAktualisieren();
     if (this.imAnderenMatch(pcId)) return this.verwerfen(e, "anderes Match", quelle);

@@ -10,6 +10,7 @@
 //   geraetName,          // Name dazu (zur Anzeige, falls das Gerät gerade fehlt)
 //   lautstaerke,         // 0 … 1
 //   abbrechen,           // ein neuer Sound beendet den laufenden
+//   beimTest,            // Tab „Signale“: der Test-Knopf spielt die Sounds des Events mit
 //   dateien: [{ id, spiel, event, pfad, url, name, an }]  // event "" = keinem Event zugeordnet
 // }
 const { SPIEL_BY_ID } = require("./spiele");
@@ -17,7 +18,7 @@ const { SPIEL_BY_ID } = require("./spiele");
 const SOUND_ENDUNGEN = ["wav", "mp3", "ogg", "oga", "m4a", "aac", "flac", "opus", "webm"];
 const MAX_DATEIEN = 500;
 
-const standardSound = () => ({ an: false, nurScharf: true, geraet: "", geraetName: "", lautstaerke: 1, abbrechen: true, dateien: [] });
+const standardSound = () => ({ an: false, nurScharf: true, geraet: "", geraetName: "", lautstaerke: 1, abbrechen: true, beimTest: true, dateien: [] });
 
 const istSound = (name) => SOUND_ENDUNGEN.includes(String(name || "").split(".").pop().toLowerCase());
 const norm = (s) => String(s ?? "").trim().toLowerCase().replace(/[\s\-.]+/g, "_");
@@ -72,6 +73,17 @@ function soundFuer(sound, eintrag, rnd = Math.random()) {
   return passend[Math.min(passend.length - 1, Math.floor(rnd * passend.length))];
 }
 
+// Eingeschaltete Sounds eines Events (unabhängig von „Sounds an“ und scharfer Ausgabe)
+const soundsVon = (sound, spiel, event) => (sound?.dateien || []).filter((d) => d.an && d.spiel === spiel && d.event === event && d.url);
+
+// Test im Tab „Signale“: ein eingeschalteter Sound des Events, auch wenn „Sounds an“ aus oder die Ausgabe nicht scharf ist.
+// Mit „beimTest“ aus: null.
+function soundZumTest(sound, spiel, event, rnd = Math.random()) {
+  if (!sound || sound.beimTest === false) return null;
+  const l = soundsVon(sound, spiel, event);
+  return l.length ? l[Math.min(l.length - 1, Math.floor(rnd * l.length))] : null;
+}
+
 function migrateSound(s) {
   const d = standardSound();
   if (!s || typeof s !== "object") return d;
@@ -83,9 +95,10 @@ function migrateSound(s) {
     geraetName: typeof s.geraetName === "string" ? s.geraetName : "",
     lautstaerke: Number.isFinite(zahl) ? Math.max(0, Math.min(1, zahl)) : 1,
     abbrechen: s.abbrechen !== false,
+    beimTest: s.beimTest !== false,
     dateien: (Array.isArray(s.dateien) ? s.dateien : []).filter((x) => x && typeof x.pfad === "string" && typeof x.spiel === "string").slice(0, MAX_DATEIEN)
       .map((x) => ({ id: typeof x.id === "string" && x.id ? x.id : uid(), spiel: x.spiel, event: typeof x.event === "string" ? x.event : "", pfad: x.pfad, url: typeof x.url === "string" ? x.url : "", name: typeof x.name === "string" && x.name ? x.name : x.pfad.split(/[\\/]/).pop(), an: x.an === true })),
   };
 }
 
-module.exports = { SOUND_ENDUNGEN, MAX_DATEIEN, standardSound, migrateSound, istSound, eventVonOrdner, dateienAufnehmen, nachEvent, soundFuer };
+module.exports = { SOUND_ENDUNGEN, MAX_DATEIEN, standardSound, migrateSound, istSound, eventVonOrdner, dateienAufnehmen, nachEvent, soundFuer, soundsVon, soundZumTest };

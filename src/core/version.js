@@ -6,6 +6,12 @@ const REPO = "Nomisimo/Advanced-Lan";
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
+  "1.0.6": [
+    "Simulator der Regie spielt mit den verbundenen Session-PCs: ihre PC-IDs (Plätze aus dem Plan, {nr}, {plan}, PC-Filter), Spielernamen und Teams. Bots füllen bis zur Matchgröße auf. Ohne Session-PCs wie bisher „SIM 01“ und folgende",
+    "Simulator: „Event auslösen“ als bestimmter PC, Zurücksetzen gibt den Session-PCs ihren eigenen Stand zurück",
+    "Tab „Signale“: Checkbox „Beim Test auch den Sound spielen“. Der Test-Knopf spielt dann einen eingeschalteten Sound des Events mit, auch bei Ausgabe aus",
+    "Tab „Signale“: Lautsprecher-Knopf mit Anzahl an jedem Event, das Sounds hat. Ein Klick spielt einen davon",
+  ],
   "1.0.5": [
     "Sound-Player in der Regie: beim Event spielt automatisch ein Sound, auf einem wählbaren Ausgabegerät (z. B. Dante Virtual Soundcard). Einstellungen im Tab „Stats-Screen“ unter „Sound“",
     "Sound-Ordner wählen: Unterordner mit dem Namen eines Events (kill, ace, spike_planted, victory …) werden automatisch zugeordnet. Sounds nach Event sortiert, jeder einzeln an/aus, Probehören, Lautstärke, Stopp. Mehrere Sounds je Event: einer zufällig. Standardmäßig nur bei scharfer Ausgabe",

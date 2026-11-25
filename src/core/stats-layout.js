@@ -7,6 +7,7 @@
 const B = 1920, H = 1080;
 const F0 = { b: B, h: H };
 const MIN = 40; // kleinste Breite und Höhe eines Elements
+const MAX_KOPIEN = 24; // hinzugefügte Anzeigen (Kopien) je Screen
 const MAX_TEXTE = 30;
 const MAX_BILDER = 12; // Bild-Blöcke
 const MAX_SPIELER = 12; // Spieler-Karten
@@ -54,11 +55,17 @@ const flaecheVon = (f) => ({ b: zahl(f?.b, B, MIN, 8192), h: zahl(f?.h, H, MIN, 
 const farbe = (v, std) => (typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v) ? v.toLowerCase() : std);
 
 // Darstellung, die jedes Element hat: Deckkraft des ganzen Elements, Transparenz und Ecken der Kacheln, Rahmen,
-// Schrift- und Akzentfarbe ("" = Standard der Anzeige)
-const STIL = { deckkraft: 100, kachel: 92, ecken: 18, rahmen: true, schrift: "", akzent: "" };
+// Schrift- und Akzentfarbe ("" = Standard der Anzeige), eigener Verlauf hinter oder vor dem Inhalt (verlaufLage, verlauf)
+const STIL = { deckkraft: 100, kachel: 92, ecken: 18, rahmen: true, schrift: "", akzent: "", verlaufLage: "aus" };
+// Lage eines eigenen Verlaufs: aus, hinter dem Inhalt/Bild, vor dem Inhalt/Bild (als Überlagerung)
+const VERLAUF_LAGEN = [["aus", "Kein Verlauf"], ["hinter", "Dahinter"], ["vor", "Davor"]];
+const verlaufLage = (v) => (VERLAUF_LAGEN.some(([k]) => k === v) ? v : "aus");
+// Verlauf für ein Element, wenn noch keiner gesetzt ist: Lila nach durchsichtig
+const elementVerlauf = () => ({ art: "linear", winkel: 90, x: 50, y: 50, stopps: [{ farbe: "#9d5cff", pos: 0, alpha: 60 }, { farbe: "#9d5cff", pos: 100, alpha: 0 }] });
 function migrateStil(e) {
   const f = (v) => (v === "" || v == null ? "" : farbe(v, ""));
-  return { deckkraft: zahl(e.deckkraft, 100, 0, 100), kachel: zahl(e.kachel, STIL.kachel, 0, 100), ecken: zahl(e.ecken, STIL.ecken, 0, 80), rahmen: e.rahmen !== false, schrift: f(e.schrift), akzent: f(e.akzent) };
+  return { deckkraft: zahl(e.deckkraft, 100, 0, 100), kachel: zahl(e.kachel, STIL.kachel, 0, 100), ecken: zahl(e.ecken, STIL.ecken, 0, 80), rahmen: e.rahmen !== false, schrift: f(e.schrift), akzent: f(e.akzent),
+    verlaufLage: verlaufLage(e.verlaufLage), ...(e.verlauf || verlaufLage(e.verlaufLage) !== "aus" ? { verlauf: migrateVerlauf(e.verlauf, elementVerlauf()) } : {}) };
 }
 // Eigene Einstellungen einzelner Anzeigen (0 bei Zeilen/Anzahl: automatisch nach Höhe)
 // Texte (Zeichenketten) können Platzhalter wie {spiel} enthalten, leer = nichts anzeigen
@@ -74,6 +81,18 @@ const OPTIONEN = {
   teams: { kopf: true, zahlen: true, textLeer: "Noch keine Spieler." },
   mvp: { nurEnde: false, punkte: true, kd: true, headshots: true, team: true, zeilen: 0, textLeer: "Noch keine Spielerdaten.", textMvp: "MVP des Matches" },
 };
+// Teams in Spielstand und Teams-Liste: Benennung, eigene Namen, Texte für die Seiten (Valorant) und Farbe je Team ("" = Standard)
+// benennung: "auto" = nach Spiel (Valorant: Angriff/Verteidigung, sobald die Seite bekannt ist), "spiel" = immer die Teamnamen des Spiels.
+// name1/name2 überschreiben den Namen von Hand (leer = Name nach Spiel)
+const TEAM_TYPEN = new Set(["spielstand", "teams"]);
+const BENENNUNGEN = [["auto", "Nach Spiel (Valorant: Angriff / Verteidigung)"], ["spiel", "Teamnamen des Spiels (z. B. TEAM A / TEAM B)"]];
+const TEAM_OPTIONEN = { benennung: "auto", name1: "", name2: "", textAngriff: "ANGRIFF", textVerteidigung: "VERTEIDIGUNG", farbe1: "", farbe2: "" };
+function migrateTeamOptionen(e) {
+  const t = (v, std) => (typeof v === "string" ? v.slice(0, 40) : std);
+  const f = (v) => (v === "" || v == null ? "" : farbe(v, ""));
+  return { benennung: BENENNUNGEN.some(([k]) => k === e.benennung) ? e.benennung : "auto", name1: t(e.name1, ""), name2: t(e.name2, ""),
+    textAngriff: t(e.textAngriff, TEAM_OPTIONEN.textAngriff), textVerteidigung: t(e.textVerteidigung, TEAM_OPTIONEN.textVerteidigung), farbe1: f(e.farbe1), farbe2: f(e.farbe2) };
+}
 // Spieler-Karte: welcher Spieler (quelle "rang" + rang oder PC-ID) und welche Zahlen
 const SPIELER_OPTIONEN = { team: true, seite: true, kills: true, tode: true, headshots: true, kd: true };
 // Einzelwert: welcher Wert (core/stats-screen.js WERTE), für Spielerwerte welcher Spieler, Beschriftung
@@ -92,7 +111,17 @@ const neueId = (p = "t") => `${p}${Date.now().toString(36)}${(zaehler++).toStrin
 
 function anzeigeStandard(a) {
   const { typ, x, y, b, h, titel, aus } = a;
-  return { id: typ, typ, x, y, b, h, sichtbar: !aus, skalieren: true, zoom: 100, ...(titel ? { titel } : {}), ...STIL, ...(OPTIONEN[typ] || {}) };
+  return { id: typ, typ, x, y, b, h, sichtbar: !aus, skalieren: true, zoom: 100, ...(titel ? { titel } : {}), ...STIL, ...(OPTIONEN[typ] || {}), ...(TEAM_TYPEN.has(typ) ? TEAM_OPTIONEN : {}) };
+}
+
+// Anzeige als weiteres Element hinzufügen (z. B. ein zweiter Spielstand mit anderen Einstellungen), anteilig auf die Fläche gesetzt
+function neueAnzeige(typ, over = {}, flaeche) {
+  const F = flaecheVon(flaeche);
+  const a = ANZEIGE[typ];
+  if (!a) return null;
+  const st = anzeigeStandard(a);
+  const k = kasten({ x: st.x * (F.b / B), y: st.y * (F.h / H), b: st.b * (F.b / B), h: st.h * (F.h / H) }, F);
+  return { ...st, ...k, id: neueId("a"), sichtbar: true, ...over };
 }
 
 function neuerText(over = {}, flaeche) {
@@ -134,7 +163,7 @@ function neuerWert(over = {}, flaeche) {
 }
 
 function standardHg() {
-  return { farbe: "#1b1922", verlauf: standardVerlauf(), bild: "", passung: "fuellen", abdunkeln: 0, verlaufDrueber: false };
+  return { farbe: "#1b1922", verlauf: standardVerlauf(), bild: "", passung: "fuellen", abdunkeln: 0, verlaufLage: "aus" };
 }
 
 // Standard-Layout; auf einer anderen Fläche werden die Anzeigen anteilig gesetzt
@@ -160,8 +189,7 @@ function einzelLayout(typ, flaeche) {
 const istBild = (v) => typeof v === "string" && v.length <= BILD_MAX && BILD_RE.test(v);
 const bildId = (v) => (typeof v === "string" && /^[\w-]{1,40}$/.test(v) ? v : "");
 
-function migrateVerlauf(v) {
-  const std = standardVerlauf();
+function migrateVerlauf(v, std = standardVerlauf()) {
   if (!v || typeof v !== "object") return std;
   let stopps = (Array.isArray(v.stopps) ? v.stopps : []).filter((st) => st && typeof st === "object").slice(0, MAX_STOPPS)
     .map((st) => ({ farbe: farbe(st.farbe, "#000000"), pos: zahl(st.pos, 0, 0, 100), alpha: zahl(st.alpha, 100, 0, 100) }));
@@ -173,7 +201,9 @@ function migrateVerlauf(v) {
 function migrateHg(h) {
   const std = standardHg();
   if (!h || typeof h !== "object") return std;
-  return { farbe: farbe(h.farbe, std.farbe), verlauf: migrateVerlauf(h.verlauf), bild: bildId(h.bild), passung: h.passung === "einpassen" ? "einpassen" : "fuellen", abdunkeln: zahl(h.abdunkeln, 0, 0, 90), verlaufDrueber: !!h.verlaufDrueber };
+  return { farbe: farbe(h.farbe, std.farbe), verlauf: migrateVerlauf(h.verlauf), bild: bildId(h.bild), passung: h.passung === "einpassen" ? "einpassen" : "fuellen", abdunkeln: zahl(h.abdunkeln, 0, 0, 90),
+    // ältere Versionen: verlaufDrueber (true = Verlauf über dem Bild)
+    verlaufLage: h.verlaufLage != null ? verlaufLage(h.verlaufLage) : h.verlaufDrueber ? "vor" : "aus" };
 }
 
 // #rrggbb und Deckkraft (0–100) → rgba(…)
@@ -237,7 +267,7 @@ function migrateLayout(l, flaeche) {
   const bilder = {};
   const nimmBild = (id) => { const k = bildId(id); if (k && istBild(quelle[k])) { bilder[k] = quelle[k]; return k; } return ""; };
   const gesehen = new Set(), out = [];
-  let texte = 0, bloecke = 0, karten = 0, werte = 0;
+  let texte = 0, bloecke = 0, karten = 0, werte = 0, kopien = 0;
   const eigeneId = (e, p) => {
     const id = typeof e.id === "string" && e.id && !gesehen.has(e.id) && !ANZEIGE[e.id] ? e.id.slice(0, 40) : neueId(p);
     gesehen.add(id);
@@ -275,11 +305,17 @@ function migrateLayout(l, flaeche) {
       out.push({ id: eigeneId(e, "w"), typ: "wert", ...kasten(e, F), sichtbar: e.sichtbar !== false, wert: WERT_KEYS.includes(e.wert) ? e.wert : "score1",
         quelle: quelleVon(e.quelle), rang: zahl(e.rang, 1, 1, 20), beschriftung: e.beschriftung !== false, text: typeof e.text === "string" ? e.text.slice(0, OPTION_TEXT_MAX) : "",
         farbe: farbe(e.farbe, "#ffffff"), ausrichtung: AUSRICHTUNG.includes(e.ausrichtung) ? e.ausrichtung : "mitte", panel: !!e.panel, ...migrateStil(e) });
-    } else if (ANZEIGE[e.typ] && !gesehen.has(e.typ)) {
-      gesehen.add(e.typ);
+    } else if (ANZEIGE[e.typ]) {
+      // Die erste Anzeige eines Typs hat die ID des Typs; weitere sind hinzugefügte Kopien mit eigener ID und eigenen Einstellungen
+      // ohne eigene ID (oder mit der ID des Typs) ist es die Basis-Anzeige; eine doppelte fällt weg
+      const basis = e.id === e.typ || e.id == null;
+      if (basis ? gesehen.has(e.typ) : kopien >= MAX_KOPIEN) continue;
+      if (!basis) kopien++;
+      const id = basis ? e.typ : eigeneId(e, "a");
+      if (basis) gesehen.add(e.typ);
       const a = ANZEIGE[e.typ];
-      out.push({ id: e.typ, typ: e.typ, ...kasten(e, F), sichtbar: e.sichtbar !== false, skalieren: e.skalieren !== false, zoom: zahl(e.zoom, 100, ZOOM_MIN, ZOOM_MAX),
-        ...(a.titel ? { titel: typeof e.titel === "string" ? e.titel.slice(0, 80) : a.titel } : {}), ...migrateStil(e), ...migrateOptionen(e.typ, e) });
+      out.push({ id, typ: e.typ, ...kasten(e, F), sichtbar: e.sichtbar !== false, skalieren: e.skalieren !== false, zoom: zahl(e.zoom, 100, ZOOM_MIN, ZOOM_MAX),
+        ...(a.titel ? { titel: typeof e.titel === "string" ? e.titel.slice(0, 80) : a.titel } : {}), ...migrateStil(e), ...migrateOptionen(e.typ, e), ...(TEAM_TYPEN.has(e.typ) ? migrateTeamOptionen(e) : {}) });
     }
   }
   for (const a of ANZEIGEN) if (!gesehen.has(a.typ)) { const st = anzeigeStandard(a); out.push({ ...st, ...kasten(st, F), sichtbar: false }); }
@@ -340,6 +376,6 @@ function einrasten(k, andere, { raster = 0, abstand = 8, kanten = null, flaeche 
 }
 
 module.exports = {
-  STIL, OPTIONEN, OPTION_TEXT_MAX, migrateStil, B, H, MIN, MAX_TEXTE, MAX_BILDER, MAX_SPIELER, MAX_WERTE, SPIELER_OPTIONEN, WERT_KEYS, neuerSpieler, neuerWert, MAX_STOPPS, BILD_MAX, ZOOM_MIN, ZOOM_MAX, ANZEIGEN, ANZEIGE, HINTERGRUENDE, VERLAUF_ARTEN, VERLAUF_VORLAGEN, PASSUNGEN, AUSRICHTUNG, PLATZHALTER,
+  STIL, MAX_KOPIEN, neueAnzeige, TEAM_TYPEN, TEAM_OPTIONEN, BENENNUNGEN, VERLAUF_LAGEN, elementVerlauf, OPTIONEN, OPTION_TEXT_MAX, migrateStil, B, H, MIN, MAX_TEXTE, MAX_BILDER, MAX_SPIELER, MAX_WERTE, SPIELER_OPTIONEN, WERT_KEYS, neuerSpieler, neuerWert, MAX_STOPPS, BILD_MAX, ZOOM_MIN, ZOOM_MAX, ANZEIGEN, ANZEIGE, HINTERGRUENDE, VERLAUF_ARTEN, VERLAUF_VORLAGEN, PASSUNGEN, AUSRICHTUNG, PLATZHALTER,
   standardLayout, einzelLayout, flaecheVon, standardHg, migrateLayout, migrateVerlauf, neuerText, neuesBild, textEinsetzen, einrasten, verlaufCss, farbeBei, rgba, inhaltsSkala, istBild, bilderAufraeumen, neueId,
 };

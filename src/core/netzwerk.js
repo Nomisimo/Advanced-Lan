@@ -43,4 +43,17 @@ function zielHinweis(host, karte) {
   return imSubnetz(host, karte) ? "" : `${host} liegt nicht im Netz von „${karte.name}“ (${karte.ip}/${karte.maske}). Das Betriebssystem leitet dann nach seiner Routing-Tabelle.`;
 }
 
-module.exports = { kartenListe, imSubnetz, karteFuer, lokaleIp, waehleAdresse, zielHinweis, istIpv4 };
+// NDI auf eine Netzwerkkarte festlegen: Inhalt der ndi-config.v1.json (NDI SDK, Verzeichnis per NDI_CONFIG_DIR).
+// basis: vorhandene Konfiguration des PCs (z. B. Discovery-Server), bleibt erhalten; ip leer = alle Karten (NDI entscheidet).
+function ndiKonfig(basis, ip) {
+  const k = basis && typeof basis === "object" && !Array.isArray(basis) ? JSON.parse(JSON.stringify(basis)) : {};
+  const ndi = k.ndi && typeof k.ndi === "object" ? k.ndi : {};
+  const adapters = ndi.adapters && typeof ndi.adapters === "object" ? { ...ndi.adapters } : {};
+  if (istIpv4(ip)) adapters.allowed = [ip];
+  else delete adapters.allowed;
+  k.ndi = { ...ndi, adapters };
+  if (!Object.keys(adapters).length) delete k.ndi.adapters;
+  return k;
+}
+
+module.exports = { ndiKonfig, kartenListe, imSubnetz, karteFuer, lokaleIp, waehleAdresse, zielHinweis, istIpv4 };

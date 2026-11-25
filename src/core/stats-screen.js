@@ -154,6 +154,37 @@ function teamListen(status, spiel) {
   return out;
 }
 
+// Valorant: welche Seite jedes Team gerade spielt → { "TEAM A": "Angriff", "TEAM B": "Verteidigung" }, sonst {}.
+// Zuerst, was Shots Fired von einem Game-PC meldet (Team und Seite), sonst aus der Runde:
+// TEAM A beginnt im Angriff, nach Runde 12 wechseln die Seiten; in der Verlängerung ist es zu unsicher.
+function teamSeiten(status, spiel) {
+  if (spiel?.id !== "valorant" || !(spiel.teams?.length >= 2)) return {};
+  const [t1, t2] = spiel.teams;
+  const gegen = (s) => (s === "Angriff" ? "Verteidigung" : "Angriff");
+  const beide = (team, seite) => ({ [team]: seite, [team === t1 ? t2 : t1]: gegen(seite) });
+  for (const pc of status?.pcs || []) {
+    const sf = pc.spiel === spiel.id && pc.stand?.sf;
+    if (sf && (sf.team === t1 || sf.team === t2) && (sf.seite === "Angriff" || sf.seite === "Verteidigung")) return beide(sf.team, sf.seite);
+  }
+  const st = status?.statistik?.spiel === spiel.id ? status.statistik : null;
+  const sd = status?.stand?.spiel === spiel.id ? status.stand : null;
+  const runde = Number(st?.runde?.nr ?? sd?.runde ?? sd?.sf?.runde);
+  if (!Number.isFinite(runde) || runde < 1 || runde > 24) return {};
+  return beide(t1, runde <= 12 ? "Angriff" : "Verteidigung");
+}
+
+// Name und Farbe eines Teams in einer Anzeige (Spielstand, Teams) nach ihren Einstellungen.
+// i: 0 = erstes, 1 = zweites Team des Spiels; seiten aus teamSeiten(). → { name, farbe } (farbe "" = Standard der Anzeige)
+const SEITEN_FARBE = { Angriff: "#ff4655", Verteidigung: "#3fd4c0" };
+function teamAnzeige(el, name, i, seiten = {}) {
+  const eigeneFarbe = (i === 0 ? el?.farbe1 : i === 1 ? el?.farbe2 : "") || "";
+  const eigenerName = (i === 0 ? el?.name1 : i === 1 ? el?.name2 : "") || "";
+  const seite = (el?.benennung || "auto") === "auto" ? seiten[name] : "";
+  const nachSpiel = seite ? (seite === "Angriff" ? el?.textAngriff ?? "ANGRIFF" : el?.textVerteidigung ?? "VERTEIDIGUNG") || seite : name;
+  // Eigener Name überschreibt den Namen nach Spiel
+  return { name: eigenerName.trim() ? eigenerName : nachSpiel, farbe: eigeneFarbe || (seite ? SEITEN_FARBE[seite] : "") };
+}
+
 // Ranking für den MVP-Endscreen: Punkte = Kills × 100 + Headshots × 30 + Assists × 40 + MVPs × 150 − Tode × 50 (nicht unter 0),
 // bei Gleichstand mehr Kills, dann weniger Tode. Rocket League: Tore, Vorlagen, Paraden, Schüsse (wie die Bestenliste).
 // → [{ ...spieler, punkte, kd, hsQuote }], MVP zuerst
@@ -202,4 +233,4 @@ function wertVon(key, { d, statistik, stand, sp }) {
   }
 }
 
-module.exports = { ranking, statsDaten, statsEvents, spielerDaten, spielerWahl, teamListen, WERTE, WERT, WERT_KURZ, wertVon, kd };
+module.exports = { teamSeiten, teamAnzeige, SEITEN_FARBE, ranking, statsDaten, statsEvents, spielerDaten, spielerWahl, teamListen, WERTE, WERT, WERT_KURZ, wertVon, kd };

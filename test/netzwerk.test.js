@@ -32,3 +32,14 @@ test("Netzwerk: Hinweis, wenn das Ziel nicht im Netz der Karte liegt", () => {
   assert.equal(zielHinweis("2.0.0.50", karten[1]), "");
   assert.match(zielHinweis("10.0.0.50", karten[1]), /nicht im Netz/);
 });
+
+test("NDI-Konfiguration: Karte festlegen, Einstellungen des PCs bleiben", () => {
+  const { ndiKonfig } = require("../src/core/netzwerk");
+  assert.deepEqual(ndiKonfig({}, "192.168.1.20"), { ndi: { adapters: { allowed: ["192.168.1.20"] } } });
+  assert.deepEqual(ndiKonfig(null, ""), { ndi: {} }, "automatisch: keine Einschränkung");
+  const pc = { ndi: { networks: { discovery: "10.0.0.5" }, adapters: { allowed: ["1.2.3.4"] } }, andere: 1 };
+  assert.deepEqual(ndiKonfig(pc, "2.0.0.20"), { ndi: { networks: { discovery: "10.0.0.5" }, adapters: { allowed: ["2.0.0.20"] } }, andere: 1 });
+  assert.deepEqual(ndiKonfig(pc, ""), { ndi: { networks: { discovery: "10.0.0.5" } }, andere: 1 }, "ohne Karte: alte Einschränkung weg");
+  assert.deepEqual(pc.ndi.adapters.allowed, ["1.2.3.4"], "Vorlage unverändert");
+  assert.deepEqual(ndiKonfig({}, "kein-ip"), { ndi: {} });
+});

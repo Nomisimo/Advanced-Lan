@@ -8,6 +8,11 @@ const { Statistik } = require("./statistik");
 const { SPIEL_BY_ID } = require("./spiele");
 const { leseSpieler } = require("./protokoll");
 const { matchGruppen, matchWahl } = require("./match-check");
+const { mvpAusloeser } = require("./aktionen");
+const { ranking } = require("./stats-screen");
+
+// Verzögerung eines Befehls in ms (Feld „Verzögerung“ im Tab „Signale“), 0 bis 10 Minuten
+const verzoegerung = (z) => Math.min(600000, Math.max(0, Math.round(Number(z?.verzoegerung) || 0)));
 
 const LOG_MAX = 300;
 // Zählen dasselbe wie die Filter im Event-Log, nur ohne dessen Grenze von LOG_MAX Einträgen.
@@ -17,7 +22,8 @@ const gleichesMatch = (a, b) => a.id === b.id || (b.id.startsWith("cs2:") && a.i
 const neueZaehler = () => ({ ereignisse: 0, eingerichtet: 0, verworfen: 0, gesendet: 0, fehler: 0 });
 
 class Regie {
-  constructor({ getConfig, send, emit, now = Date.now }) {
+  constructor({ getConfig, send, emit, now = Date.now, timer = setTimeout }) {
+    this.timer = timer;
     this.getConfig = getConfig;
     this.send = send; // ({ ziel, address, args }) → Promise
     this.emit = emit || (() => {}); // (typ, daten)
@@ -162,17 +168,31 @@ class Regie {
     if (befehle.length) this.zaehler.eingerichtet++;
     const eintrag = {
       id: ++this.nr, t: now, ev, quelle, scharf: !!cfg.armed, gesperrt: befehle.length === 0,
-      befehle: befehle.map((b) => ({ ziel: b.ziel?.name || "?", typ: b.ziel?.typ || "", nachrichten: b.nachrichten.map(zeigeNachricht), fehler: b.fehler })),
+      befehle: befehle.map((b) => ({ ziel: b.ziel?.name || "?", typ: b.ziel?.typ || "", nachrichten: b.nachrichten.map(zeigeNachricht), fehler: b.fehler, ...(verzoegerung(b.zuweisung) ? { ms: verzoegerung(b.zuweisung) } : {}) })),
       fehler: befehle.filter((b) => b.fehler).map((b) => `${b.ziel?.name || "?"}: ${b.fehler}`),
     };
     if (eintrag.fehler.length) this.fehlerZaehlen(eintrag);
-    if (cfg.armed) for (const b of befehle) this.ausgeben(b, eintrag);
+    if (cfg.armed) for (const b of befehle) {
+      const ms = verzoegerung(b.zuweisung);
+      // Verzögert: nur senden, wenn die Ausgabe dann noch an ist
+      if (ms) this.timer(() => { if (this.getConfig().armed) this.ausgeben(b, eintrag); }, ms);
+      else this.ausgeben(b, eintrag);
+    }
     if (ev.spiel === this.aktiv()) this.statistik.add(ev);
     this.log.unshift(eintrag);
     if (this.log.length > LOG_MAX) this.log.length = LOG_MAX;
     this.emit("event", eintrag);
     this.emit("status");
+    if (ev.type !== "match_mvp" && ev.type === mvpAusloeser(cfg, ev.spiel)) this.matchMvp(ev);
     return eintrag;
+  }
+
+  // Match-MVP: bester Spieler im Ranking des MVP-Endscreens, sobald das Auslöser-Event da ist
+  matchMvp(ausloeser) {
+    const [mvp] = ranking(this.snapshot(), SPIEL_BY_ID[ausloeser.spiel]);
+    if (!mvp) return null;
+    const pc = mvp.pcId || ausloeser.pc || "";
+    return this.fire({ type: "match_mvp", spiel: ausloeser.spiel, player: mvp.name, team: mvp.team || "", pc, pcId: pc, round: ausloeser.round, match: ausloeser.match, aktion: `nach ${ausloeser.type}` }, "regie");
   }
 
   // Test-Knopf einer Zuweisung im Tab „Signale“: sendet sofort, auch wenn die Ausgabe aus ist

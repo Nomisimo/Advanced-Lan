@@ -79,7 +79,7 @@ test("Dedupe: dasselbe Ereignis von mehreren Clients zählt einmal", () => {
 
 test("Mehrfach: Einstellung wird bereinigt, unbekannt = Standard", () => {
   const { migrateMehrfach, mehrfachModus } = require("../src/core/events");
-  assert.deepEqual(migrateMehrfach({ cs2: { kill: "alle", ace: "standard", x: 3 }, rl: {}, lol: null }), { cs2: { kill: "alle" } });
+  assert.deepEqual(migrateMehrfach({ cs2: { kill: "alle", round_end: "team", ace: "standard", x: 3 }, rl: {}, lol: null }), { cs2: { kill: "alle", round_end: "team" } });
   assert.deepEqual(migrateMehrfach("quatsch"), {});
   assert.equal(mehrfachModus({ mehrfach: { cs2: { kill: "pc" } } }, "cs2", "kill"), "pc");
   assert.equal(mehrfachModus({ mehrfach: { cs2: { kill: "nein" } } }, "cs2", "kill"), "standard");

@@ -329,3 +329,19 @@ test("Mehrfach gemeldete Events: Standard einmal, „Einmal je PC“ und „Alle
   assert.ok(melden("PC 2", "round_end"));
   assert.deepEqual(verworfen.map((e) => [e.ev.type, e.verworfen]), [["freezetime", "doppelt"], ["bomb_planted", "doppelt (selber PC)"]]);
 });
+
+test("Mehrfach „Nur PCs im Team“: Runde gewonnen nur von den PCs des Gewinnerteams, jeder einmal", () => {
+  const cfg = { ...standardRegie(), aktivesSpiel: "valorant", mehrfach: { valorant: { round_end: "team" } } };
+  const verworfen = [], gefeuert = [];
+  const regie = new Regie({ getConfig: () => cfg, send: () => {}, emit: (typ, d) => typ === "event" && (d.verworfen ? verworfen : gefeuert).push(d), now: () => 0 });
+  const teams = { "PC 1": "TEAM A", "PC 2": "TEAM A", "PC 3": "TEAM B", "PC 4": "" };
+  for (const [pc, team] of Object.entries(teams)) {
+    regie.pcVerbunden(pc, { spiele: ["valorant"] });
+    regie.pcStatus(pc, { spiel: "valorant", status: { spieler: pc, team } });
+  }
+  for (const pc of Object.keys(teams)) regie.pcEvent(pc, "valorant", { type: "round_end", team: "TEAM A", round: 1 });
+  regie.pcEvent("PC 1", "valorant", { type: "round_end", team: "TEAM A", round: 1 });
+  regie.pcEvent("PC 2", "valorant", { type: "round_end", team: "", round: 1 });
+  assert.deepEqual(gefeuert.map((e) => e.ev.pc), ["PC 1", "PC 2"]);
+  assert.deepEqual(verworfen.map((e) => [e.ev.pc, e.verworfen]), [["PC 3", "PC im anderen Team"], ["PC 4", "Team des PCs unbekannt"], ["PC 1", "doppelt (selber PC)"], ["PC 2", "ohne Team"]]);
+});

@@ -199,14 +199,14 @@ class Regie {
   testBefehl(cfg, spiel, type, zuweisung) {
     // Ohne PC-Filter spielt der erste Platz aus dem Plan den Auslöser, damit {nr} und {plan} einen Wert haben
     const pc = zuweisung.pc || cfg.plan?.pcs?.[0]?.pcId || "Regie";
-    const ev = { type, spiel, team: zuweisung.team || SPIEL_BY_ID[spiel]?.teams?.[0] || "", player: "Testspieler", pc, pcId: pc, round: 1 };
+    const ev = { type, spiel, team: zuweisung.team || SPIEL_BY_ID[spiel]?.teams?.[0] || "", player: "Testspieler", pc, pcId: pc, round: 1, ...(zuweisung.seite ? { seiteTeam: zuweisung.seite } : {}) };
     return befehleFuer({ ...cfg, signale: { [spiel]: { [type]: [{ ...zuweisung, aus: false }] } } }, ev)[0];
   }
 
   // Test-Knopf einer Zuweisung im Tab „Signale“: sendet sofort, auch wenn die Ausgabe aus ist
   testeZuweisung(spiel, type, zuweisung) {
     const b = this.testBefehl(this.getConfig(), spiel, type, zuweisung);
-    const k = { nachrichten: b ? b.nachrichten.map(zeigeNachricht) : [], ziel: b?.ziel?.name || "", fehler: b?.fehler ? [b.fehler] : [] };
+    const k = { nachrichten: b ? b.nachrichten.map(zeigeNachricht) : [], ziel: b?.ziel?.name || "", fehler: b?.fehler ? [b.fehler] : b ? [] : ["Filter passt nicht zum Test-Event"] };
     if (b && !b.fehler) this.ausgeben(b, k);
     return k;
   }

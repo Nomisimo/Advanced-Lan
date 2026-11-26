@@ -3,7 +3,7 @@
 // Ohne Netzwerk: Senden und Melden kommen von außen (Main-Prozess oder Browser-Vorschau).
 
 const { Dedupe } = require("./events");
-const { befehleFuer, zeigeNachricht } = require("./signal");
+const { befehleFuer, zuweisungen, zeigeNachricht } = require("./signal");
 const { Statistik } = require("./statistik");
 const { SPIEL_BY_ID } = require("./spiele");
 const { leseSpieler } = require("./protokoll");
@@ -195,15 +195,39 @@ class Regie {
     return this.fire({ type: "match_mvp", spiel: ausloeser.spiel, player: mvp.name, team: mvp.team || "", pc, pcId: pc, round: ausloeser.round, match: ausloeser.match, aktion: `nach ${ausloeser.type}` }, "regie");
   }
 
-  // Test-Knopf einer Zuweisung im Tab „Signale“: sendet sofort, auch wenn die Ausgabe aus ist
-  testeZuweisung(spiel, type, zuweisung) {
-    const cfg = this.getConfig();
+  // Befehl einer Zuweisung mit einem Test-Ereignis, das zu ihren Filtern passt
+  testBefehl(cfg, spiel, type, zuweisung) {
     // Ohne PC-Filter spielt der erste Platz aus dem Plan den Auslöser, damit {nr} und {plan} einen Wert haben
     const pc = zuweisung.pc || cfg.plan?.pcs?.[0]?.pcId || "Regie";
     const ev = { type, spiel, team: zuweisung.team || SPIEL_BY_ID[spiel]?.teams?.[0] || "", player: "Testspieler", pc, pcId: pc, round: 1 };
-    const [b] = befehleFuer({ ...cfg, signale: { [spiel]: { [type]: [{ ...zuweisung, aus: false }] } } }, ev);
+    return befehleFuer({ ...cfg, signale: { [spiel]: { [type]: [{ ...zuweisung, aus: false }] } } }, ev)[0];
+  }
+
+  // Test-Knopf einer Zuweisung im Tab „Signale“: sendet sofort, auch wenn die Ausgabe aus ist
+  testeZuweisung(spiel, type, zuweisung) {
+    const b = this.testBefehl(this.getConfig(), spiel, type, zuweisung);
     const k = { nachrichten: b ? b.nachrichten.map(zeigeNachricht) : [], ziel: b?.ziel?.name || "", fehler: b?.fehler ? [b.fehler] : [] };
     if (b && !b.fehler) this.ausgeben(b, k);
+    return k;
+  }
+
+  // Knopf „Alle testen“ eines Events im Tab „Signale“: alle Befehle des Events (auch die von „Allgemein“ geerbten)
+  // wie beim echten Event, jeder mit seiner Verzögerung, auch wenn die Ausgabe aus ist. Abgeschaltete Befehle bleiben aus.
+  testeEvent(spiel, type) {
+    const cfg = this.getConfig();
+    const k = { befehle: [], fehler: [], gesendet: 0, verzoegert: 0, maxMs: 0 };
+    for (const z of zuweisungen(cfg, spiel, type)) {
+      if (z.aus === true) continue;
+      const b = this.testBefehl(cfg, spiel, type, z);
+      if (!b) continue;
+      const name = b.ziel?.name || "?";
+      if (b.fehler) { k.fehler.push(`${name}: ${b.fehler}`); continue; }
+      const ms = verzoegerung(z);
+      k.befehle.push({ ziel: name, nachrichten: b.nachrichten.map(zeigeNachricht), ...(ms ? { ms } : {}) });
+      k.gesendet++;
+      if (ms) { k.verzoegert++; k.maxMs = Math.max(k.maxMs, ms); this.timer(() => this.ausgeben(b, k), ms); }
+      else this.ausgeben(b, k);
+    }
     return k;
   }
 

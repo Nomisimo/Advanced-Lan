@@ -273,6 +273,7 @@ function browserApi() {
     soundDateien: () => soundWahl(false),
     eventAusloesen: async (ev) => { const pc = ev?.pcId && regie.pcs.get(ev.pcId)?.verbunden ? ev.pcId : null; return regie.fire({ round: regie.stand?.runde, map: regie.stand?.map, ...ev, spiel: cfg.regie.aktivesSpiel, pc: pc || "Regie", pcId: pc || "regie" }, "manuell"); },
     signalTesten: async (spiel, type, z) => regie.testeZuweisung(spiel, type, z),
+    eventTesten: async (spiel, type) => regie.testeEvent(spiel, type),
     overlayZuruecksetzen: async () => {},
     zielTesten: async (id) => {
       const z = cfg.regie.targets.find((t) => t.id === id);

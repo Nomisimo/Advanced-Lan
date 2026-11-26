@@ -5,12 +5,12 @@ import { api } from "../api.js";
 import { uid } from "../../core/defaults.js";
 import { SPIELE, SPIEL_BY_ID } from "../../core/spiele.js";
 import { zielTyp, befehleVon, befehlVon } from "../../core/ziel-typen.js";
-import { baueNachrichten, zeigeNachricht, nutztPlan } from "../../core/signal.js";
+import { baueNachrichten, zeigeNachricht, nutztPlan, zuweisungen } from "../../core/signal.js";
 import { ALLGEMEIN, AKTIONEN, aktionVon, mvpAusloeser, geerbt, modus } from "../../core/aktionen.js";
 import { migrateSound, vorschlagFuer, dateiListe, dateiWert } from "../../core/sound.js";
 import { istLokal } from "../../core/ziel-typen.js";
 import { SEITEN } from "../../core/signal.js";
-import { Send, Plus, Trash2, Layers, Volume2 } from "lucide-react";
+import { Send, Plus, Trash2, Layers, Volume2, Zap } from "lucide-react";
 
 // Werte eines neuen Befehls: „Sound abspielen“ schlägt die Dateien aus dem Event-Ordner der Bibliothek vor
 const startWerte = (cfg, spiel, event, typ, befehl) => (typ === "sound" && befehl === "abspielen" ? { datei: dateiWert(vorschlagFuer(cfg.sound, spiel, event)) } : {});
@@ -167,6 +167,15 @@ function EventZeile({ spiel, ev, cfg, mutate, pcs, notify }) {
   });
   const aktiv = zuw.length > 0 || (m !== "ersetzt" && nGeerbt > 0);
   const soundZiel = cfg.targets.find((t) => t.typ === "sound");
+  // Alle Befehle des Events (eigene und geerbte) auf einmal testen, jeder mit seiner Verzögerung
+  const nTest = zuweisungen(cfg, spiel.id, ev.id).filter((z) => z.aus !== true).length;
+  const alleTesten = async () => {
+    const k = await api.eventTesten(spiel.id, ev.id);
+    const teile = [`${k.gesendet} ${k.gesendet === 1 ? "Befehl" : "Befehle"} von „${ev.label}“ getestet`];
+    if (k.verzoegert) teile.push(`${k.verzoegert} davon verzögert, der letzte nach ${k.maxMs} ms`);
+    if (k.fehler.length) notify(`${teile.join(", ")}. Fehler: ${k.fehler.join(", ")}`, "err");
+    else notify(teile.join(", "));
+  };
   const aendereListe = (fn) => mutate((d) => {
     d.signale = d.signale || {};
     d.signale[spiel.id] = d.signale[spiel.id] || {};
@@ -187,6 +196,7 @@ function EventZeile({ spiel, ev, cfg, mutate, pcs, notify }) {
         {aktion && <span title={`${MODUS[m].title}. Allgemeine Aktion „${aktion.label}“.`} style={{ ...S.badge, background: "transparent", border: `1px solid ${MODUS[m].farbe}55`, color: MODUS[m].farbe, display: "inline-flex", alignItems: "center", gap: 4 }}><Layers size={10} /> {MODUS[m].text(nGeerbt)}</span>}
         {aktion && <button style={S.smallBtn} onClick={() => ersetzen(m !== "ersetzt")} title={m === "ersetzt" ? "Allgemeine Befehle wieder gelten lassen" : "Allgemeine Befehle hier nicht senden, nur die eigenen"}>{m === "ersetzt" ? "Allgemein nutzen" : "Ersetzen"}</button>}
         {zuw.length > 0 && <span style={{ ...S.badge, background: ACCENT + "33", color: "#d9c6ff" }}>{zuw.length} {zuw.length === 1 ? "Befehl" : "Befehle"}</span>}
+        {nTest > 0 && <button style={S.smallBtn} data-testid={`signal-alle-testen-${ev.id}`} onClick={alleTesten} title={`Alle ${nTest} Befehle dieses Events jetzt senden, wie beim echten Event mit ihrer Verzögerung, auch wenn die Ausgabe aus ist`}><Zap size={12} /> Alle testen</button>}
         {soundZiel && <button style={{ ...S.smallBtn, color: "#9be7b4" }} data-testid={`signal-sound-${ev.id}`} onClick={() => neu(soundZiel)} title={`Befehl „Sound abspielen“ an „${soundZiel.name || "Local Sound"}“`}><Volume2 size={12} /> Sound</button>}
         <button style={S.smallBtn} disabled={!cfg.targets.length} onClick={() => neu()}><Plus size={12} /> Befehl</button>
       </div>

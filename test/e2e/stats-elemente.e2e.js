@@ -1,6 +1,6 @@
 // Oberflächentest: optionale Elemente des Game-Stats-Screens mit Beispieldaten (Valorant).
 // Prüft: Anzeige „Teams und Spieler“ einblenden (Namen beider Teams wie aus ui_team_order), Spieler-Karte (Platz 1, dann fester PC),
-// Wert-Block (Punkte links, dann Kills eines Spielers), alles landet in den Einstellungen.
+// Überschrift der Spieler-Karte ändern und leeren, Wert-Block (Punkte links, dann Kills eines Spielers), alles landet in den Einstellungen.
 // Aufruf: npm run build:dev && node test/e2e/stats-elemente.e2e.js [dist-app/index.html] [Ordner für Screenshots]
 // Braucht Playwright mit Chromium (nicht in den Abhängigkeiten), z. B. global: npm i -g playwright, dann mit NODE_PATH=$(npm root -g)
 const { chromium } = require('playwright');
@@ -54,6 +54,14 @@ const BILDER = process.argv[3] || require('os').tmpdir();
   assert.strictEqual(sp.quelle, 'PC 03');
   assert.ok((await page.getByTestId(`el-${sp.id}`).getAttribute('title')).includes('PC 03'));
   assert.ok((await flaeche.textContent()).includes('Flux'), 'Karte zeigt den Spielernamen von PC 03');
+  // Überschrift der Karte: frei wählbar, leer = keine
+  await page.getByTestId('el-ueberschrift').fill('Spieler der Runde');
+  await page.waitForTimeout(400);
+  assert.strictEqual((await layout()).elemente.find((e) => e.id === sp.id).titel, 'Spieler der Runde');
+  assert.ok((await flaeche.textContent()).includes('Spieler der Runde'), 'Karte zeigt die Überschrift');
+  await page.getByTestId('el-ueberschrift').fill('');
+  await page.waitForTimeout(400);
+  assert.ok(!(await flaeche.textContent()).includes('Spieler der Runde'), 'leer = keine Überschrift');
 
   // 3) Wert: Kills eines Spielers
   await page.getByTestId('wert-neu').click();

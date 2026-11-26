@@ -17,7 +17,8 @@ const BILD_MAX = 4_000_000; // Zeichen einer Bild-Data-URL (die Oberfläche verk
 const BILD_RE = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/;
 const ZOOM_MIN = 25, ZOOM_MAX = 300;
 
-// Anzeigen des Screens; jede gibt es genau einmal. titel: Überschrift, die man im Editor ändern kann
+// Anzeigen des Screens; jede gibt es genau einmal. titel: Standard-Überschrift (ohne Angabe keine);
+// jede Anzeige, Spieler-Karte und jeder Bild-Block hat ein Feld titel, das man im Editor ändern oder leeren kann
 const ANZEIGEN = [
   { typ: "logo", label: "Logo und Titel", x: 44, y: 34, b: 560, h: 78, titel: "ADVANCED LAN" },
   { typ: "spiel", label: "Aktives Spiel", x: 640, y: 34, b: 640, h: 78 },
@@ -99,6 +100,8 @@ const SPIELER_OPTIONEN = { agent: true, waffe: true, team: true, seite: true, ki
 const WERT_KEYS = ["score1", "score2", "team1", "team2", "runde", "kills", "tode", "headshots", "aces", "sp.name", "sp.kills", "sp.tode", "sp.headshots", "sp.kd", "sp.team", "sp.seite"];
 const quelleVon = (v) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 60) : "rang");
 const OPTION_TEXT_MAX = 80;
+// Überschrift eines Elements: eigener Text (auch leer = keine Überschrift), sonst der Standard
+const titelVon = (e, std = "") => (typeof e.titel === "string" ? e.titel.slice(0, OPTION_TEXT_MAX) : std || "");
 function migrateOptionen(typ, e) {
   const o = OPTIONEN[typ];
   if (!o) return {};
@@ -111,7 +114,7 @@ const neueId = (p = "t") => `${p}${Date.now().toString(36)}${(zaehler++).toStrin
 
 function anzeigeStandard(a) {
   const { typ, x, y, b, h, titel, aus } = a;
-  return { id: typ, typ, x, y, b, h, sichtbar: !aus, skalieren: true, zoom: 100, ...(titel ? { titel } : {}), ...STIL, ...(OPTIONEN[typ] || {}), ...(TEAM_TYPEN.has(typ) ? TEAM_OPTIONEN : {}) };
+  return { id: typ, typ, x, y, b, h, sichtbar: !aus, skalieren: true, zoom: 100, titel: titel || "", ...STIL, ...(OPTIONEN[typ] || {}), ...(TEAM_TYPEN.has(typ) ? TEAM_OPTIONEN : {}) };
 }
 
 // Anzeige als weiteres Element hinzufügen (z. B. ein zweiter Spielstand mit anderen Einstellungen), anteilig auf die Fläche gesetzt
@@ -140,7 +143,7 @@ function neuesBild(bild, { b0 = 16, h0 = 9, flaeche, ...over } = {}) {
   let b = mb, h = Math.round(mb / v);
   if (h > mh) { h = mh; b = Math.round(mh * v); }
   b = Math.max(MIN, Math.min(F.b, b)); h = Math.max(MIN, Math.min(F.h, h));
-  return { id: neueId("i"), typ: "bild", x: Math.round((F.b - b) / 2), y: Math.round((F.h - h) / 2), b, h, sichtbar: true, bild, passung: "einpassen", radius: 0, panel: false, ...STIL, ...over };
+  return { id: neueId("i"), typ: "bild", x: Math.round((F.b - b) / 2), y: Math.round((F.h - h) / 2), b, h, sichtbar: true, bild, passung: "einpassen", radius: 0, panel: false, titel: "", ...STIL, ...over };
 }
 
 function standardVerlauf() {
@@ -151,7 +154,7 @@ function standardVerlauf() {
 function neuerSpieler(over = {}, flaeche) {
   const F = flaecheVon(flaeche);
   const b = Math.min(680, F.b), h = Math.min(170, F.h);
-  return { id: neueId("p"), typ: "spieler", x: Math.round((F.b - b) / 2), y: Math.round((F.h - h) / 2), b, h, sichtbar: true, quelle: "rang", rang: 1, ...SPIELER_OPTIONEN, ...STIL, ...over };
+  return { id: neueId("p"), typ: "spieler", x: Math.round((F.b - b) / 2), y: Math.round((F.h - h) / 2), b, h, sichtbar: true, quelle: "rang", rang: 1, ...SPIELER_OPTIONEN, titel: "", ...STIL, ...over };
 }
 
 // Einzelwert: eine Zahl oder ein Name groß, z. B. Punkte links, Runde oder Kills eines Spielers
@@ -291,14 +294,14 @@ function migrateLayout(l, flaeche) {
       out.push({
         id: eigeneId(e, "i"), typ: "bild", ...kasten(e, F), sichtbar: e.sichtbar !== false, bild,
         passung: PASSUNGEN.some(([k]) => k === e.passung) ? e.passung : "einpassen",
-        radius: zahl(e.radius, 0, 0, 540), panel: !!e.panel, ...migrateStil(e),
+        radius: zahl(e.radius, 0, 0, 540), panel: !!e.panel, titel: titelVon(e), ...migrateStil(e),
         ...(typeof e.name === "string" && e.name ? { name: e.name.slice(0, 60) } : {}),
       });
     } else if (e.typ === "spieler") {
       if (karten >= MAX_SPIELER) continue;
       karten++;
       out.push({ id: eigeneId(e, "p"), typ: "spieler", ...kasten(e, F), sichtbar: e.sichtbar !== false, quelle: quelleVon(e.quelle), rang: zahl(e.rang, 1, 1, 20),
-        ...Object.fromEntries(Object.keys(SPIELER_OPTIONEN).map((k) => [k, e[k] !== false])), ...migrateStil(e) });
+        ...Object.fromEntries(Object.keys(SPIELER_OPTIONEN).map((k) => [k, e[k] !== false])), titel: titelVon(e), ...migrateStil(e) });
     } else if (e.typ === "wert") {
       if (werte >= MAX_WERTE) continue;
       werte++;
@@ -315,7 +318,7 @@ function migrateLayout(l, flaeche) {
       if (basis) gesehen.add(e.typ);
       const a = ANZEIGE[e.typ];
       out.push({ id, typ: e.typ, ...kasten(e, F), sichtbar: e.sichtbar !== false, skalieren: e.skalieren !== false, zoom: zahl(e.zoom, 100, ZOOM_MIN, ZOOM_MAX),
-        ...(a.titel ? { titel: typeof e.titel === "string" ? e.titel.slice(0, 80) : a.titel } : {}), ...migrateStil(e), ...migrateOptionen(e.typ, e), ...(TEAM_TYPEN.has(e.typ) ? migrateTeamOptionen(e) : {}) });
+        titel: titelVon(e, a.titel), ...migrateStil(e), ...migrateOptionen(e.typ, e), ...(TEAM_TYPEN.has(e.typ) ? migrateTeamOptionen(e) : {}) });
     }
   }
   for (const a of ANZEIGEN) if (!gesehen.has(a.typ)) { const st = anzeigeStandard(a); out.push({ ...st, ...kasten(st, F), sichtbar: false }); }

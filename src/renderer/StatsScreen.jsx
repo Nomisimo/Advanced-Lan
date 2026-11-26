@@ -313,8 +313,22 @@ function BildElement({ el, bilder }) {
   return <div style={{ width: "100%", height: "100%", borderRadius: el.radius, overflow: "hidden" }}>{img}</div>;
 }
 
+// Elemente, deren Überschrift nicht im eigenen Panel steht: sie kommt über den Inhalt (leer = keine)
+const TITEL_DARUEBER = new Set(["spiel", "session", "live", "spielstand", "zahlen", "spieler", "bild"]);
+
 // Inhalt eines Elements des Layouts in seinem Kasten
 export function ElementInhalt({ el, ctx }) {
+  const titel = TITEL_DARUEBER.has(el.typ) ? textEinsetzen(el.titel || "", ctx.werte) : "";
+  if (!titel) return <ElementKern el={el} ctx={ctx} />;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <div data-testid="el-titel" style={{ flexShrink: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}><Titel>{titel}</Titel></div>
+      <div style={{ flex: 1, minHeight: 0 }}><ElementKern el={el} ctx={ctx} /></div>
+    </div>
+  );
+}
+
+function ElementKern({ el, ctx }) {
   const { d, spiel, live, log, cfg, werte, namen } = ctx;
   const tx = (t) => textEinsetzen(t, werte);
   switch (el.typ) {

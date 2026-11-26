@@ -634,9 +634,9 @@ function Eigenschaften({ e, F, pcs = [], bilder, aendern, tippen, fokus, duplizi
       {OPTIONEN[e.typ] && Object.keys(OPTIONEN[e.typ]).length > 0 && <Optionen e={e} aendern={aendern} tippen={tippen} fokus={fokus} />}
       {TEAM_TYPEN.has(e.typ) && <TeamEinstellungen e={e} aendern={aendern} tippen={tippen} fokus={fokus} />}
       <Darstellung e={e} tippen={tippen} aendern={aendern} fokus={fokus} stilAlle={stilAlle} />
-      {!text && "titel" in e && (
+      {!text && !wert && (
         <Field label="Überschrift" hint="Leer lassen für keine Überschrift. Platzhalter wie {spiel} gehen auch.">
-          <input style={S.inputSm} value={e.titel} maxLength={80} onFocus={fokus} onChange={(ev) => tippen({ titel: ev.target.value })} />
+          <input style={S.inputSm} value={e.titel ?? ""} maxLength={80} onFocus={fokus} data-testid="el-ueberschrift" onChange={(ev) => tippen({ titel: ev.target.value })} />
         </Field>
       )}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>

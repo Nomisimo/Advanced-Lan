@@ -144,7 +144,15 @@ class Regie {
     if (this.imAnderenMatch(pcId)) return this.verwerfen(e, "anderes Match", quelle);
     // Mehrere PCs melden dieselbe Runde: einmal zählen. Je Event einstellbar (Setup → Mehrfach gemeldete Events)
     const modus = mehrfachModus(this.getConfig(), spiel, e.type);
-    if (modus !== "alle" && !this.dedupe.accept(e, this.now(), { proPc: modus === "pc" })) return this.verwerfen(e, modus === "pc" ? "doppelt (selber PC)" : "doppelt", quelle);
+    if (modus === "team") {
+      // Nur PCs im Team des Events (Team des PCs aus seinem Status), jeder einmal
+      const pcTeam = p?.status?.team || p?.stand?.sf?.team || "";
+      if (!e.team) return this.verwerfen(e, "ohne Team", quelle);
+      if (!pcTeam) return this.verwerfen(e, "Team des PCs unbekannt", quelle);
+      if (pcTeam !== e.team) return this.verwerfen(e, "PC im anderen Team", quelle);
+    }
+    const proPc = modus === "pc" || modus === "team";
+    if (modus !== "alle" && !this.dedupe.accept(e, this.now(), { proPc })) return this.verwerfen(e, proPc ? "doppelt (selber PC)" : "doppelt", quelle);
     return this.fire(e, quelle);
   }
 

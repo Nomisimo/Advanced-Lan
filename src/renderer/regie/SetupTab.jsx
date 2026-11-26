@@ -114,6 +114,7 @@ function StatsPcs({ cfg, mutate, status }) {
 const MEHRFACH_TEXT = {
   standard: "Einmal (Standard)",
   pc: "Einmal je PC",
+  team: "Nur PCs im Team",
   alle: "Alle durchlassen",
 };
 function Mehrfach({ cfg, mutate }) {
@@ -133,7 +134,7 @@ function Mehrfach({ cfg, mutate }) {
   const events = spiel.events.filter((e) => !e.mvp);
   return (
     <Section title="Mehrfach gemeldete Events"
-      subtitle="Melden mehrere PCs dasselbe Event kurz hintereinander (gleiche Runde, gleicher Spieler, gleiches Team), zählt die Regie es normal nur einmal und verwirft den Rest als „doppelt“: 8 Sekunden für Runden-, Match- und Team-Events, 5 Sekunden für Spieler-Events. „Einmal je PC“ lässt jeden PC einmal durch, „Alle durchlassen“ verwirft nie (dann kommt ein Event, das alle 10 PCs melden, auch 10-mal)."
+      subtitle="Melden mehrere PCs dasselbe Event kurz hintereinander (gleiche Runde, gleicher Spieler, gleiches Team), zählt die Regie es normal nur einmal und verwirft den Rest als „doppelt“: 8 Sekunden für Runden-, Match- und Team-Events, 5 Sekunden für Spieler-Events. „Einmal je PC“ lässt jeden PC einmal durch, „Nur PCs im Team“ nur die PCs, deren Team im Event steht (z. B. „Runde gewonnen“ nur von den Gewinnern, jeder einmal), „Alle durchlassen“ verwirft nie (dann kommt ein Event, das alle 10 PCs melden, auch 10-mal)."
       right={geaendert(spiel.id) ? <button style={S.smallBtn} onClick={alleZurueck}>{spiel.kurz}: alle auf Standard</button> : null}>
       <div data-testid="mehrfach">
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
@@ -147,14 +148,14 @@ function Mehrfach({ cfg, mutate }) {
             );
           })}
         </div>
-        <div style={{ border: `1px solid ${LINE}`, borderRadius: 8, overflow: "hidden", display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(330px, 1fr))" }}>
+        <div style={{ border: `1px solid ${LINE}`, borderRadius: 8, overflow: "hidden", display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))" }}>
           {events.map((e) => {
             const modus = mehrfachModus(cfg, spiel.id, e.id);
             return (
               <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 12px", borderBottom: `1px solid ${LINE}`, borderRight: `1px solid ${LINE}`, background: modus !== "standard" ? WARN + "12" : "transparent" }}>
                 <span style={{ flex: 1, fontSize: 13, color: modus !== "standard" ? "#fff" : SUB }}>{e.label}<span style={{ color: MUTED, fontSize: 11 }}> · {e.gruppe}</span></span>
-                <select style={{ ...S.selectSm, width: 160 }} value={modus} data-testid={`mehrfach-${spiel.id}-${e.id}`} onChange={(x) => setzen(spiel.id, e.id, x.target.value)}>
-                  {Object.entries(MEHRFACH_TEXT).map(([k, t]) => <option key={k} value={k}>{t}</option>)}
+                <select style={{ ...S.selectSm, width: 180 }} value={modus} data-testid={`mehrfach-${spiel.id}-${e.id}`} onChange={(x) => setzen(spiel.id, e.id, x.target.value)}>
+                  {Object.entries(MEHRFACH_TEXT).filter(([k]) => k !== "team" || e.team || e.fest || modus === "team").map(([k, t]) => <option key={k} value={k}>{t}</option>)}
                 </select>
               </div>
             );

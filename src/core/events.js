@@ -108,8 +108,9 @@ class Dedupe {
 }
 
 // Regie → Setup → „Mehrfach gemeldete Events“: was die Regie mit derselben Meldung von mehreren PCs macht
-// standard = einmal zählen (Dedupe oben), pc = einmal je PC, alle = nie verwerfen
-const MEHRFACH = ["standard", "pc", "alle"];
+// standard = einmal zählen (Dedupe oben), pc = einmal je PC, team = einmal je PC, aber nur PCs im Team des Events
+// (z. B. „Runde gewonnen“ nur von den Gewinnern), alle = nie verwerfen
+const MEHRFACH = ["standard", "pc", "team", "alle"];
 const mehrfachModus = (cfg, spiel, type) => {
   const m = cfg?.mehrfach?.[spiel]?.[type];
   return MEHRFACH.includes(m) ? m : "standard";
@@ -119,7 +120,7 @@ function migrateMehrfach(r) {
   if (!r || typeof r !== "object") return out;
   for (const [spiel, evs] of Object.entries(r)) {
     if (!evs || typeof evs !== "object") continue;
-    const x = Object.fromEntries(Object.entries(evs).filter(([, v]) => v === "pc" || v === "alle"));
+    const x = Object.fromEntries(Object.entries(evs).filter(([, v]) => v !== "standard" && MEHRFACH.includes(v)));
     if (Object.keys(x).length) out[spiel] = x;
   }
   return out;

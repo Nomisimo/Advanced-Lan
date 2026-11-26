@@ -6,6 +6,9 @@ const REPO = "Nomisimo/Advanced-Lan";
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
+  "1.0.13": [
+    "Setup → Mehrfach gemeldete Events: neue Option „Nur PCs im Team“. Löst nur bei PCs aus, deren Team im Event steht, jeder PC einmal. Z. B. „Runde gewonnen“ nur von den 5 PCs des Gewinnerteams (Cues je Platz mit {nr} oder {plan}). PCs des anderen Teams erscheinen im Log als verworfen („PC im anderen Team“). Nur ein Regie-Update",
+  ],
   "1.0.12": [
     "Setup: neuer Bereich „Mehrfach gemeldete Events“. Je Spiel und Event einstellbar, was mit derselben Meldung von mehreren PCs passiert: „Einmal (Standard)“ wie bisher, „Einmal je PC“ oder „Alle durchlassen“ (nie als doppelt verwerfen). Wird in der Regie-Show gespeichert",
     "Stats-Screen: meldet ein PC das Rundenende ohne Sieger (Team nicht erkannt, kein Spielstand), trägt der nächste PC mit Team den Punkt nach. Vorher fehlte der Punkt, Runden und Punkte passten nicht zusammen",

@@ -11,6 +11,8 @@ const ma3 = { id: "m", typ: "ma3", name: "MA3", host: "10.0.0.5", port: 8000, op
 test("Befehle aus der Ziel-Datenbank: Werte und Platzhalter aus dem Ereignis", () => {
   const ev = { spiel: "rl", type: "goal", team: "ORANGE", player: "Momo", pcId: "PC 03", round: 2 };
   assert.deepEqual(baueNachrichten(ma3, { befehl: "goto_cue", werte: { seq: "101", cue: "3" } }, ev), [{ address: "/gma3/cmd", args: [{ type: "s", value: "Goto Sequence 101 Cue 3" }] }]);
+  assert.deepEqual(baueNachrichten(ma3, { befehl: "go_cue", werte: { seq: "300", cue: "3" } }, ev), [{ address: "/gma3/cmd", args: [{ type: "s", value: "Go+ Sequence 300 Cue 3" }] }]);
+  assert.deepEqual(baueNachrichten(ma3, { befehl: "go", werte: { seq: "300" } }, ev), [{ address: "/gma3/cmd", args: [{ type: "s", value: "Go+ Sequence 300" }] }]);
   assert.equal(baueNachrichten({ ...ma3, optionen: { prefix: "" } }, { befehl: "go", werte: { seq: "7" } })[0].address, "/cmd", "ohne Prefix");
   assert.deepEqual(baueNachrichten({ typ: "qlab" }, { befehl: "start", werte: { cue: "{team}-{runde}" } }, ev)[0].address, "/cue/ORANGE-2/start");
   const r = baueNachrichten({ typ: "reaper" }, { befehl: "marker_play", werte: { marker: "4" } });

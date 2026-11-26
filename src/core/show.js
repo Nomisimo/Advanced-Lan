@@ -23,6 +23,7 @@ function showDaten(cfg, art) {
     // Ohne Plan und ohne ersetzte Events wie vor beta.10: ältere Shows gelten nicht als geändert
     if (istLeer(d.plan)) delete d.plan;
     if (d.ersetzt && !Object.keys(d.ersetzt).length) delete d.ersetzt;
+    if (d.mehrfach && !Object.keys(d.mehrfach).length) delete d.mehrfach;
     return d;
   }
   const d = kopie(cfg.gamepc);

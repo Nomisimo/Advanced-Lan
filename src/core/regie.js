@@ -2,7 +2,7 @@
 // Regie: nimmt Ereignisse der Game-PCs an, lässt nur das aktive Spiel durch, entdoppelt und führt die eingestellten OSC-Befehle aus.
 // Ohne Netzwerk: Senden und Melden kommen von außen (Main-Prozess oder Browser-Vorschau).
 
-const { Dedupe } = require("./events");
+const { Dedupe, mehrfachModus } = require("./events");
 const { befehleFuer, zuweisungen, zeigeNachricht } = require("./signal");
 const { Statistik } = require("./statistik");
 const { SPIEL_BY_ID } = require("./spiele");
@@ -142,7 +142,9 @@ class Regie {
     if (spiel !== this.aktiv()) return this.verwerfen(e, "anderes Spiel", quelle);
     this.matchAktualisieren();
     if (this.imAnderenMatch(pcId)) return this.verwerfen(e, "anderes Match", quelle);
-    if (!this.dedupe.accept(e, this.now())) return this.verwerfen(e, "doppelt", quelle); // mehrere PCs melden dieselbe Runde
+    // Mehrere PCs melden dieselbe Runde: einmal zählen. Je Event einstellbar (Setup → Mehrfach gemeldete Events)
+    const modus = mehrfachModus(this.getConfig(), spiel, e.type);
+    if (modus !== "alle" && !this.dedupe.accept(e, this.now(), { proPc: modus === "pc" })) return this.verwerfen(e, modus === "pc" ? "doppelt (selber PC)" : "doppelt", quelle);
     return this.fire(e, quelle);
   }
 

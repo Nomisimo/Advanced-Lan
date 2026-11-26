@@ -302,14 +302,33 @@ class BildQuelle {
     const matchStart = () => { if (!z.laeuft) { this.neu(); z.laeuft = true; global("match_start", { round: 0 }); } };
     if (ev.art === "start") {
       matchStart();
-      z.runde++;
+      const nr = Math.floor(Number(m.runde));
+      if (nr > 0) {
+        // Rundennummer aus dem Spiel (Shots Fired): dieselbe Runde startet nur einmal, z. B. round_number und Kaufphase
+        // oder match_start mitten in der ersten Kaufphase
+        if (nr === z.runde && z.nach !== z.runde) return this.ergebnis([], now);
+        z.runde = nr;
+      } else {
+        // Ohne Nummer: ein zweiter Start kurz nach dem ersten, ohne Rundenende dazwischen, ist dieselbe Runde
+        if (z.runde > 0 && z.nach !== z.runde && now - (z.startT ?? -Infinity) < 20000) return this.ergebnis([], now);
+        z.runde++;
+      }
+      z.startT = now;
       global(ev.id, { round: z.runde });
       this.verlaengerung(roh);
     } else if (ev.art === "ende") {
-      if (z.nach === z.runde && now - z.endeT < 15000) return this.ergebnis([], now); // eine Runde endet nur einmal, auch wenn Sieg und Niederlage flackern
+      if (z.nach === z.runde && now - z.endeT < 15000) {
+        // Eine Runde endet nur einmal, auch wenn Sieg und Niederlage flackern. Kam das Ende erst ohne Sieger (Shots Fired: round_phase
+        // „end“ vor dem ersten score), wird der Sieger nachgereicht, ohne die Runde noch einmal zu zählen
+        if (!team || z.endeTeam) return this.ergebnis([], now);
+        z.endeTeam = team;
+        z.siege[team] = (z.siege[team] || 0) + 1;
+        global(ev.id, { team });
+        return this.ergebnis(roh, now);
+      }
       matchStart();
       if (z.runde === 0 || z.nach === z.runde) z.runde++; // ohne erkannten Rundenstart zählt das Rundenende
-      Object.assign(z, { nach: z.runde, endeT: now });
+      Object.assign(z, { nach: z.runde, endeT: now, endeTeam: team });
       if (team) z.siege[team] = (z.siege[team] || 0) + 1;
       global(ev.id, { team });
       this.verlaengerung(roh);

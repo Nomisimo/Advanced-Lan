@@ -308,3 +308,24 @@ test("Befehle eines Events tragen dieselbe Event-ID (Local Sound: Sounds eines E
   const b = regie.pcEvent("PC 1", "cs2", { type: "round_end", team: "CT", round: 2 });
   assert.deepEqual(gesendet.map((s) => s.ereignis), [a.id, a.id, b.id, b.id]);
 });
+
+test("Mehrfach gemeldete Events: Standard einmal, „Einmal je PC“ und „Alle durchlassen“ je Event", () => {
+  let t = 0;
+  const cfg = { ...standardRegie(), aktivesSpiel: "cs2", mehrfach: { cs2: { bomb_planted: "pc", round_end: "alle" } } };
+  const verworfen = [];
+  const regie = new Regie({ getConfig: () => cfg, send: () => {}, emit: (typ, d) => typ === "event" && d.verworfen && verworfen.push(d), now: () => t });
+  ["PC 1", "PC 2"].forEach((p) => regie.pcVerbunden(p, { spiele: ["cs2"] }));
+  const melden = (pc, type) => regie.pcEvent(pc, "cs2", { type, team: "T", round: 3 });
+  // Standard: nur die erste Meldung zählt
+  assert.ok(melden("PC 1", "freezetime"));
+  assert.equal(melden("PC 2", "freezetime"), null);
+  // Einmal je PC: jeder PC einmal, derselbe PC doppelt wird verworfen
+  assert.ok(melden("PC 1", "bomb_planted"));
+  assert.ok(melden("PC 2", "bomb_planted"));
+  assert.equal(melden("PC 2", "bomb_planted"), null);
+  // Alle durchlassen
+  assert.ok(melden("PC 1", "round_end"));
+  assert.ok(melden("PC 2", "round_end"));
+  assert.ok(melden("PC 2", "round_end"));
+  assert.deepEqual(verworfen.map((e) => [e.ev.type, e.verworfen]), [["freezetime", "doppelt"], ["bomb_planted", "doppelt (selber PC)"]]);
+});

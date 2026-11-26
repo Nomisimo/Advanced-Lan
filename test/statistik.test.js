@@ -40,3 +40,40 @@ test("Setup: nur genutzte Spiele, aktives Spiel ist immer eins davon", () => {
   assert.equal(migrateKonfig(k).regie.spiele.cs2, true);
   assert.equal(migrateKonfig({ ...k, version: 3 }).version, 5);
 });
+
+test("Valorant: Rundenende erst ohne Sieger gemeldet, der nächste PC mit Team trägt den Punkt nach", () => {
+  const s = new Statistik();
+  const ev = (type, extra = {}) => s.add({ spiel: "valorant", type, round: 1, ...extra });
+  ev("round_start");
+  ev("round_end", { team: "" }); // PC ohne erkanntes Team
+  ev("round_end", { team: "TEAM A" });
+  ev("round_end", { team: "TEAM B" }); // zu spät, Sieger steht schon
+  const j = s.json();
+  assert.equal(j.match.runden, 1);
+  assert.equal(j.match.siege["TEAM A"], 1);
+  assert.ok(!j.match.siege["TEAM B"]);
+});
+
+test("CS2: Rundenende ohne Sieger, Sieger kommt nach", () => {
+  const s = new Statistik();
+  s.add({ spiel: "cs2", type: "round_live", round: 1 });
+  s.add({ spiel: "cs2", type: "round_end", round: 1, team: "" });
+  s.add({ spiel: "cs2", type: "round_end", round: 1, team: "CT" });
+  assert.deepEqual(s.json().match.siege, { CT: 1, T: 0 });
+  assert.equal(s.json().match.runden, 1);
+});
+
+test("Valorant: Rundenstart mehrfach (mehrere PCs, doppelt) zählt die Runde nicht hoch, Nummer vom PC gilt", () => {
+  const s = new Statistik();
+  const ev = (type, extra = {}) => s.add({ spiel: "valorant", type, ...extra });
+  ev("round_start", { round: 1 });
+  ev("round_start", { round: 1 });
+  ev("round_start"); // ohne Nummer, Runde läuft noch
+  assert.equal(s.json().runde.nr, 1);
+  ev("round_end", { team: "TEAM B", round: 1 });
+  ev("round_start", { round: 2 });
+  assert.equal(s.json().runde.nr, 2);
+  ev("round_start", { round: 5 }); // PC weiß es besser (z. B. Regie später gestartet)
+  assert.equal(s.json().runde.nr, 5);
+  assert.equal(s.json().match.siege["TEAM B"], 1);
+});

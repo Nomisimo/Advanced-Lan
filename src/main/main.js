@@ -295,7 +295,7 @@ const rlClient = new RlClient({ onNachricht: (m) => rlNachricht(m), onChange: st
 const overdrive = new OverdriveServer({ onEvent: (event) => bildNachricht('valorant', { bild: true, event, seite: 'eigen', aktion: 'Automation Overdrive', quelle: 'overdrive' }), onChange: statusMelden });
 // Valorant, Fortnite, LoL und The Finals über die Overwolf-App „Shots Fired“ (Webhook): alle Overwolf-Events, dieselbe Quelle
 const shotsfired = new ShotsFiredServer({
-  onEvent: ({ spiel, event, seite }) => bildNachricht(spiel, { bild: true, event, seite, aktion: 'Shots Fired', quelle: 'shotsfired' }),
+  onEvent: ({ spiel, event, seite, runde }) => bildNachricht(spiel, { bild: true, event, seite, ...(runde ? { runde } : {}), aktion: 'Shots Fired', quelle: 'shotsfired' }),
   onTeam: (team) => { sfTeam = team; if (quellen.valorant) quellen.valorant.team = teamVon('valorant'); teamPruefen(); statusMelden(); },
   // Neue Infos (Spieler, Seite, Zähler, Match-ID) gleich an die Regie, auch wenn kein Event dabei war
   onInfo: () => { if (hatSpiele() && quellen.valorant) statusAnRegie('valorant', quellen.valorant.status(), quellen.valorant.stand()); teamPruefen(); },
@@ -361,7 +361,7 @@ function statusAnRegie(spiel, status, stand) {
   const match = spiel === 'valorant' ? valorantMatch() : '';
   if (match) stand = { ...(stand || {}), match };
   // Valorant: was Shots Fired weiß (Seite, Team, Spieler beider Teams, Zähler, Agent, Waffe des letzten Kills) für den Stats-Screen der Regie
-  if (spiel === 'valorant') { const sf = shotsfired.valorantInfo(); if (sf.seite || sf.verbuendete.length || sf.gegner.length || sf.kills != null || sf.runde != null || sf.agent || sf.waffe) stand = { ...(stand || {}), sf }; }
+  if (spiel === 'valorant') { const sf = shotsfired.valorantInfo(); if (sf.seite || sf.verbuendete.length || sf.gegner.length || sf.kills != null || sf.runde != null || sf.agent || sf.waffe || sf.score) stand = { ...(stand || {}), sf }; }
   if (cfg.modus === 'standalone') regie.pcStatus(lokalId(), { spiel, status, stand });
   else client.status(spiel, status, stand);
 }

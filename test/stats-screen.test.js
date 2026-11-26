@@ -475,3 +475,12 @@ test("Screen-Layout: jedes Element außer Text und Einzelwert hat eine Überschr
   assert.equal(neuerSpieler().titel, "");
   assert.equal(neuesBild("b1").titel, "");
 });
+
+test("Stats-Screen Valorant: Spielstand aus Shots Fired statt gezählter Rundenenden", () => {
+  const { statsDaten } = require("../src/core/stats-screen");
+  const { SPIEL_BY_ID } = require("../src/core/spiele");
+  const statistik = { spiel: "valorant", match: { siege: { "TEAM A": 5, "TEAM B": 9 }, runden: 16 }, runde: { nr: 17 }, top: [] };
+  const stand = { spiel: "valorant", sf: { team: "TEAM B", score: { won: 10, lost: 6 } } };
+  assert.deepEqual(statsDaten(SPIEL_BY_ID.valorant, statistik, stand).teams.map((t) => t.score), [6, 10]);
+  assert.deepEqual(statsDaten(SPIEL_BY_ID.valorant, statistik, { spiel: "valorant" }).teams.map((t) => t.score), [5, 9], "ohne Shots Fired: gezählt");
+});

@@ -75,7 +75,10 @@ function statsDaten(spiel, statistik, stand) {
   out.spalten = [["kills", "K"], ["tode", "D"], ...(mitAssists ? [["assists", "A"]] : [])];
   if (sd?.map && !dota) out.chips.push(sd.map);
   const [t1, t2] = spiel.teams || [];
-  if (t1 && t2) out.teams = [team(t1, dota ? sd?.score?.[t1] : m.siege?.[t1]), team(t2, dota ? sd?.score?.[t2] : m.siege?.[t2])];
+  // Valorant mit Shots Fired: der Spielstand aus dem Spiel ({ won, lost } aus Sicht des PCs) ist verlässlicher als gezählte Rundenenden
+  const sfs = spiel.id === "valorant" && sd?.sf?.score && (sd.sf.team === t1 || sd.sf.team === t2) ? sd.sf : null;
+  const punkte = (t) => (dota ? sd?.score?.[t] : sfs ? (sfs.team === t ? sfs.score.won : sfs.score.lost) : m.siege?.[t]);
+  if (t1 && t2) out.teams = [team(t1, punkte(t1)), team(t2, punkte(t2))];
   if (BOMBE[r.bombe]) out.chips.push(BOMBE[r.bombe].replace("Bombe", "Spike"));
   if (dota) {
     out.mitte = { gross: uhr(Math.max(0, n(sd?.zeit))), klein: DOTA_PHASE[sd?.phase] || "Spielzeit" };

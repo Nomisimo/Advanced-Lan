@@ -218,7 +218,7 @@ test("Shots Fired: headshots-Zähler, team und ui_team_order", () => {
   assert.deepEqual(ev({ event: "round_number", data: 3 }, z), ["round_start"]);
   assert.deepEqual(ev({ event: "ui_team_order_allies", data: JSON.stringify([{ name: "Momo" }, { name: "Ben" }]) }, z), []);
   assert.deepEqual(ev({ event: "ui team order enemies", data: "Ana, Tom" }, z), []);
-  assert.deepEqual(sfInfo(z), { seite: "Angriff", team: "TEAM A", verbuendete: ["Momo", "Ben"], gegner: ["Ana", "Tom"], match: "", agent: "", waffe: "", letzterKill: null });
+  assert.deepEqual(sfInfo(z), { seite: "Angriff", team: "TEAM A", verbuendete: ["Momo", "Ben"], gegner: ["Ana", "Tom"], score: null, match: "", agent: "", waffe: "", letzterKill: null });
   ev({ event: "round_number", data: 13 }, z);
   assert.equal(sfInfo(z).team, "TEAM B", "Seitenwechsel nach Runde 12: im Angriff ist jetzt Blau");
   ev({ event: "team", data: "defense" }, z);
@@ -227,7 +227,7 @@ test("Shots Fired: headshots-Zähler, team und ui_team_order", () => {
   assert.equal(sfInfo(z).team, "", "Verlängerung: zu unsicher");
   // match_start setzt alles zurück
   ev({ event: "match_start" }, z);
-  assert.deepEqual(sfInfo(z), { seite: "", team: "", verbuendete: [], gegner: [], match: "", agent: "", waffe: "", letzterKill: null });
+  assert.deepEqual(sfInfo(z), { seite: "", team: "", verbuendete: [], gegner: [], score: null, match: "", agent: "", waffe: "", letzterKill: null });
 });
 
 test("Shots Fired: Formen von team und ui_team_order", () => {
@@ -329,4 +329,54 @@ test("Valorant: agent und Waffe des letzten eigenen Kills aus kill_feed", () => 
   ev({ events: [{ name: "match_start" }] }, z);
   assert.equal(sfInfo(z).agent, "Jett");
   assert.equal(sfInfo(z).waffe, "");
+});
+
+test("Shots Fired: score kommt erst nach Runde 1 (ohne 0:0), der Punkt der ersten Runde zählt trotzdem", () => {
+  const q = new BildQuelle("valorant", { team: "TEAM A", name: "Momo" });
+  const z = sfZustand();
+  const typen = (body, t) => shotsfiredEvents(body, z).flatMap((n) => q.ingest({ bild: true, ...n }, t).events).map((e) => `${e.type}${e.team ? ":" + e.team : ""}`);
+  assert.deepEqual(typen({ name: "match_start" }, 0), ["match_start"]);
+  assert.deepEqual(typen({ key: "round_phase", value: "shopping" }, 1000), ["round_start"]);
+  // Rundenende ohne Spielstand: erst ohne Sieger, der erste score (0:1) reicht den Sieger nach, ohne die Runde doppelt zu zählen
+  assert.deepEqual(typen({ key: "round_phase", value: "end" }, 50000), ["round_end"]);
+  assert.deepEqual(typen(score(0, 1), 51000), ["round_end:TEAM B"]);
+  assert.deepEqual(q.stand(), { runde: 1, score: { "TEAM B": 1 }, laeuft: true });
+  assert.deepEqual(typen({ key: "round_phase", value: "shopping" }, 60000), ["round_start"]);
+  assert.deepEqual(typen(score(1, 1), 100000), ["round_end:TEAM A"]);
+  assert.deepEqual(q.stand().score, { "TEAM A": 1, "TEAM B": 1 });
+  assert.deepEqual(sfInfo(z).score, { won: 1, lost: 1 });
+  // Mitten im Match gestartet: erster Stand 5:3 löst nichts aus
+  const z2 = sfZustand();
+  assert.deepEqual(ev(score(5, 3), z2), []);
+});
+
+test("Valorant: Runde 1 startet nur einmal (round_number, match_start in der Kaufphase, Kaufphase)", () => {
+  const q = new BildQuelle("valorant", { team: "TEAM A", name: "Momo" });
+  const z = sfZustand();
+  const typen = (body, t) => shotsfiredEvents(body, z).flatMap((n) => q.ingest({ bild: true, ...n }, t).events).map((e) => `${e.type}:${e.round}`);
+  assert.deepEqual(typen({ key: "round_number", value: 1 }, 0), ["match_start:0", "round_start:1"]);
+  typen({ name: "match_start" }, 2000);
+  assert.deepEqual(typen({ key: "round_phase", value: "shopping" }, 3000), [], "dieselbe Runde, nicht Runde 2");
+  assert.equal(q.stand().runde, 1);
+  typen(score(1, 0), 90000);
+  assert.deepEqual(typen({ key: "round_number", value: 2 }, 100000), ["round_start:2"]);
+  assert.deepEqual(typen({ key: "round_phase", value: "shopping" }, 100500), []);
+  assert.equal(q.stand().runde, 2);
+  assert.deepEqual(q.stand().score, { "TEAM A": 1 });
+});
+
+test("Valorant ohne round_number: Rundennummer aus dem Spielstand, doppelter Start zählt nicht", () => {
+  const q = new BildQuelle("valorant", { team: "TEAM A", name: "Momo" });
+  const z = sfZustand();
+  const typen = (body, t) => shotsfiredEvents(body, z).flatMap((n) => q.ingest({ bild: true, ...n }, t).events).map((e) => `${e.type}:${e.round}`);
+  typen({ key: "round_phase", value: "shopping" }, 0);
+  typen({ key: "round_phase", value: "end" }, 60000);
+  typen(score(0, 1), 61000);
+  assert.deepEqual(typen({ key: "round_phase", value: "shopping" }, 70000), ["round_start:2"]);
+  assert.equal(q.stand().runde, 2);
+  // Bilderkennung ohne Nummer: zweiter Start kurz danach ohne Rundenende = dieselbe Runde
+  const b = new BildQuelle("valorant", { team: "TEAM A" });
+  b.ingest({ bild: true, event: "round_start", seite: "eigen" }, 0);
+  assert.deepEqual(b.ingest({ bild: true, event: "round_start", seite: "eigen" }, 5000).events, []);
+  assert.equal(b.stand().runde, 1);
 });

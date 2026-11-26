@@ -118,7 +118,7 @@ const regie = new Regie({
 // Absenderkarte: die des Ziels, sonst die für „Senden“, sonst automatisch
 // Local Sound geht nicht ins Netz: die Regie-Oberfläche spielt die Datei (renderer/regie/sound-player.js)
 function oscSenden(s) {
-  if (istLokal(s.ziel)) { an('sound-ausgabe', { ziel: s.ziel, address: s.address, args: s.args }); return Promise.resolve(); }
+  if (istLokal(s.ziel)) { an('sound-ausgabe', { ziel: s.ziel, address: s.address, args: s.args, ereignis: s.ereignis }); return Promise.resolve(); }
   const l = lokaleIp(karten(), s.ziel.netz || cfg.regie.netz?.senden);
   return l.fehler ? Promise.reject(new Error(l.fehler)) : osc.send({ ...s, lokal: l.ip });
 }

@@ -296,3 +296,15 @@ test("Test-Knopf mit Seiten-Filter: Verteidigung sendet genauso wie Angriff", ()
   }
   assert.equal(gesendet.length, 2);
 });
+
+test("Befehle eines Events tragen dieselbe Event-ID (Local Sound: Sounds eines Events laufen zusammen)", () => {
+  const cfg = { ...standardRegie(), armed: true, aktivesSpiel: "cs2", targets: ZIELE, signale: { cs2: { round_end: [
+    { id: "1", ziel: "ql", befehl: "start", werte: { cue: "1" }, pc: "", team: "" }, { id: "2", ziel: "ql", befehl: "start", werte: { cue: "2" }, pc: "", team: "" }] } } };
+  const gesendet = [];
+  let t = 0;
+  const regie = new Regie({ getConfig: () => cfg, send: (s) => gesendet.push(s), now: () => (t += 10000) });
+  regie.pcVerbunden("PC 1", { spiele: ["cs2"] });
+  const a = regie.pcEvent("PC 1", "cs2", { type: "round_end", team: "CT", round: 1 });
+  const b = regie.pcEvent("PC 1", "cs2", { type: "round_end", team: "CT", round: 2 });
+  assert.deepEqual(gesendet.map((s) => s.ereignis), [a.id, a.id, b.id, b.id]);
+});

@@ -24,6 +24,7 @@ const neueZaehler = () => ({ ereignisse: 0, eingerichtet: 0, verworfen: 0, gesen
 class Regie {
   constructor({ getConfig, send, emit, now = Date.now, timer = setTimeout }) {
     this.timer = timer;
+    this.testNr = 0;
     this.getConfig = getConfig;
     this.send = send; // ({ ziel, address, args }) → Promise
     this.emit = emit || (() => {}); // (typ, daten)
@@ -215,7 +216,7 @@ class Regie {
   // wie beim echten Event, jeder mit seiner Verzögerung, auch wenn die Ausgabe aus ist. Abgeschaltete Befehle bleiben aus.
   testeEvent(spiel, type) {
     const cfg = this.getConfig();
-    const k = { befehle: [], fehler: [], gesendet: 0, verzoegert: 0, maxMs: 0 };
+    const k = { befehle: [], fehler: [], gesendet: 0, verzoegert: 0, maxMs: 0, ereignis: `test:${++this.testNr}` }; // Sounds des Tests laufen zusammen
     for (const z of zuweisungen(cfg, spiel, type)) {
       if (z.aus === true) continue;
       const b = this.testBefehl(cfg, spiel, type, z);
@@ -235,7 +236,7 @@ class Regie {
     const ziel = b.ziel;
     for (const n of b.nachrichten) {
       this.zaehler.gesendet++;
-      Promise.resolve(this.send({ ziel, address: n.address, args: n.args })).catch((e) => {
+      Promise.resolve(this.send({ ziel, address: n.address, args: n.args, ...(k.ereignis || k.id ? { ereignis: k.ereignis || k.id } : {}) })).catch((e) => {
         if (k.id) this.fehlerZaehlen(k);
         k.fehler.push(`${ziel.name || ziel.host}: ${e.message}`);
         this.emit("fehler", `${ziel.name || ziel.host}: ${e.message}`);

@@ -85,7 +85,7 @@ function browserApi() {
   const regie = new Regie({
     getConfig: () => cfg.regie,
     // Vorschau: Local Sound spielt im Browser, OSC geht nirgends hin
-    send: (s) => { if (istLokal(s.ziel)) melde("soundAusgabe", { ziel: s.ziel, address: s.address, args: s.args }); return Promise.resolve(); },
+    send: (s) => { if (istLokal(s.ziel)) melde("soundAusgabe", { ziel: s.ziel, address: s.address, args: s.args, ereignis: s.ereignis }); return Promise.resolve(); },
     emit: (typ, d) => { if (typ === "event") melde("regieEvent", d); statusMelden(); },
   });
   const sim = new RegieSim({ regie, onChange: statusMelden });

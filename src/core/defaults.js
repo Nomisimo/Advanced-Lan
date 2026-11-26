@@ -2,7 +2,7 @@
 // Einstellungen der App. Eine Datei für beide Modi: Regie und Game-PC.
 const { STANDARD_HOTKEY, gueltigerHotkey } = require("./app-info");
 const { standardBild, migrateBild } = require("./bild-spiele");
-const { standardStats, migrateStats } = require("./stats-screens");
+const { standardStats, migrateStats, migrateEigene } = require("./stats-screens");
 const { standardSync, migrateSync, standardStatsPc, migrateStatsPc } = require("./stats-sync-cfg");
 const { standardSound, migrateSound, soundUmziehen } = require("./sound");
 const { standardNamensAbfrage, migrateNamensAbfrage } = require("./namen");
@@ -147,7 +147,7 @@ function migrateKonfig(k) {
       statsSync: migrateSync(r.statsSync),
       sound: migrateSound(r.sound),
     },
-    statspc: migrateStatsPc(k.statspc),
+    statspc: { ...migrateStatsPc(k.statspc), eigene: migrateEigene(k.statspc?.eigene) },
     gamepc: { ...d.gamepc, ...g, regie: { ...d.gamepc.regie, ...(g.regie || {}) }, overlay: { ...d.gamepc.overlay, ...(g.overlay && typeof g.overlay === "object" ? g.overlay : {}) }, bild: migrateBild(g.bild), spieler: leseSpieler(g.spieler), namensAbfrage: migrateNamensAbfrage(g.namensAbfrage), gsiToken: g.gsiToken || d.gamepc.gsiToken, verwaltet: g.verwaltet !== false },
   };
   soundUmziehen(m.regie, uid); // Sounds bis 1.0.7 → Ziel „Local Sound“ und Signale

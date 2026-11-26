@@ -68,7 +68,8 @@ export default function ScreenTab({ cfg, mutate, status, log, notify }) {
   );
 }
 
-function Editor({ cfg, mutate, status, log, screen }) {
+// Auch auf dem Stats-Screen-PC für die eigenen Screens (cfg = { stats, aktivesSpiel })
+export function Editor({ cfg, mutate, status, log, screen }) {
   const F = useMemo(() => ({ b: screen.b, h: screen.h }), [screen.b, screen.h]);
   const B = F.b, H = F.h;
   const gespeichert = useMemo(() => migrateLayout(screen.layout, F), [screen.layout, F]);

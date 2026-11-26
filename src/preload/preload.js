@@ -50,6 +50,7 @@ contextBridge.exposeInMainWorld('regieAPI', {
   soundOrdner:     call('sound-ordner'),
   soundDateien:    call('sound-dateien'),
   signalTesten:    call('signal-testen'),
+  eventTesten:     call('event-testen'),
   zielTesten:      call('ziel-testen'),
   overlayZuruecksetzen: call('overlay-zuruecksetzen'),
   simStart:        call('sim-start'),

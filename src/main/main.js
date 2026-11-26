@@ -1091,6 +1091,7 @@ ipcMain.handle('sound-dateien', async () => {
 const manuellerPc = (id) => (id && regie.pcs.get(id)?.verbunden ? id : null);
 ipcMain.handle('event-ausloesen', (_, ev) => { const pc = manuellerPc(ev?.pcId); return regie.fire({ round: regie.stand?.runde, map: regie.stand?.map, ...ev, spiel: cfg.regie.aktivesSpiel, pc: pc || 'Regie', pcId: pc || 'regie' }, 'manuell'); });
 ipcMain.handle('signal-testen', (_, spiel, type, zuweisung) => regie.testeZuweisung(spiel, type, zuweisung));
+ipcMain.handle('event-testen', (_, spiel, type) => regie.testeEvent(spiel, type));
 ipcMain.handle('ziel-testen', async (_, zielId) => {
   const ziel = cfg.regie.targets.find((t) => t.id === zielId);
   if (!ziel) return { fehler: 'Ziel nicht gefunden' };

@@ -2,7 +2,7 @@
 // Alle zeigen dieselbe Seite (index.html#stats=<id>). Für NDI rendert je Screen ein unsichtbares Offscreen-Fenster die Seite
 // in der Größe des Screens (z. B. 1920×1080 oder nur 400×120 für ein einzelnes Element), jedes Bild geht als BGRA an das NDI SDK
 // (Paket @stagetimerio/grandiose, optional: fehlt es, ist NDI nicht verfügbar). Transparenter Hintergrund = NDI mit Alpha-Kanal.
-const { BrowserWindow } = require('electron');
+const { BrowserWindow, screen } = require('electron');
 const path = require('path');
 const { ndiKonfigSchreiben, umgebungAktiv } = require('./ndi-umgebung');
 const { screenVon, statsHash, alphaGerade } = require('../core/stats-screens');
@@ -37,6 +37,14 @@ function fensterGroesse(s) {
   return { width: Math.max(160, Math.round(s.b * f)), height: Math.max(90, Math.round(s.h * f)) };
 }
 
+// Gemerkte Stelle nur, wenn das Fenster noch zum größten Teil auf einem Bildschirm liegt (Beamer abgesteckt)
+function lageAufBildschirm(l) {
+  if (!l) return {};
+  const mitte = { x: l.x + l.b / 2, y: l.y + l.h / 2 };
+  const da = screen.getAllDisplays().some(({ workArea: w }) => mitte.x >= w.x && mitte.x < w.x + w.width && mitte.y >= w.y && mitte.y < w.y + w.height);
+  return da ? { x: l.x, y: l.y, width: l.b, height: l.h } : { width: l.b, height: l.h };
+}
+
 // Ein Screen: Pop-out-Fenster und NDI-Sender
 class ScreenAusgabe {
   constructor(eltern, id) {
@@ -63,13 +71,13 @@ class ScreenAusgabe {
 
   webContents() { return [this.fenster, this.ndiWin].filter((w) => w && !w.isDestroyed()).map((w) => w.webContents); }
 
-  // vollbild: gleich als Vollbild (Stats-Screen-PC)
-  fensterOeffnen({ vollbild } = {}) {
+  // Stats-Screen-PC: lage { x, y, b, h } = gemerkte Stelle (nur wenn sie auf einem Bildschirm liegt), vollbild: gleich als Vollbild
+  fensterOeffnen({ vollbild, lage } = {}) {
     const s = this.cfg();
     if (!s) return false;
     if (this.fenster && !this.fenster.isDestroyed()) { if (this.fenster.isMinimized()) this.fenster.restore(); this.fenster.show(); this.fenster.focus(); return true; }
     this.fenster = new BrowserWindow({
-      ...fensterGroesse(s), minWidth: 120, minHeight: 60, title: `Advanced LAN · ${s.name}`, backgroundColor: '#000000', icon: this.e.icon,
+      ...fensterGroesse(s), ...lageAufBildschirm(lage), minWidth: 120, minHeight: 60, title: `Advanced LAN · ${s.name}`, backgroundColor: '#000000', icon: this.e.icon,
       webPreferences: { contextIsolation: true, nodeIntegration: false, preload: this.e.preload },
     });
     this.fenster.setMenuBarVisibility(false);
@@ -77,6 +85,13 @@ class ScreenAusgabe {
     this.fenster.on('page-title-updated', (ev) => ev.preventDefault());
     this.fenster.on('closed', () => { this.fenster = null; this.e.onChange(); this.e.onFensterZu(); });
     if (vollbild) this.fenster.setFullScreen(true);
+    // Stelle, Größe und Vollbild merken (gebündelt), auch beim Schließen
+    const f = this.fenster;
+    let t = null;
+    const merken = () => { if (f.isDestroyed() || f.isMinimized()) return; const r = f.isFullScreen() ? (f.getNormalBounds?.() || f.getBounds()) : f.getBounds(); this.e.onFensterLage?.(this.id, { x: r.x, y: r.y, b: r.width, h: r.height, vollbild: f.isFullScreen() }); };
+    const spaeter = () => { clearTimeout(t); t = setTimeout(merken, 400); };
+    for (const ev of ['move', 'resize', 'enter-full-screen', 'leave-full-screen']) f.on(ev, spaeter);
+    f.on('close', () => { clearTimeout(t); merken(); });
     this.e.onChange();
     return true;
   }
@@ -193,8 +208,8 @@ class ScreenAusgabe {
 
 class StatsAusgabe {
   // root: App-Ordner, preload: Pfad zum Preload, getStats(): cfg.regie.stats, aktiv(): läuft Regie oder Standalone, onChange()
-  constructor({ root, preload, icon, getStats, aktiv, onChange, onFensterZu, ndiKarte, ndiOrdner }) {
-    Object.assign(this, { root, preload, icon, getStats, aktiv, onChange: onChange || (() => {}), onFensterZu: onFensterZu || (() => {}) });
+  constructor({ root, preload, icon, getStats, aktiv, onChange, onFensterZu, onFensterLage, ndiKarte, ndiOrdner }) {
+    Object.assign(this, { root, preload, icon, getStats, aktiv, onChange: onChange || (() => {}), onFensterZu: onFensterZu || (() => {}), onFensterLage });
     if (ndiKarte) ndiNetz = { karte: ndiKarte, ordner: ndiOrdner || (() => '') };
     this.screens = new Map(); // id → ScreenAusgabe
   }

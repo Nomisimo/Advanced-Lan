@@ -42,7 +42,44 @@ const BILDER = process.argv[3] || require('os').tmpdir();
   await page.getByTestId('statspc-regie').press('Enter');
   await page.waitForTimeout(300);
   assert.strictEqual((await konfig()).statspc.regie, '192.168.1.5');
+  assert.strictEqual((await konfig()).statspc.vollbildStart, false, 'Fenster normal, nicht gleich Vollbild');
   await page.screenshot({ path: BILDER + '/statspc-2-app.png', fullPage: true });
+
+  // Screen der Regie als eigenen kopieren: landet im Editor, die Regie-Screens bleiben
+  await page.getByTestId('statspc-kopie-haupt').click();
+  await page.getByTestId('screen-flaeche').waitFor();
+  let k = await konfig();
+  assert.strictEqual(k.statspc.eigene.screens.length, 1, 'eigener Screen angelegt');
+  const eigen = k.statspc.eigene.screens[0];
+  assert.ok(eigen.name.includes('(eigen)') && eigen.id !== 'haupt');
+  assert.strictEqual(k.regie.stats.screens.length, 1, 'Screens der Regie unverändert');
+  // Im Editor ändern: Text hinzufügen
+  await page.getByRole('button', { name: 'Text hinzufügen' }).click();
+  await page.waitForTimeout(500);
+  k = await konfig();
+  assert.ok(k.statspc.eigene.screens[0].layout.elemente.some((e) => e.typ === 'text'), 'Text im eigenen Screen gespeichert');
+  await page.getByTestId('screen-name').fill('Mein Beamer');
+  await page.getByTestId('screen-name').press('Enter');
+  await page.waitForTimeout(300);
+  assert.strictEqual((await konfig()).statspc.eigene.screens[0].name, 'Mein Beamer');
+  await page.screenshot({ path: BILDER + '/statspc-3-eigene.png', fullPage: true });
+  // In der Liste: Regie-Screen und eigener
+  await page.getByRole('button', { name: /^Screens/ }).click();
+  assert.ok(await page.getByTestId(`statspc-screen-${eigen.id}`).isVisible(), 'eigener Screen in der Liste');
+  assert.ok((await page.getByTestId(`statspc-screen-${eigen.id}`).textContent()).includes('eigen'));
+
+  // Daten: alles, was ankommt
+  await page.getByRole('button', { name: 'Daten', exact: true }).click();
+  await page.getByTestId('daten-empfang').waitFor();
+  assert.ok((await page.locator('main').textContent()).includes('Rohdaten'));
+  await page.screenshot({ path: BILDER + '/statspc-4-daten.png', fullPage: true });
+
+  // Letzten eigenen Screen löschen geht
+  await page.getByRole('button', { name: /^Eigene Screens/ }).click();
+  await page.getByTestId('screen-loeschen').click();
+  await page.getByRole('button', { name: 'OK', exact: true }).click();
+  await page.getByTestId('eigen-neu').waitFor();
+  assert.strictEqual((await konfig()).statspc.eigene.screens.length, 0);
 
   assert.deepStrictEqual(fehler, [], 'keine Fehler auf der Seite');
   await browser.close();

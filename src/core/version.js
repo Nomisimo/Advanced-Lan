@@ -6,6 +6,10 @@ const REPO = "Nomisimo/Advanced-Lan";
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
+  "1.0.11": [
+    "Local Sound: mehrere Sounds im selben Event spielen zusammen. „Neuer Sound beendet laufenden“ stoppt nur noch Sounds aus früheren Events (auch bei „Alle testen“)",
+    "grandMA3: neuer Befehl „Sequenz: Go+ auf Cue“ (Go+ Sequence X Cue Y)",
+  ],
   "1.0.10": [
     "Stats-Screen-Editor: jede Anzeige, Spieler-Karte und jeder Bild-Block hat jetzt ein Feld „Überschrift“ (auch Spielstand, Zahlen, Aktives Spiel, Session, LIVE). Frei ändern oder leer lassen = keine Überschrift, Platzhalter wie {spiel} gehen auch. Bestehende Layouts bleiben unverändert",
     "Stats-Screen: Trennlinien in Letzte Events, Beste Spieler, Teams und MVP-Ranking werden mit dem Kachel-Hintergrund durchsichtig, bei 0 % sind sie weg",

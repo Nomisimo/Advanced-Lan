@@ -110,7 +110,7 @@ function migrateSignale(s) {
     if (!evs || typeof evs !== "object") continue;
     for (const [ev, liste] of Object.entries(evs)) {
       if (!Array.isArray(liste)) continue;
-      (out[spiel] = out[spiel] || {})[ev] = liste.filter((z) => z && typeof z === "object").map((z) => ({ id: z.id || uid(), ziel: z.ziel || "", befehl: z.befehl || "eigene", werte: z.werte && typeof z.werte === "object" ? z.werte : {}, pc: z.pc || "", team: z.team || "", ...(typeof z.seite === "string" && z.seite ? { seite: z.seite } : {}), ...(z.aus === true ? { aus: true } : {}) }));
+      (out[spiel] = out[spiel] || {})[ev] = liste.filter((z) => z && typeof z === "object").map((z) => ({ id: z.id || uid(), ziel: z.ziel || "", befehl: z.befehl || "eigene", werte: z.werte && typeof z.werte === "object" ? z.werte : {}, pc: z.pc || "", team: z.team || "", ...(typeof z.seite === "string" && z.seite ? { seite: z.seite } : {}), ...(z.aus === true ? { aus: true } : {}), ...(Number(z.verzoegerung) > 0 ? { verzoegerung: Math.min(600000, Math.round(Number(z.verzoegerung))) } : {}) }));
     }
   }
   return out;
@@ -140,6 +140,7 @@ function migrateKonfig(k) {
       targets: Array.isArray(r.targets) ? r.targets.map(migrateZiel) : d.regie.targets,
       signale: migrateSignale(r.signale),
       ersetzt: migrateErsetzt(r.ersetzt),
+      mvpNach: Object.fromEntries(Object.entries(r.mvpNach && typeof r.mvpNach === "object" ? r.mvpNach : {}).filter(([, v]) => typeof v === "string" && v)),
       plan: migratePlan(r.plan),
       spiele: genutzteSpiele(r.spiele, d.regie.spiele),
       stats: migrateStats(r.stats),

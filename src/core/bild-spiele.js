@@ -26,9 +26,11 @@ const BILD_SPIELE = [
     exe: "valorant-win64-shipping.exe", fenster: "VALORANT", riot: true, // riot: Team kann der Riot Client liefern (riot-team.js)
     events: [
       // team: kommt nicht aus der Bilderkennung, sondern vom Game-PC, sobald das Team automatisch erkannt ist (vor match_start)
-      M("team", "Team steht fest", { team: true, auto: true }), M("match_start", "Match startet"), M("match_won", "Match gewonnen", { team: true, art: "matchende" }),
+      M("team", "Team steht fest", { team: true, auto: true }), M("match_start", "Match startet"), M("overtime", "Verlängerung (12:12)", { auto: true }), M("match_won", "Match gewonnen", { team: true, art: "matchende" }),
       R("round_start", "Kaufphase (Runde startet)", { art: "start" }), R("round_end", "Runde gewonnen", { team: true, art: "ende" }),
       R("spike_planted", "Spike gelegt"), R("spike_defused", "Spike entschärft"), R("spike_detonated", "Spike explodiert"),
+      // Nur aus Shots Fired (round_phase „combat“): Ende der Kaufphase, die Barriere fällt
+      R("round_combat", "Kampf beginnt (Barriere fällt)"),
       P("kill", "Kill"), P("death", "Spieler stirbt"), P("ace", "Ace"), P("clutch", "Clutch"), P("thrifty", "Thrifty"),
       // Liefert auch Shots Fired (shotsfired.js) und Automation Overdrive (overdrive.js): Match vorbei ohne Sieger, Assist, Headshot
       M("match_end", "Match vorbei", { art: "matchende" }), P("assist", "Assist"), P("headshot", "Headshot"),
@@ -275,7 +277,14 @@ class BildQuelle {
   }
 
   // Neues Match: Zustand an Ort und Stelle zurücksetzen
-  neu() { this.z = Object.assign(this.z || {}, { laeuft: false, runde: 0, siege: {}, n: {}, nach: null, endeT: null }); }
+  neu() { this.z = Object.assign(this.z || {}, { laeuft: false, runde: 0, siege: {}, n: {}, nach: null, endeT: null, ot: false }); }
+
+  // Valorant: Verlängerung, sobald es 12:12 steht (oder Runde 25 beginnt, wenn die Sieger nicht bekannt sind). Einmal je Match.
+  verlaengerung(roh) {
+    const z = this.z, s = Object.values(z.siege);
+    if (this.spiel !== "valorant" || z.ot) return;
+    if ((s.length === 2 && s[0] === 12 && s[1] === 12) || z.runde === 25) { z.ot = true; roh.push({ type: "overtime", team: "", round: 25 }); }
+  }
 
   gegner() { const t = this.def.teams; return t.length === 2 ? t[t[0] === this.team ? 1 : 0] : ""; }
 
@@ -287,6 +296,7 @@ class BildQuelle {
     const z = this.z, roh = [];
     const team = m.seite === "gegner" ? this.gegner() : m.seite === "keins" ? "" : this.team; // keins: Rundenende ohne bekannten Sieger
     // einmal: eindeutige ID eines Ereignisses, das alle PCs melden (z. B. EventID der LoL-API), damit die Regie es nur einmal zählt
+    if (ev.id === "match_start" && m.neu) z.laeuft = false; // neues Match laut Riot Client, auch wenn das alte nicht sauber endete
     const global = (type, extra = {}) => roh.push({ type, team: "", round: z.runde, ...(m.einmal ? { einmal: `${this.spiel}:${m.einmal}` } : {}), ...extra });
     // Erste Runde nach dem Matchende (oder überhaupt): neues Match
     const matchStart = () => { if (!z.laeuft) { this.neu(); z.laeuft = true; global("match_start", { round: 0 }); } };
@@ -294,6 +304,7 @@ class BildQuelle {
       matchStart();
       z.runde++;
       global(ev.id, { round: z.runde });
+      this.verlaengerung(roh);
     } else if (ev.art === "ende") {
       if (z.nach === z.runde && now - z.endeT < 15000) return this.ergebnis([], now); // eine Runde endet nur einmal, auch wenn Sieg und Niederlage flackern
       matchStart();
@@ -301,6 +312,7 @@ class BildQuelle {
       Object.assign(z, { nach: z.runde, endeT: now });
       if (team) z.siege[team] = (z.siege[team] || 0) + 1;
       global(ev.id, { team });
+      this.verlaengerung(roh);
     } else if (ev.art === "matchende") {
       if (!z.laeuft) return this.ergebnis([], now); // nur nach erkannten Runden, und nur einmal
       z.laeuft = false;

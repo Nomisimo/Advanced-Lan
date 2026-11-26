@@ -373,7 +373,7 @@ test("Stats-Screen: Spieler aus Statistik, Shots Fired und PC-Status; Teams aus 
     namen: { "PC 01": "Momo" },
     statistik: { spiel: "valorant", alle: [{ id: "PC 01", name: "Momo", team: t1, kills: 7, tode: 2, headshots: 3, assists: 1 }], match: { kills: 9, tode: 5 }, runde: { nr: 8 } },
     pcs: [
-      { pcId: "PC 01", spiel: "valorant", verbunden: true, stand: { sf: { team: t1, seite: "Angriff", verbuendete: ["Momo", "Kira"], gegner: ["Rex", "Juno"], kills: 6 } } },
+      { pcId: "PC 01", spiel: "valorant", verbunden: true, stand: { sf: { team: t1, seite: "Angriff", verbuendete: ["Momo", "Kira"], gegner: ["Rex", "Juno"], kills: 6, agent: "Jett", waffe: "Vandal" } } },
       { pcId: "PC 02", spiel: "valorant", verbunden: true, status: { team: t2, kills: 2, deaths: 4 }, stand: { sf: { kills: 3, deaths: 1, headshots: 2 } } },
       { pcId: "PC 03", spiel: "cs2", verbunden: true },
     ],
@@ -393,6 +393,10 @@ test("Stats-Screen: Spieler aus Statistik, Shots Fired und PC-Status; Teams aus 
   assert.equal(wertVon("kills", { statistik: status.statistik }), "9");
   assert.equal(wertVon("sp.kd", { sp: l[0] }), "3.50");
   assert.equal(wertVon("sp.seite", { sp: l[1] }), "–");
+  assert.equal(wertVon("sp.agent", { sp: l[0] }), "Jett");
+  assert.equal(wertVon("sp.waffe", { sp: l[0] }), "Vandal");
+  assert.equal(wertVon("sp.waffe", { sp: l[1] }), "–");
+  assert.equal(teams[0].spieler[0].agent, "Jett");
   assert.equal(wertVon("score1", { d: { teams: [{ name: "A", score: 4 }] } }), "4");
 });
 

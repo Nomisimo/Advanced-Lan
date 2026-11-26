@@ -6,6 +6,13 @@ const REPO = "Nomisimo/Advanced-Lan";
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
+  "1.0.9": [
+    "Valorant: neues Event „Kampf beginnt (Barriere fällt)“ aus Shots Fired (round_phase „combat“), einmal je Runde nach der Kaufphase. Eigener Cue für Licht und Sound, Sound-Ordner „combat“ oder „barrier“",
+    "Stats-Screen (Valorant mit Shots Fired): Agent jedes Spielers (agent) in Spieler-Karte und Teams-Liste, dazu die Waffe des letzten eigenen Kills aus dem kill_feed (z. B. Vandal, Operator, Messer). Neue Werte „Agent“ und „Waffe des letzten Kills“, in der Spieler-Karte einzeln abschaltbar",
+    "Game-PC → Setup → Shots Fired zeigt Agent, Waffe des letzten eigenen Kills und den letzten Kill im Feed. In Shots Fired dafür agent, player_name und kill_feed als Webhook anlegen",
+    "Valorant: „Match startet“ kommt über den Riot Client schon zu Beginn des Matches, neues Event „Verlängerung (12:12)“",
+    "Neues Event „Match-MVP“ nach einstellbarem Auslöser, und eine Verzögerung (ms) an jedem Befehl",
+  ],
   "1.0.8": [
     "Sound als Ziel „Local Sound“ (Tab „Ziele“): Ausgabegerät und Lautstärke je Ziel, darunter die Sound-Bibliothek. Im Tab „Signale“ je Event „Sound abspielen“ mit einer oder mehreren Dateien (mehrere: zufällig eine), wie die OSC-Befehle nur bei scharfer Ausgabe, Test immer",
     "Signale (Valorant): Filter nach Seite „Angriff“ oder „Verteidigung“ in der Team-Auswahl, z. B. eigene Sounds oder Cues für „Attackers win“ und „Defenders win“. Berücksichtigt den Seitenwechsel zur Halbzeit. Platzhalter {seite}",

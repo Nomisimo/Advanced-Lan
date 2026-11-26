@@ -95,7 +95,7 @@ function ShotsFiredAnleitung({ punkte, sf, mac, notify }) {
 
 // Valorant: was Shots Fired über die Teams weiß (team, ui_team_order_allies / _enemies)
 function SfTeams({ info }) {
-  if (!info || (!info.seite && !info.verbuendete?.length && !info.gegner?.length && !info.match)) return null;
+  if (!info || (!info.seite && !info.verbuendete?.length && !info.gegner?.length && !info.match && !info.agent && !info.letzterKill)) return null;
   const zeile = (titel, wert) => wert ? <div><span style={{ color: SUB }}>{titel}:</span> {wert}</div> : null;
   return (
     <div style={{ marginTop: 12, fontSize: 12, padding: "6px 8px", background: "#1a1820", border: `1px solid ${LINE}`, borderRadius: 6, display: "grid", gap: 2 }}>
@@ -104,6 +104,9 @@ function SfTeams({ info }) {
       {zeile("Eigenes Team", info.verbuendete?.join(", "))}
       {zeile("Gegner", info.gegner?.join(", "))}
       {zeile("Match-ID", info.match)}
+      {zeile("Agent", info.agent)}
+      {zeile("Waffe des letzten eigenen Kills", info.waffe)}
+      {info.letzterKill && zeile("Letzter Kill im Feed", `${info.letzterKill.angreifer || "?"} → ${info.letzterKill.opfer || "?"}${info.letzterKill.waffe ? ` (${info.letzterKill.waffe}${info.letzterKill.headshot ? ", Headshot" : ""})` : ""}`)}
     </div>
   );
 }

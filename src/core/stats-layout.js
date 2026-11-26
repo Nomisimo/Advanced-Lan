@@ -94,7 +94,7 @@ function migrateTeamOptionen(e) {
     textAngriff: t(e.textAngriff, TEAM_OPTIONEN.textAngriff), textVerteidigung: t(e.textVerteidigung, TEAM_OPTIONEN.textVerteidigung), farbe1: f(e.farbe1), farbe2: f(e.farbe2) };
 }
 // Spieler-Karte: welcher Spieler (quelle "rang" + rang oder PC-ID) und welche Zahlen
-const SPIELER_OPTIONEN = { team: true, seite: true, kills: true, tode: true, headshots: true, kd: true };
+const SPIELER_OPTIONEN = { agent: true, waffe: true, team: true, seite: true, kills: true, tode: true, headshots: true, kd: true };
 // Einzelwert: welcher Wert (core/stats-screen.js WERTE), für Spielerwerte welcher Spieler, Beschriftung
 const WERT_KEYS = ["score1", "score2", "team1", "team2", "runde", "kills", "tode", "headshots", "aces", "sp.name", "sp.kills", "sp.tode", "sp.headshots", "sp.kd", "sp.team", "sp.seite"];
 const quelleVon = (v) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 60) : "rang");

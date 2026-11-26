@@ -186,6 +186,7 @@ function TeamsAnzeige({ teams, spiel, seiten, titel, o, tx }) {
                 {t.spieler.map((p) => (
                   <div key={p.name} style={{ ...zelle, display: "flex", gap: 12, alignItems: "center", borderLeft: `4px solid ${f}` }}>
                     <span style={{ flex: 1, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
+                    {p.agent && <span style={{ fontSize: 18, color: SUB, textTransform: "uppercase", letterSpacing: 1, whiteSpace: "nowrap" }}>{p.agent}</span>}
                     {o.zahlen !== false && p.kills != null && <span style={{ fontSize: 22, color: SUB, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}><b style={{ color: TXT }}>{p.kills}</b> / {p.tode ?? 0}</span>}
                   </div>
                 ))}
@@ -268,13 +269,15 @@ function MvpAnzeige({ el, liste, d, spiel, tx, h }) {
 function SpielerKarte({ el, sp }) {
   const f = sp?.team ? teamFarbe(sp.team) : ACCENT;
   const zahlen = [["kills", "Kills", sp?.kills], ["tode", "Tode", sp?.tode], ["headshots", "HS", sp?.headshots], ["kd", "K/D", sp ? kd(sp) : null]].filter(([k]) => el[k] !== false);
-  const unter = [el.team !== false && sp?.team, el.seite !== false && sp?.seite].filter(Boolean).join(" · ");
+  const unter = [el.agent !== false && sp?.agent, el.team !== false && sp?.team, el.seite !== false && sp?.seite].filter(Boolean).join(" · ");
+  const waffe = el.waffe !== false && sp?.waffe;
   return (
     <Panel style={{ width: "100%", height: "100%", boxSizing: "border-box", display: "flex", alignItems: "center", gap: 24, padding: "0 28px 0 0", overflow: "hidden", position: "relative" }}>
       <div style={{ alignSelf: "stretch", width: 10, background: f, boxShadow: `0 0 20px ${f}` }} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 44, fontWeight: 800, color: TXT, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sp ? sp.name : "Kein Spieler"}</div>
         {unter && <div style={{ fontSize: 22, fontWeight: 700, color: f, letterSpacing: 1, textTransform: "uppercase", marginTop: 4, whiteSpace: "nowrap" }}>{unter}</div>}
+        {waffe && <div style={{ fontSize: 18, color: SUB, letterSpacing: 1, textTransform: "uppercase", marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Letzter Kill: {waffe}</div>}
       </div>
       {zahlen.map(([k, l, v]) => (
         <div key={k} style={{ textAlign: "center", minWidth: 70 }}>

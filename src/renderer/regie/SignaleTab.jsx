@@ -6,7 +6,7 @@ import { uid } from "../../core/defaults.js";
 import { SPIELE, SPIEL_BY_ID } from "../../core/spiele.js";
 import { zielTyp, befehleVon, befehlVon } from "../../core/ziel-typen.js";
 import { baueNachrichten, zeigeNachricht, nutztPlan } from "../../core/signal.js";
-import { ALLGEMEIN, AKTIONEN, aktionVon, geerbt, modus } from "../../core/aktionen.js";
+import { ALLGEMEIN, AKTIONEN, aktionVon, mvpAusloeser, geerbt, modus } from "../../core/aktionen.js";
 import { migrateSound, vorschlagFuer, dateiListe, dateiWert } from "../../core/sound.js";
 import { istLokal } from "../../core/ziel-typen.js";
 import { SEITEN } from "../../core/signal.js";
@@ -50,7 +50,7 @@ function SoundWahl({ cfg, spiel, wert, setzen }) {
 const ALLGEMEIN_SPIEL = { id: ALLGEMEIN, name: "Allgemein", teams: [], events: AKTIONEN.map(({ id, label, gruppe, spieler }) => ({ id, label, gruppe, spieler })) };
 
 // Feste Spalten, damit Ziel, Befehl, Werte, PC, Team und Knöpfe in allen Zeilen untereinander stehen
-const ZEILE = "170px 230px minmax(220px,1fr) 130px 130px 92px";
+const ZEILE = "170px 230px minmax(220px,1fr) 130px 130px 84px 92px";
 
 // Jedes Feld hat einen Titel darüber, auch leere Spalten, damit alle Zeilen gleich hoch beginnen
 // div statt label, wenn das Feld selbst mehrere Eingaben hat (Dateiwahl): ein label würde jeden Klick aufs erste Kästchen lenken
@@ -126,6 +126,11 @@ function Zuweisung({ spiel, ev, z, cfg, pcs, aendern, loeschen, notify }) {
             </select>
             : <Leer text="alle" />}
         </Feld>
+        <Feld titel="Verzögerung">
+          <input style={{ ...S.inputSm, ...S.mono }} inputMode="numeric" placeholder="0 ms" data-testid="signal-verzoegerung" value={z.verzoegerung || ""}
+            title="Befehl erst so viele Millisekunden nach dem Event senden (1000 = 1 Sekunde)"
+            onChange={(e) => aendern((w) => { const n = Math.min(600000, Math.max(0, Math.round(Number(e.target.value.replace(/\D/g, "")) || 0))); if (n) w.verzoegerung = n; else delete w.verzoegerung; })} />
+        </Feld>
         <Feld titel=" ">
           <div style={{ display: "flex", gap: 6, whiteSpace: "nowrap" }}>
             <button style={{ ...S.smallBtn, padding: "6px 8px" }} disabled={!!v.fehler} onClick={testen} title="Jetzt senden, auch wenn die Ausgabe aus ist"><Send size={12} /> Test</button>
@@ -185,6 +190,16 @@ function EventZeile({ spiel, ev, cfg, mutate, pcs, notify }) {
         {soundZiel && <button style={{ ...S.smallBtn, color: "#9be7b4" }} data-testid={`signal-sound-${ev.id}`} onClick={() => neu(soundZiel)} title={`Befehl „Sound abspielen“ an „${soundZiel.name || "Local Sound"}“`}><Volume2 size={12} /> Sound</button>}
         <button style={S.smallBtn} disabled={!cfg.targets.length} onClick={() => neu()}><Plus size={12} /> Befehl</button>
       </div>
+      {ev.mvp && spiel.id !== ALLGEMEIN && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0 0 30px", fontSize: 12, color: SUB }}>
+          <span>Kommt nach</span>
+          <select style={{ ...S.selectSm, width: 230 }} data-testid="mvp-nach" value={mvpAusloeser(cfg, spiel.id)}
+            onChange={(e) => mutate((d) => { d.mvpNach = { ...(d.mvpNach || {}), [spiel.id]: e.target.value }; })}>
+            {spiel.events.filter((x) => !x.mvp).map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}
+          </select>
+          <span>mit dem besten Spieler im Ranking (MVP-Endscreen). Wartezeit am Befehl unter „Verzögerung“.</span>
+        </div>
+      )}
       {zuw.map((z) => (
         <Zuweisung key={z.id} spiel={spiel} ev={ev} z={z} cfg={cfg} pcs={pcs} notify={notify}
           aendern={(fn) => aendereListe((l) => l.map((w) => { if (w.id !== z.id) return w; const k = { ...w }; fn(k); return k; }))}

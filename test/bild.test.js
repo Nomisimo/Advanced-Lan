@@ -163,3 +163,28 @@ test("Mehrere Bereiche je Aktion: einer reicht oder alle gleichzeitig, auch nur 
   assert.ok(d.aktionen[0].bereiche[1].region.x > 0.8, "rechter Bereich rutscht mit dem Rand");
   assert.ok(Math.abs(d.aktionen[0].bereiche[0].region.x + d.aktionen[0].bereiche[0].region.b / 2 - 0.5) < 1e-6, "mittiger Bereich bleibt mittig");
 });
+
+test("Valorant: Verlängerung bei 12:12, einmal je Match; Riot-Match-Start setzt neu auf", () => {
+  const { BildQuelle } = require("../src/core/bild-spiele");
+  const q = new BildQuelle("valorant", { team: "TEAM A" });
+  let t = 0;
+  const typen = (m) => q.ingest({ bild: true, ...m }, (t += 20000)).events.map((e) => e.type);
+  // 24 Runden, abwechselnd gewonnen: 12:12 kommt mit dem letzten Rundenende
+  const alle = [];
+  for (let i = 0; i < 12; i++) { alle.push(...typen({ event: "round_start" }), ...typen({ event: "round_end", seite: "eigen" }), ...typen({ event: "round_start" }), ...typen({ event: "round_end", seite: "gegner" })); }
+  assert.equal(alle.filter((x) => x === "overtime").length, 1);
+  assert.equal(alle.lastIndexOf("overtime"), alle.length - 1, "direkt nach dem Rundenende zum 12:12");
+  assert.deepEqual(typen({ event: "round_start" }).filter((x) => x === "overtime"), [], "nur einmal");
+  // Riot Client: neues Match, auch wenn das alte noch läuft
+  assert.deepEqual(typen({ event: "match_start", neu: true }), ["match_start"]);
+  assert.equal(q.z.ot, false);
+});
+
+test("Valorant: Verlängerung ohne bekannte Sieger ab Runde 25", () => {
+  const { BildQuelle } = require("../src/core/bild-spiele");
+  const q = new BildQuelle("valorant", { team: "TEAM A" });
+  let t = 0, alle = [];
+  for (let i = 0; i < 25; i++) alle.push(...q.ingest({ bild: true, event: "round_start" }, (t += 20000)).events.map((e) => e.type));
+  assert.equal(alle.filter((x) => x === "overtime").length, 1);
+  assert.equal(alle[alle.length - 1], "overtime");
+});

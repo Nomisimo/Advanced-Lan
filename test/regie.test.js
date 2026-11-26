@@ -219,3 +219,45 @@ test("Valorant: „Team steht fest“ je PC, ein Befehl je Team mit {nr} aus dem
   assert.match(text[0], /\b1\b/);
   assert.match(text[1], /102/);
 });
+
+test("Verzögerung am Befehl: sendet erst nach der eingestellten Zeit, und nur wenn die Ausgabe dann noch an ist", () => {
+  const cfg = { ...standardRegie(), armed: true, aktivesSpiel: "cs2", targets: ZIELE, signale: { cs2: { round_end: [{ id: "1", ziel: "ma", befehl: "goto_cue", werte: { seq: "1", cue: "2" }, pc: "", team: "", verzoegerung: 3000 }] } } };
+  const gesendet = [], uhr = [];
+  let t = 0;
+  const regie = new Regie({ getConfig: () => cfg, send: (s) => gesendet.push(s), now: () => (t += 10000), timer: (fn, ms) => uhr.push({ fn, ms }) });
+  regie.pcVerbunden("PC 1", { spiele: ["cs2"] });
+  const e = regie.pcEvent("PC 1", "cs2", { type: "round_end", team: "CT", round: 1 });
+  assert.equal(gesendet.length, 0);
+  assert.equal(e.befehle[0].ms, 3000);
+  assert.deepEqual(uhr.map((u) => u.ms), [3000]);
+  uhr[0].fn();
+  assert.equal(gesendet.length, 1);
+  regie.pcEvent("PC 1", "cs2", { type: "round_end", team: "CT", round: 2 });
+  cfg.armed = false;
+  uhr[1].fn();
+  assert.equal(gesendet.length, 1);
+});
+
+test("Match-MVP: kommt nach dem Auslöser-Event mit dem besten Spieler, Auslöser einstellbar", () => {
+  const cfg = { ...standardRegie(), armed: true, aktivesSpiel: "valorant", targets: ZIELE, signale: { valorant: { match_mvp: [{ id: "m", ziel: "ql", befehl: "start", werte: { cue: "MVP {spieler}" }, pc: "", team: "", verzoegerung: 3000 }] } } };
+  const gesendet = [], uhr = [], events = [];
+  let t = 0;
+  const regie = new Regie({ getConfig: () => cfg, send: (s) => gesendet.push(s), emit: (typ, d) => typ === "event" && !d.verworfen && events.push(d), now: () => (t += 10000), timer: (fn, ms) => uhr.push({ fn, ms }) });
+  for (const pc of ["PC 1", "PC 2"]) regie.pcVerbunden(pc, { spiele: ["valorant"] });
+  for (let i = 0; i < 3; i++) regie.pcEvent("PC 2", "valorant", { type: "kill", player: "PC 2", team: "TEAM B", round: i + 1 });
+  regie.pcEvent("PC 1", "valorant", { type: "kill", player: "PC 1", team: "TEAM A", round: 1 });
+  regie.pcEvent("PC 1", "valorant", { type: "match_won", team: "TEAM B" });
+  const mvp = events.find((e) => e.ev.type === "match_mvp");
+  assert.ok(mvp, "Match-MVP fehlt");
+  assert.equal(mvp.ev.pcId, "PC 2");
+  assert.equal(gesendet.length, 0);
+  uhr.at(-1).fn();
+  assert.equal(gesendet.length, 1);
+  // anderer Auslöser
+  cfg.mvpNach = { valorant: "match_end" };
+  const vorher = events.length;
+  regie.pcEvent("PC 1", "valorant", { type: "match_won", team: "TEAM A" });
+  assert.equal(events.slice(vorher).filter((e) => e.ev.type === "match_mvp").length, 0);
+  regie.pcEvent("PC 1", "valorant", { type: "match_end" });
+  assert.equal(events.slice(vorher).filter((e) => e.ev.type === "match_mvp").length, 1);
+});

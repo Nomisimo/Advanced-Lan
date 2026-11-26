@@ -19,8 +19,13 @@ const AKTIONEN = [
   { id: "round_start", label: "Runde startet", gruppe: "Runde", events: { cs2: ["round_live"], valorant: ["round_start"], finals: ["round_start"], rl: ["kickoff"] } },
   { id: "round_end", label: "Runde vorbei", gruppe: "Runde", events: { cs2: ["round_end"], valorant: ["round_end"], finals: ["round_end"] } },
   { id: "match_start", label: "Match startet", gruppe: "Match", events: { cs2: ["match_live"], valorant: ["match_start"], rl: ["match_start"], dota2: ["match_start"], finals: ["match_start"], fortnite: ["match_start"], lol: ["match_start"] } },
+  { id: "overtime", label: "Verlängerung", gruppe: "Match", events: { valorant: ["overtime"], rl: ["overtime"] } },
   { id: "win", label: "Sieg / Match vorbei", gruppe: "Match", events: { cs2: ["match_end"], valorant: ["match_won"], rl: ["match_end"], dota2: ["match_end"], finals: ["match_won"], fortnite: ["match_won"], lol: ["match_won"] } },
+  { id: "match_mvp", label: "Match-MVP", gruppe: "Match", spieler: true, events: Object.fromEntries(["cs2", "valorant", "rl", "dota2", "finals", "fortnite", "lol"].map((s) => [s, ["match_mvp"]])) },
 ];
+
+// Auslöser des Match-MVP: das Event der Aktion „Sieg / Match vorbei“, wenn im Spiel nichts anderes eingestellt ist
+const mvpAusloeser = (cfg, spiel) => cfg?.mvpNach?.[spiel] || AKTIONEN.find((a) => a.id === "win").events[spiel]?.[0] || "";
 
 // Allgemeine Aktion eines Spiel-Events, sonst null
 const aktionVon = (spiel, type) => AKTIONEN.find((a) => a.events[spiel]?.includes(type)) || null;
@@ -49,4 +54,4 @@ function migrateErsetzt(e) {
   return out;
 }
 
-module.exports = { ALLGEMEIN, AKTIONEN, aktionVon, istErsetzt, geerbt, modus, migrateErsetzt };
+module.exports = { ALLGEMEIN, AKTIONEN, mvpAusloeser, aktionVon, istErsetzt, geerbt, modus, migrateErsetzt };

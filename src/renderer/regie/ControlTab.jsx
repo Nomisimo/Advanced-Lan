@@ -355,7 +355,7 @@ export function EventZeile({ e, neu }) {
       ) : (e.befehle || []).map((b, i) => (
         <div key={i} style={{ ...S.mono, fontSize: 11, marginTop: 2, paddingLeft: 112, color: b.fehler ? ERR : !e.scharf ? MUTED : "#d9c6ff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           <span style={{ color: b.fehler ? ERR : !e.scharf ? WARN : OK }}>{b.ziel}</span>
-          <span style={{ marginLeft: 8 }}>{b.fehler || b.nachrichten.join("  ·  ")}</span>
+          <span style={{ marginLeft: 8 }}>{b.fehler || b.nachrichten.join("  ·  ")}{b.ms ? `  (+${b.ms} ms)` : ""}</span>
           {!e.scharf && !b.fehler && <span style={{ marginLeft: 8, color: WARN }}>nicht gesendet</span>}
         </div>
       ))}

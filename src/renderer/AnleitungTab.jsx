@@ -71,6 +71,8 @@ const Regie = ({ goTab }) => (
       mit <b>+ Event einrichten</b> kommt ein Event dazu. Eigene Befehle <b>ergänzen</b> die allgemeinen, <b>Ersetzen</b> lässt für dieses Event nur die eigenen gelten.
       <b> + Befehl</b> legt fest: Ziel, Befehl und Werte (zum Beispiel Sequenz und Cue). Werte können Platzhalter enthalten: <Kbd>{"{plan}"}</Kbd> (Spalte des Ziels im Plan für den auslösenden PC),
       <Kbd>{"{nr}"}</Kbd>, <Kbd>{"{spieler}"}</Kbd>, <Kbd>{"{team}"}</Kbd>, <Kbd>{"{runde}"}</Kbd> und Rechnungen wie <Kbd>{"{100+nr}"}</Kbd>.
+      <b> Verzögerung</b> schickt den Befehl erst so viele Millisekunden nach dem Event (3000 = 3 Sekunden).
+      <b> Match-MVP</b> löst die Regie selbst aus, sobald das unter „Kommt nach“ gewählte Event da ist (Standard: Sieg / Match vorbei), mit dem besten Spieler aus dem Ranking des MVP-Endscreens als <Kbd>{"{spieler}"}</Kbd> und <Kbd>{"{pc}"}</Kbd>.
       <b> Test</b> sendet den Befehl sofort, auch bei Ausgabe aus (ohne PC-Filter als erster Platz des Plans).
     </Schritt>
     <Schritt n={6} titel="Proben" onGo={goTab && (() => goTab("sim"))} goLabel="Simulator">

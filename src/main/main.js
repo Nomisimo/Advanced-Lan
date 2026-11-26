@@ -236,7 +236,12 @@ let quellen = {};
 // Neue MatchID: sofort an die Regie, damit sie diesen PC dem richtigen Match zuordnet (auch vor dem ersten Event)
 const riot = new RiotClient({
   onTeam: () => { if (quellen.valorant) quellen.valorant.team = teamVon('valorant'); teamPruefen(); statusMelden(); },
-  onMatch: () => { if (quellen.valorant) statusAnRegie('valorant', quellen.valorant.status(), quellen.valorant.stand()); teamPruefen(); },
+  onMatch: (_, { neu } = {}) => {
+    if (quellen.valorant) statusAnRegie('valorant', quellen.valorant.status(), quellen.valorant.stand());
+    teamPruefen();
+    // Match startet, sobald das Spiel nach der Agentenwahl lädt: früher als Shots Fired und Bilderkennung, die dann nicht doppelt auslösen
+    if (neu) bildNachricht('valorant', { bild: true, event: 'match_start', neu: true, seite: 'eigen', aktion: 'Riot Client', quelle: 'api' });
+  },
   onChange: statusMelden,
 });
 // Der Riot Client wird nur gefragt, wenn „Automatisch (Riot Client)“ an ist
@@ -348,8 +353,8 @@ function statusAnRegie(spiel, status, stand) {
   // Valorant: MatchID vom Riot Client, damit die Regie die PCs nach Match trennt (core/match-check.js)
   const match = spiel === 'valorant' ? valorantMatch() : '';
   if (match) stand = { ...(stand || {}), match };
-  // Valorant: was Shots Fired weiß (Seite, Team, Spieler beider Teams, Zähler) für den Stats-Screen der Regie
-  if (spiel === 'valorant') { const sf = shotsfired.valorantInfo(); if (sf.seite || sf.verbuendete.length || sf.gegner.length || sf.kills != null || sf.runde != null) stand = { ...(stand || {}), sf }; }
+  // Valorant: was Shots Fired weiß (Seite, Team, Spieler beider Teams, Zähler, Agent, Waffe des letzten Kills) für den Stats-Screen der Regie
+  if (spiel === 'valorant') { const sf = shotsfired.valorantInfo(); if (sf.seite || sf.verbuendete.length || sf.gegner.length || sf.kills != null || sf.runde != null || sf.agent || sf.waffe) stand = { ...(stand || {}), sf }; }
   if (cfg.modus === 'standalone') regie.pcStatus(lokalId(), { spiel, status, stand });
   else client.status(spiel, status, stand);
 }

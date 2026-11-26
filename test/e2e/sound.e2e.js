@@ -111,6 +111,15 @@ function wav(datei) {
   await zeile.locator('button', { hasText: 'Test' }).click();
   await page.waitForTimeout(300);
   assert.deepStrictEqual(await page.evaluate(() => window.__gespielt), ['r1.wav'], 'Test spielt den Sound');
+  // „Alle testen“ an Valorant-Kill: REAPER-Befehl und Sound auf einmal, auch bei Ausgabe aus
+  await page.evaluate(() => { window.__gespielt = []; });
+  const alle = page.getByTestId('signal-alle-testen-kill').last();
+  await alle.scrollIntoViewIfNeeded();
+  await alle.click();
+  await page.getByText('2 Befehle von „Kill“ getestet').waitFor();
+  await page.waitForTimeout(300);
+  assert.deepStrictEqual(await page.evaluate(() => window.__gespielt), ['k2.wav'], 'Alle testen spielt den Sound');
+  await page.screenshot({ path: path.join(BILDER, 'signale-alle-testen.png') });
   assert.deepStrictEqual(fehler, []);
   console.log('Local Sound: OK');
   await browser.close();

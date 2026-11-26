@@ -456,3 +456,22 @@ test("Teams: Benennung nach Spiel, Namen von Hand, Farbe je Team", () => {
   assert.deepEqual(teamAnzeige(el, "CT", 0, {}), { name: "CT", farbe: "" });
   assert.deepEqual(teamAnzeige(undefined, "CT", 0), { name: "CT", farbe: "" }, "ohne Einstellungen");
 });
+
+test("Screen-Layout: jedes Element außer Text und Einzelwert hat eine Überschrift, auch leer", () => {
+  const { neuerSpieler, neuesBild } = require("../src/core/stats-layout");
+  const l = standardLayout();
+  for (const e of l.elemente) assert.equal(typeof e.titel, "string", e.typ);
+  assert.equal(l.elemente.find((e) => e.typ === "spielstand").titel, "");
+  assert.equal(l.elemente.find((e) => e.typ === "bestenliste").titel, "Beste Spieler");
+  // Alte Layouts ohne Feld: Standard bleibt; leer bleibt leer; eigener Text bei Anzeigen ohne Standard bleibt erhalten
+  const m = migrateLayout({ elemente: [{ typ: "bestenliste" }, { typ: "events", titel: "" }, { typ: "spielstand", titel: "Score {spiel}" },
+    { typ: "spieler", id: "p1", titel: "Bester Spieler" }, { typ: "spieler", id: "p2" }] });
+  const von = (id) => m.elemente.find((e) => e.id === id);
+  assert.equal(von("bestenliste").titel, "Beste Spieler");
+  assert.equal(von("events").titel, "");
+  assert.equal(von("spielstand").titel, "Score {spiel}");
+  assert.equal(von("p1").titel, "Bester Spieler");
+  assert.equal(von("p2").titel, "");
+  assert.equal(neuerSpieler().titel, "");
+  assert.equal(neuesBild("b1").titel, "");
+});

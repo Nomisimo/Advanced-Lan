@@ -6,6 +6,15 @@ const REPO = "Nomisimo/Advanced-Lan";
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
+  "1.0.10": [
+    "Stats-Screen-Editor: jede Anzeige, Spieler-Karte und jeder Bild-Block hat jetzt ein Feld „Überschrift“ (auch Spielstand, Zahlen, Aktives Spiel, Session, LIVE). Frei ändern oder leer lassen = keine Überschrift, Platzhalter wie {spiel} gehen auch. Bestehende Layouts bleiben unverändert",
+    "Stats-Screen: Trennlinien in Letzte Events, Beste Spieler, Teams und MVP-Ranking werden mit dem Kachel-Hintergrund durchsichtig, bei 0 % sind sie weg",
+    "Stats-Screen-PC: Layouts kommen vollständig an, auch große mit Bildern (bis etwa 18 MB). Die Regie sendet gedrosselt, fehlende Teile fragt der Stats-PC gezielt nach",
+    "Stats-Screen-PC: eigene Screens mit demselben Editor wie in der Regie, auch als Kopie eines Regie-Screens. Die Daten kommen weiter live von der Regie",
+    "Stats-Screen-PC: Screens öffnen als normale Fenster (Vollbild beim Start einstellbar), Stelle, Größe und Vollbild werden je Screen gemerkt. Neuer Tab „Daten“ mit Empfang, Spiel und Stand, PCs, Events und Rohdaten",
+    "Signale: Knopf „Alle testen“ pro Event sendet alle Befehle des Events samt Verzögerung",
+    "Signale: Test-Knopf mit Seiten-Filter „Verteidigung“ sendet wieder (das Test-Event bekommt die Seite des Filters)",
+  ],
   "1.0.9": [
     "Valorant: neues Event „Kampf beginnt (Barriere fällt)“ aus Shots Fired (round_phase „combat“), einmal je Runde nach der Kaufphase. Eigener Cue für Licht und Sound, Sound-Ordner „combat“ oder „barrier“",
     "Stats-Screen (Valorant mit Shots Fired): Agent jedes Spielers (agent) in Spieler-Karte und Teams-Liste, dazu die Waffe des letzten eigenen Kills aus dem kill_feed (z. B. Vandal, Operator, Messer). Neue Werte „Agent“ und „Waffe des letzten Kills“, in der Spieler-Karte einzeln abschaltbar",

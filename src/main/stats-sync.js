@@ -6,13 +6,17 @@
 const dgram = require('dgram');
 const os = require('os');
 const crypto = require('crypto');
-const { verpacken, lesePaket, Zusammensetzer, versionVon } = require('../core/stats-sync');
+const { verpacken, lesePaket, Zusammensetzer, auspacken, luecken, ausBereichen, versionVon } = require('../core/stats-sync');
 
 const LEBENSZEICHEN_MS = 1000; // Lebenszeichen und kompletter Stand
 const ABO_MS = 2000; // Anmeldung der Stats-PCs
 const ABO_TTL = 7000; // ohne Anmeldung gilt ein Stats-PC als weg
 const FRISCH_MS = 3500; // so lange gilt der Multicast als angekommen
 const zufallsId = () => crypto.randomBytes(4).readUInt32BE(0);
+const PULK = 48; // Datagramme je Schub beim Layout, dann kurz warten: der Empfänger-Puffer läuft nicht über
+const PULK_PAUSE_MS = 2;
+const PUFFER = 8 * 1024 * 1024; // Socket-Puffer (Windows hat sonst nur 64 KB)
+const STILL_MS = 300; // so lange ohne neue Layout-Teile: Fehlendes nachfragen
 
 class StatsSender {
   // opts: einstellungen() → { an, gruppe, port }, ip() → IP der gewählten Karte ("" = automatisch), name() → Session-Name, onChange
@@ -23,7 +27,8 @@ class StatsSender {
     this.sock = null;
     this.fehler = '';
     this.letzterStatus = null;
-    this.cfg = null; this.cfgVersion = '';
+    this.cfg = null; this.cfgVersion = ''; this.cfgNr = 0; this.cfgPakete = null;
+    this.schlange = []; this.pumpt = null; // gedrosselter Versand des Layouts
     this.empfaenger = new Map(); // "ip:port" → { id, name, ip, port, multicast, version, t }
     this.gesendet = 0; this.bytes = 0;
     this.timer = null; this.statusTimer = null; this.letzterVersand = 0;
@@ -43,6 +48,7 @@ class StatsSender {
     try {
       await new Promise((ok, nein) => { sock.once('error', nein); sock.bind(e.port + 1, () => { sock.off('error', nein); ok(); }); });
       try { sock.setMulticastTTL(4); } catch {}
+      try { sock.setSendBufferSize(PUFFER); } catch {}
       try { sock.setMulticastLoopback(true); } catch {} // ein Stats-PC auf demselben Rechner bekommt es auch
       if (lauf.ip) try { sock.setMulticastInterface(lauf.ip); } catch (err) { this.fehler = `Karte: ${err.message}`; }
       this.sock = sock;
@@ -59,8 +65,9 @@ class StatsSender {
   }
 
   async stop() {
-    clearInterval(this.timer); clearTimeout(this.statusTimer);
-    this.timer = this.statusTimer = null;
+    clearInterval(this.timer); clearTimeout(this.statusTimer); clearTimeout(this.pumpt);
+    this.timer = this.statusTimer = this.pumpt = null;
+    this.schlange = [];
     if (this.sock) { const s = this.sock; this.sock = null; await new Promise((r) => { try { s.close(r); } catch { r(); } }); }
     this.empfaenger.clear();
   }
@@ -113,7 +120,36 @@ class StatsSender {
     const v = versionVon(obj);
     if (v === this.cfgVersion) return;
     this.cfg = obj; this.cfgVersion = v;
+    this.cfgNr = this.nummer++; this.cfgPakete = null; // feste Nummer je Version: nachgefragte Teile passen zu den schon erhaltenen
     this.lebenszeichen();
+  }
+
+  // Layout (alle Teile oder nur die fehlenden) an einen Stats-PC, gedrosselt
+  cfgSenden(ziel, bereiche) {
+    if (!this.cfgPakete) {
+      try { this.cfgPakete = verpacken('cfg', this.id, this.cfgNr, { v: this.cfgVersion, cfg: this.cfg }, 'unicast'); }
+      catch (err) { this.fehler = `Layout: ${err.message}`; this.onChange?.(); return; }
+    }
+    const n = this.cfgPakete.length;
+    const nummern = bereiche ? ausBereichen(bereiche, n) : [...Array(n).keys()];
+    // Neue Anfrage desselben Stats-PCs ersetzt, was für ihn noch in der Schlange steht
+    this.schlange = this.schlange.filter((x) => x.ip !== ziel.address);
+    for (const i of nummern) this.schlange.push({ p: this.cfgPakete[i], ip: ziel.address, port: ziel.port });
+    this.pumpen();
+  }
+
+  pumpen() {
+    if (this.pumpt || !this.sock) return;
+    const schub = () => {
+      this.pumpt = null;
+      if (!this.sock) { this.schlange = []; return; }
+      for (const x of this.schlange.splice(0, PULK)) {
+        this.sock.send(x.p, x.port, x.ip, () => {});
+        this.gesendet++; this.bytes += x.p.length;
+      }
+      if (this.schlange.length) this.pumpt = setTimeout(schub, PULK_PAUSE_MS);
+    };
+    schub();
   }
 
   lebenszeichen() {
@@ -144,7 +180,9 @@ class StatsSender {
       // Neu oder ohne Multicast: Stand gleich per Unicast, damit nichts wartet
       if (neu && !x.multicast && this.letzterStatus) this.senden('status', this.letzterStatus, { address: rinfo.address, port: this.lauf.port });
     } else if (m.art === 'anfrage' && o.was === 'cfg' && this.cfg) {
-      this.senden('cfg', { v: this.cfgVersion, cfg: this.cfg }, { address: rinfo.address, port: this.lauf.port });
+      // Nur die fehlenden Teile, wenn der Stats-PC schon Teile dieser Version hat
+      const teile = o.nr === this.cfgNr && Array.isArray(o.teile) && o.teile.length ? o.teile : null;
+      this.cfgSenden({ address: rinfo.address, port: this.lauf.port }, teile);
     }
   }
 
@@ -171,6 +209,7 @@ class StatsEmpfaenger {
     this.multicastT = 0; this.unicastT = 0; this.letztesT = 0; this.statusT = 0;
     this.pakete = 0; this.verworfen = 0;
     this.sender = null; // ID der Regie, deren Nachrichten zählen (die zuletzt gehörte)
+    this.cfgLauf = null; // Layout, das gerade ankommt: { sender, nummer, teile, da, t }
     this.timer = null; this.lauf = null;
   }
 
@@ -183,6 +222,7 @@ class StatsEmpfaenger {
     sock.on('message', (buf, rinfo) => this.paket(buf, rinfo));
     try {
       await new Promise((ok, nein) => { sock.once('error', nein); sock.bind(e.port, () => { sock.off('error', nein); ok(); }); });
+      try { sock.setRecvBufferSize(PUFFER); } catch {}
       this.sock = sock;
       this.fehler = '';
       this.gruppeBeitreten();
@@ -193,6 +233,7 @@ class StatsEmpfaenger {
       return;
     }
     this.timer = setInterval(() => this.anmelden(), ABO_MS);
+    this.nachTimer = setInterval(() => { if (this.cfgLauf) this.layoutHolen(); }, 150); // fehlende Layout-Teile bald nachfragen
     this.anmelden();
     this.onChange?.();
   }
@@ -206,7 +247,8 @@ class StatsEmpfaenger {
   }
 
   async stop() {
-    clearInterval(this.timer); this.timer = null;
+    clearInterval(this.timer); clearInterval(this.nachTimer); this.timer = this.nachTimer = null;
+    this.cfgLauf = null;
     if (this.sock) { const s = this.sock; this.sock = null; await new Promise((r) => { try { s.close(r); } catch { r(); } }); }
   }
 
@@ -216,6 +258,7 @@ class StatsEmpfaenger {
     const jetzt = Date.now();
     if (p.weg === 'multicast') this.multicastT = jetzt; else this.unicastT = jetzt;
     this.letztesT = jetzt; this.pakete++;
+    if (p.art === 'cfg') { this.cfgTeil(p, jetzt); return; }
     // Mehrere Regien im Netz: es bleibt bei der ersten, bis von ihr 5 s nichts mehr kommt
     const m = this.zs.nimm(p, jetzt);
     if (!m) return;
@@ -231,14 +274,33 @@ class StatsEmpfaenger {
     if (this.sender != null && m.sender !== this.sender) { this.verworfen++; return; }
     if (m.art === 'status') { this.statusT = jetzt; this.onStatus?.(m.obj); }
     else if (m.art === 'event') this.onEvent?.(m.obj);
-    else if (m.art === 'cfg' && m.obj?.cfg) { this.cfgVersion = String(m.obj.v || ''); this.onCfg?.(m.obj.cfg); this.onChange?.(); }
   }
 
+  // Teil des Layouts: bleibt liegen, bis alles da ist (auch über mehrere Nachfragen), dann einmal auswerten
+  cfgTeil(p, jetzt) {
+    if (this.sender != null && p.sender !== this.sender) { this.verworfen++; return; }
+    let l = this.cfgLauf;
+    if (!l || l.sender !== p.sender || l.nummer !== p.nummer || l.teile.length !== p.teile) l = this.cfgLauf = { sender: p.sender, nummer: p.nummer, teile: new Array(p.teile), da: 0, t: jetzt };
+    l.t = jetzt;
+    if (!l.teile[p.teil]) { l.teile[p.teil] = Buffer.from(p.daten); l.da++; }
+    if (l.da < l.teile.length) return;
+    this.cfgLauf = null;
+    let obj;
+    try { obj = auspacken(l.teile); } catch { return; }
+    if (!obj?.cfg) return;
+    this.cfgVersion = String(obj.v || '');
+    this.onCfg?.(obj.cfg);
+    this.onChange?.();
+  }
+
+  // Layout anfragen: alles oder, wenn schon Teile da sind, nur die fehlenden
   layoutHolen() {
     const jetzt = Date.now();
-    if (jetzt - this.letzteAnfrage < 1000 || !this.regie) return;
+    const l = this.cfgLauf;
+    if (jetzt - this.letzteAnfrage < (l ? STILL_MS : 1000) || !this.regie) return;
+    if (l && jetzt - l.t < STILL_MS) return; // kommt gerade noch an
     this.letzteAnfrage = jetzt;
-    this.steuern('anfrage', { was: 'cfg', id: this.id }, [this.regie.ip]);
+    this.steuern('anfrage', { was: 'cfg', id: this.id, ...(l ? { nr: l.nummer, teile: luecken(l.teile) } : {}) }, [this.regie.ip]);
   }
 
   // Anmeldung bei der Regie: Adresse von Hand, aus dem Lebenszeichen und aus der Session-Suche
@@ -263,6 +325,7 @@ class StatsEmpfaenger {
       verbunden: jetzt - this.letztesT < FRISCH_MS && !!this.regie, weg: mc ? 'multicast' : uc ? 'unicast' : '',
       regie: this.regie ? { ip: this.regie.ip, name: this.regie.name } : null, layout: !!this.cfgVersion && this.cfgVersion === this.regie?.v,
       letztes: this.letztesT ? jetzt - this.letztesT : null, pakete: this.pakete, verworfen: this.verworfen,
+      laden: this.cfgLauf ? Math.round((this.cfgLauf.da / this.cfgLauf.teile.length) * 100) : null, // Layout kommt gerade an (%)
     };
   }
 }

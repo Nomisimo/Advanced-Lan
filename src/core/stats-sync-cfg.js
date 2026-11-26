@@ -13,8 +13,20 @@ function migrateSync(s) {
   const port = Math.round(Number(s.port));
   return { an: s.an !== false, gruppe: istMulticast(s.gruppe) ? String(s.gruppe) : d.gruppe, port: port >= 1024 && port <= 65534 ? port : d.port, netz: typeof s.netz === "string" ? s.netz : "" };
 }
-// Stats-PC: Adresse der Regie (leer = automatisch über Multicast und Session-Suche), Netzwerkkarte, Port, Fenster beim Start
-function standardStatsPc() { return { regie: "", netz: "", gruppe: GRUPPE, port: DATEN_PORT, fenster: [], vollbild: true }; }
+// Stats-PC: Adresse der Regie (leer = automatisch über Multicast und Session-Suche), Netzwerkkarte, Port, Fenster beim Start.
+// Fenster gehen als normale Fenster auf (vollbildStart: gleich als Vollbild), lage: Position und Größe je Screen.
+// Eigene Screens (eigene, wie regie.stats) migriert defaults.js
+function standardStatsPc() { return { regie: "", netz: "", gruppe: GRUPPE, port: DATEN_PORT, fenster: [], vollbildStart: false, lage: {}, eigene: { an: true, aktiv: "", screens: [] } }; }
+const ganz = (v) => (Number.isFinite(Number(v)) ? Math.round(Number(v)) : null);
+function migrateLage(l) {
+  const out = {};
+  for (const [id, x] of Object.entries(l && typeof l === "object" ? l : {}).slice(0, 32)) {
+    const [px, py, b, h] = [ganz(x?.x), ganz(x?.y), ganz(x?.b), ganz(x?.h)];
+    if (!/^[\w-]{1,40}$/.test(id) || px == null || py == null || !(b >= 120) || !(h >= 60)) continue;
+    out[id] = { x: px, y: py, b: Math.min(8000, b), h: Math.min(8000, h), vollbild: !!x.vollbild };
+  }
+  return out;
+}
 function migrateStatsPc(s) {
   const d = standardStatsPc();
   if (!s || typeof s !== "object") return d;
@@ -24,8 +36,10 @@ function migrateStatsPc(s) {
     netz: typeof s.netz === "string" ? s.netz : "",
     gruppe: istMulticast(s.gruppe) ? String(s.gruppe) : d.gruppe,
     port: port >= 1024 && port <= 65534 ? port : d.port,
-    fenster: Array.isArray(s.fenster) ? s.fenster.filter((x) => typeof x === "string").slice(0, 8) : [],
-    vollbild: s.vollbild !== false,
+    fenster: Array.isArray(s.fenster) ? [...new Set(s.fenster.filter((x) => typeof x === "string"))].slice(0, 16) : [],
+    vollbildStart: s.vollbildStart === true, // bis 1.0.8 hieß es vollbild und war an: jetzt normale Fenster
+    lage: migrateLage(s.lage),
+    eigene: d.eigene,
   };
 }
 

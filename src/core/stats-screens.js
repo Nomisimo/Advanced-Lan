@@ -70,6 +70,20 @@ function migrateStats(s) {
   return { an: !!s.an, aktiv, screens };
 }
 
+// Eigene Screens eines Stats-Screen-PCs: wie die der Regie, aber auch keiner erlaubt und ohne NDI (das sendet die Regie)
+function migrateEigene(s) {
+  const roh = Array.isArray(s?.screens) ? s.screens : [];
+  const ids = new Set(), screens = [];
+  for (const r of roh) {
+    if (!r || typeof r !== "object" || screens.length >= MAX_SCREENS) continue;
+    const m = { ...migrateScreen(r, screens.length), ndi: false };
+    if (ids.has(m.id)) m.id = neueScreenId();
+    ids.add(m.id);
+    screens.push(m);
+  }
+  return { an: true, aktiv: screens.some((x) => x.id === s?.aktiv) ? s.aktiv : screens[0]?.id || "", screens };
+}
+
 // Screen zu einer ID (oder der erste)
 function screenVon(stats, id) {
   const l = stats?.screens || [];
@@ -99,5 +113,5 @@ function alphaGerade(buf) {
 
 module.exports = {
   MAX_SCREENS, GROESSE_MIN, GROESSE_MAX, NAME_MAX, NDI_NAME_MAX, NDI_STANDARD, FORMATE,
-  neuerScreen, standardStats, migrateStats, freierNdiName, screenVon, statsHash, leseStatsHash, alphaGerade, groesse,
+  neuerScreen, standardStats, migrateStats, migrateEigene, freierNdiName, screenVon, statsHash, leseStatsHash, alphaGerade, groesse,
 };

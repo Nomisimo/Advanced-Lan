@@ -178,6 +178,9 @@ const BILDER = process.argv[3] || require('os').tmpdir();
   await page.waitForTimeout(400);
   const evS = (await layout()).elemente.find((x) => x.id === 'events');
   assert.deepStrictEqual([evS.deckkraft, evS.kachel], [60, 0]);
+  // Trennlinien der Events werden mit dem Kachel-Hintergrund durchsichtig
+  const linien = await flaeche.evaluate((f) => [...f.querySelectorAll('div')].filter((d) => d.style.borderBottom.includes('1px')).map((d) => getComputedStyle(d).borderBottomColor));
+  assert.ok(linien.includes('rgba(58, 54, 71, 0)'), 'Event-Linien bei 0 % unsichtbar');
   await page.getByRole('button', { name: 'Darstellung auf alle Elemente übertragen' }).click();
   await page.waitForTimeout(400);
   assert.ok((await layout()).elemente.every((x) => x.kachel === 0 && x.deckkraft === 60), 'Darstellung auf alle übertragen');

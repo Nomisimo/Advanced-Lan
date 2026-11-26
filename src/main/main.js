@@ -143,6 +143,8 @@ const stats = new StatsAusgabe({
   root, preload: path.join(root, 'src', 'preload', 'preload.js'), icon: APP_ICON,
   getStats: () => (istStatsPc() ? fernStats() : cfg.regie.stats), aktiv: () => istRegie() || istStatsPc(), onChange: statusMelden,
   onFensterZu: () => restoreFocus(mainWin),
+  // Stats-PC: Position, Größe und Vollbild je Screen merken, beim nächsten Öffnen kommt das Fenster dorthin
+  onFensterLage: (id, lage) => { if (!istStatsPc()) return; cfg.statspc.lage = { ...cfg.statspc.lage, [id]: lage }; speichereKonfig(); },
   ndiKarte: () => cfg.regie.netz?.ndi || '', ndiOrdner: () => path.join(app.getPath('userData'), 'ndi'),
 });
 
@@ -158,20 +160,25 @@ const logMischen = (alt, neu) => {
   for (const e of neu) if (e && e.id != null) m.set(e.id, e);
   return [...m.values()].sort((a, b) => b.id - a.id).slice(0, 100);
 };
-// Screens der Regie, auf dem Stats-PC immer an, NDI sendet die Regie
+// Screens der Regie und die eigenen dieses Stats-PCs; auf dem Stats-PC immer an, NDI sendet die Regie
 function fernStats() {
   const s = fern.cfg?.regie?.stats;
-  return s ? { ...s, an: true, screens: (s.screens || []).map((x) => ({ ...x, ndi: false })) } : { an: true, aktiv: '', screens: [] };
+  const regieScreens = (s?.screens || []).map((x) => ({ ...x, ndi: false }));
+  const ids = new Set(regieScreens.map((x) => x.id));
+  const eigene = (cfg.statspc?.eigene?.screens || []).filter((x) => !ids.has(x.id)).map((x) => ({ ...x, ndi: false, eigen: true }));
+  return { ...(s || {}), an: true, aktiv: s?.aktiv || '', screens: [...regieScreens, ...eigene] };
 }
 const fernKonfig = () => ({ ...cfg, regie: { ...cfg.regie, ...(fern.cfg?.regie || {}), stats: fernStats() } });
 const fensterGeoeffnet = new Set(); // beim Start schon geöffnete Fenster (nur einmal automatisch)
+// Stats-PC: normales Fenster an der gemerkten Stelle (oder gleich Vollbild, wenn so eingestellt oder zuletzt so)
+const fensterOpts = (id) => { const l = cfg.statspc.lage[id]; return { lage: l || null, vollbild: cfg.statspc.vollbildStart || !!l?.vollbild }; };
 async function statsPcFenster() {
   if (!istStatsPc()) return;
   await stats.anwenden();
   for (const id of cfg.statspc.fenster) {
     if (fensterGeoeffnet.has(id) || !fernStats().screens.some((x) => x.id === id)) continue;
     fensterGeoeffnet.add(id);
-    stats.fensterOeffnen(id, { vollbild: cfg.statspc.vollbild });
+    stats.fensterOeffnen(id, fensterOpts(id));
   }
 }
 const statsEmpfaenger = new StatsEmpfaenger({
@@ -727,7 +734,7 @@ function gesamtStatus() {
     // regie: Stand der Regie für die Stats-Fenster; statspc: Empfang und Screens für das Hauptfenster
     s.regie = fern.status ? { ...fern.status, stats: stats.status() } : null;
     s.statspc = { ...statsEmpfaenger.info(), session: fern.cfg?.regie?.session?.name || '', aktivesSpiel: fern.cfg?.regie?.aktivesSpiel || '',
-      screens: fernStats().screens.map(({ id, name, b, h }) => ({ id, name, b, h })), ausgabe: stats.status() };
+      screens: fernStats().screens.map(({ id, name, b, h, eigen }) => ({ id, name, b, h, eigen: !!eigen })), ausgabe: stats.status() };
   }
   if (hatSpiele()) s.gamepc = { spieler: cfg.gamepc.spieler, vollbild: vollbild.art, nameWartet: !!nameWartet, spielerAnzeige: cfg.gamepc.spieler || anzeigePcId(), client: client.info(), sessions: discovery.liste(), discoveryFehler: discovery.fehler, gsi: gsi.status(), letzte: gp.letzte, status: gp.status, stand: gp.stand, fremd: gp.fremd, sim: { ...gpSim.status(), spiel: gpSimSpiel }, rl: { ...rlClient.status(), letzte: rl.letzte, stand: rl.stand }, daten, bild: bild.status(), overdrive: overdrive.status(), shotsfired: shotsfired.status(), lol: lolClient.status(), quelleAktiv: Object.fromEntries(BILD_SPIELE.map((d) => [d.id, vorrang.aktiv(d.id)])), riot: riot.status() };
   return s;
@@ -888,6 +895,7 @@ async function konfigUebernehmen(neu) {
   if (client.zustand !== 'getrennt' && client.zustand !== 'abgelehnt') cfg.gamepc.pcId = alt.gamepc.pcId; // PC-ID nur ohne aktive Session änderbar
   cfg.gamepc.overlay = { ...cfg.gamepc.overlay, x: alt.gamepc.overlay?.x ?? null, y: alt.gamepc.overlay?.y ?? null }; // Position setzt nur das Overlay selbst
   cfg.gamepc.spieler = alt.gamepc.spieler; // Spielername setzen nur das Namens-Popup und „spieler-setzen“
+  cfg.statspc.lage = alt.statspc.lage; cfg.statspc.fenster = alt.statspc.fenster; // merkt sich nur der Hauptprozess
   speichereKonfig();
   if (cfg.app.hotkey !== alt.app.hotkey) hotkeyAnwenden();
   overlayAktualisieren();
@@ -909,6 +917,11 @@ async function konfigUebernehmen(neu) {
   if (istRegie() && JSON.stringify(cfg.regie.stats) !== JSON.stringify(alt.regie.stats)) {
     // Neues Layout aus dem Editor sofort an Pop-out-Fenster und NDI geben
     for (const wc of stats.webContents()) wc.send('stats-config', cfg);
+    await stats.anwenden();
+  }
+  if (istStatsPc() && JSON.stringify(cfg.statspc.eigene) !== JSON.stringify(alt.statspc.eigene)) {
+    // Eigene Screens des Stats-PCs geändert: Fenster zeigen das neue Layout sofort
+    for (const wc of stats.webContents()) wc.send('stats-config', fernKonfig());
     await stats.anwenden();
   }
   await statsSyncAnwenden(); // Senden an die Stats-PCs (Layout, Karte, Gruppe) oder eigener Empfang
@@ -1091,6 +1104,7 @@ ipcMain.handle('sound-dateien', async () => {
 const manuellerPc = (id) => (id && regie.pcs.get(id)?.verbunden ? id : null);
 ipcMain.handle('event-ausloesen', (_, ev) => { const pc = manuellerPc(ev?.pcId); return regie.fire({ round: regie.stand?.runde, map: regie.stand?.map, ...ev, spiel: cfg.regie.aktivesSpiel, pc: pc || 'Regie', pcId: pc || 'regie' }, 'manuell'); });
 ipcMain.handle('signal-testen', (_, spiel, type, zuweisung) => regie.testeZuweisung(spiel, type, zuweisung));
+ipcMain.handle('event-testen', (_, spiel, type) => regie.testeEvent(spiel, type));
 ipcMain.handle('ziel-testen', async (_, zielId) => {
   const ziel = cfg.regie.targets.find((t) => t.id === zielId);
   if (!ziel) return { fehler: 'Ziel nicht gefunden' };
@@ -1103,7 +1117,7 @@ ipcMain.handle('sim-neu', () => { regieSim.neu(); return regieSim.status(); });
 // Game-Stats-Screen
 // id: Screen (ohne Angabe der erste); offen === false schließt, ohne id alle Fenster
 ipcMain.handle('stats-fenster', (_, offen, id) => {
-  if (offen === false) stats.fensterSchliessen(id); else stats.fensterOeffnen(id, istStatsPc() ? { vollbild: cfg.statspc.vollbild } : undefined);
+  if (offen === false) stats.fensterSchliessen(id); else stats.fensterOeffnen(id, istStatsPc() ? fensterOpts(id) : undefined);
   // Stats-PC: offene Fenster merken, beim nächsten Start gehen sie wieder auf
   if (istStatsPc() && id) {
     const l = new Set(cfg.statspc.fenster);

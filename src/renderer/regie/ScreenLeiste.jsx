@@ -12,7 +12,9 @@ const VORLAGEN = [["standard", "Alle Anzeigen (Standard-Layout)"], ["leer", "Lee
 const kopie = (x) => JSON.parse(JSON.stringify(x));
 
 // Leiste über dem Editor: Screens wählen, anlegen, duplizieren, löschen, Name und Größe in Pixeln
-export default function ScreenLeiste({ cfg, mutate, status, screen }) {
+// leerErlaubt: auch der letzte Screen lässt sich löschen (eigene Screens am Stats-PC)
+export default function ScreenLeiste({ cfg, mutate, status, screen, leerErlaubt = false }) {
+  const minimum = leerErlaubt ? 1 : 2;
   const screens = cfg.stats?.screens || [];
   const [neu, setNeu] = useState(null); // offenes Formular für einen neuen Screen
   const setStats = (fn) => mutate((d) => { d.stats = fn(kopie(d.stats)); });
@@ -29,9 +31,9 @@ export default function ScreenLeiste({ cfg, mutate, status, screen }) {
     return { ...s, aktiv: n.id, screens: [...s.screens, n] };
   });
   const loeschen = async () => {
-    if (screens.length < 2) return;
-    if (!(await uiConfirm(`Screen „${screen.name}“ mit seinem Layout löschen? Pop-out-Fenster und NDI-Quelle des Screens gehen aus.`))) return;
-    setStats((s) => { const rest = s.screens.filter((x) => x.id !== screen.id); return { ...s, aktiv: rest[0].id, screens: rest }; });
+    if (screens.length < minimum) return;
+    if (!(await uiConfirm(`Screen „${screen.name}“ mit seinem Layout löschen? ${leerErlaubt ? "Sein Fenster geht zu." : "Pop-out-Fenster und NDI-Quelle des Screens gehen aus."}`))) return;
+    setStats((s) => { const rest = s.screens.filter((x) => x.id !== screen.id); return { ...s, aktiv: rest[0]?.id || "", screens: rest }; });
   };
   // Neue Größe: Elemente bleiben in der Fläche; mitSkalieren: Positionen und Größen anteilig mitnehmen
   const groesseSetzen = (b, h, mitSkalieren) => {
@@ -59,7 +61,7 @@ export default function ScreenLeiste({ cfg, mutate, status, screen }) {
           );
         })}
         <button style={S.secondaryBtn} disabled={screens.length >= MAX_SCREENS} onClick={() => setNeu(neu ? null : { name: `Screen ${screens.length + 1}`, b: 800, h: 200, vorlage: "spielstand" })}
-          title={`Weiteren Screen anlegen (höchstens ${MAX_SCREENS}), jeder mit eigener NDI-Quelle`} data-testid="screen-neu"><Plus size={14} /> Neuer Screen</button>
+          title={`Weiteren Screen anlegen (höchstens ${MAX_SCREENS})${leerErlaubt ? "" : ", jeder mit eigener NDI-Quelle"}`} data-testid="screen-neu"><Plus size={14} /> Neuer Screen</button>
       </div>
 
       {neu && <NeuerScreen wert={neu} setWert={setNeu} abbrechen={() => setNeu(null)} anlegen={() => { anlegen(neu); setNeu(null); }} />}
@@ -71,7 +73,7 @@ export default function ScreenLeiste({ cfg, mutate, status, screen }) {
         <Groesse screen={screen} setzen={groesseSetzen} />
         <span style={{ flex: 1 }} />
         <button style={S.smallBtn} disabled={screens.length >= MAX_SCREENS} onClick={duplizieren} title="Screen mit Layout kopieren"><Copy size={12} /> Duplizieren</button>
-        <button style={S.dangerBtn} disabled={screens.length < 2} onClick={loeschen} title={screens.length < 2 ? "Der letzte Screen bleibt" : "Screen löschen"}><Trash2 size={12} /> Löschen</button>
+        <button style={S.dangerBtn} disabled={screens.length < minimum} onClick={loeschen} title={screens.length < minimum ? "Der letzte Screen bleibt" : "Screen löschen"} data-testid="screen-loeschen"><Trash2 size={12} /> Löschen</button>
       </div>
     </div>
   );

@@ -94,6 +94,28 @@ test("Test-Knopf sendet eine Zuweisung sofort, auch wenn nicht scharf", () => {
   assert.equal(regie.testeZuweisung("rl", "goal", { ziel: "weg", befehl: "go" }).fehler[0], "Ziel fehlt");
 });
 
+test("Alle testen: sendet alle Befehle eines Events samt Verzögerung, auch wenn nicht scharf", () => {
+  const signale = { rl: { goal: [
+    { id: "a", ziel: "ql", befehl: "start", werte: { cue: "{team}" } },
+    { id: "b", ziel: "ma", befehl: "goto_cue", werte: { seq: "101", cue: "3" }, verzoegerung: 500 },
+    { id: "c", ziel: "ql", befehl: "go", aus: true },
+    { id: "d", ziel: "weg", befehl: "go" },
+  ] } };
+  const cfg = { ...standardRegie(), armed: false, targets: ZIELE, signale };
+  const gesendet = [], timer = [];
+  const regie = new Regie({ getConfig: () => cfg, send: (s) => gesendet.push(s), timer: (fn, ms) => timer.push({ fn, ms }) });
+  const k = regie.testeEvent("rl", "goal");
+  assert.equal(k.gesendet, 2);
+  assert.equal(k.verzoegert, 1);
+  assert.equal(k.maxMs, 500);
+  assert.deepEqual(k.fehler, ["?: Ziel fehlt"]);
+  assert.deepEqual(gesendet.map((s) => s.address), ["/cue/BLUE/start"]);
+  assert.deepEqual(timer.map((t) => t.ms), [500]);
+  timer[0].fn();
+  assert.deepEqual(gesendet.map((s) => s.address), ["/cue/BLUE/start", "/gma3/cmd"]);
+  assert.equal(regie.log.length, 0); // Test, kein Eintrag im Event-Log
+});
+
 test("Nur das aktive Spiel erzeugt OSC, andere Spiele werden verworfen und geloggt", () => {
   const { gesendet, events, verworfen, regie } = lauf({ armed: true, aktivesSpiel: "valorant" });
   assert.equal(events.length, 0);
@@ -260,4 +282,17 @@ test("Match-MVP: kommt nach dem Auslöser-Event mit dem besten Spieler, Auslöse
   assert.equal(events.slice(vorher).filter((e) => e.ev.type === "match_mvp").length, 0);
   regie.pcEvent("PC 1", "valorant", { type: "match_end" });
   assert.equal(events.slice(vorher).filter((e) => e.ev.type === "match_mvp").length, 1);
+});
+
+test("Test-Knopf mit Seiten-Filter: Verteidigung sendet genauso wie Angriff", () => {
+  const cfg = { ...standardRegie(), aktivesSpiel: "valorant", targets: ZIELE };
+  const gesendet = [];
+  const regie = new Regie({ getConfig: () => cfg, send: (s) => gesendet.push(s) });
+  for (const seite of ["Angriff", "Verteidigung"]) {
+    const k = regie.testeZuweisung("valorant", "round_end", { id: "s", ziel: "ql", befehl: "start", werte: { cue: "{seite}" }, pc: "", team: "", seite });
+    assert.deepEqual(k.fehler, []);
+    assert.equal(k.nachrichten.length, 1);
+    assert.match(k.nachrichten[0], new RegExp(seite));
+  }
+  assert.equal(gesendet.length, 2);
 });

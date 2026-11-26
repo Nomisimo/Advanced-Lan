@@ -361,7 +361,7 @@ function statusAnRegie(spiel, status, stand) {
   const match = spiel === 'valorant' ? valorantMatch() : '';
   if (match) stand = { ...(stand || {}), match };
   // Valorant: was Shots Fired weiß (Seite, Team, Spieler beider Teams, Zähler, Agent, Waffe des letzten Kills) für den Stats-Screen der Regie
-  if (spiel === 'valorant') { const sf = shotsfired.valorantInfo(); if (sf.seite || sf.verbuendete.length || sf.gegner.length || sf.kills != null || sf.runde != null || sf.agent || sf.waffe) stand = { ...(stand || {}), sf }; }
+  if (spiel === 'valorant') { const sf = shotsfired.valorantInfo(); if (sf.seite || sf.verbuendete.length || sf.gegner.length || sf.kills != null || sf.runde != null || sf.agent || sf.waffe || sf.score) stand = { ...(stand || {}), sf }; }
   if (cfg.modus === 'standalone') regie.pcStatus(lokalId(), { spiel, status, stand });
   else client.status(spiel, status, stand);
 }

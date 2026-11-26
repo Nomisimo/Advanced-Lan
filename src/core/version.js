@@ -9,6 +9,7 @@ const CHANGELOG = {
   "1.0.12": [
     "Setup: neuer Bereich „Mehrfach gemeldete Events“. Je Spiel und Event einstellbar, was mit derselben Meldung von mehreren PCs passiert: „Einmal (Standard)“ wie bisher, „Einmal je PC“ oder „Alle durchlassen“ (nie als doppelt verwerfen). Wird in der Regie-Show gespeichert",
     "Stats-Screen: meldet ein PC das Rundenende ohne Sieger (Team nicht erkannt, kein Spielstand), trägt der nächste PC mit Team den Punkt nach. Vorher fehlte der Punkt, Runden und Punkte passten nicht zusammen",
+    "Valorant: der Punkt der ersten Runde fehlte, wenn Shots Fired den Spielstand erst nach Runde 1 meldet (1:0 statt vorher 0:0). Jetzt zählt er. Der Stats-Screen nimmt den Spielstand direkt aus Shots Fired, sobald ein PC ihn meldet",
   ],
   "1.0.11": [
     "Local Sound: mehrere Sounds im selben Event spielen zusammen. „Neuer Sound beendet laufenden“ stoppt nur noch Sounds aus früheren Events (auch bei „Alle testen“)",

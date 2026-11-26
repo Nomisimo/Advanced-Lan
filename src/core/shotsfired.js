@@ -204,7 +204,7 @@ function teamAusSeite(seite, runde) {
 // Was Shots Fired über die Teams weiß: { seite, team, verbuendete, gegner }
 function sfInfo(z) {
   const i = z?.info || neueInfo();
-  return { seite: i.seite, team: teamAusSeite(i.seite, z?.z?.runde), verbuendete: [...i.verbuendete], gegner: [...i.gegner], match: i.match || i.pseudo || "", agent: i.agent || "", waffe: i.waffe || "", letzterKill: i.letzterKill ? { ...i.letzterKill } : null };
+  return { seite: i.seite, team: teamAusSeite(i.seite, z?.z?.runde), score: z?.score ? { ...z.score } : null, verbuendete: [...i.verbuendete], gegner: [...i.gegner], match: i.match || i.pseudo || "", agent: i.agent || "", waffe: i.waffe || "", letzterKill: i.letzterKill ? { ...i.letzterKill } : null };
 }
 // Zahl aus einem Wert: 3, "3", { kills: 3 } oder JSON-Text
 function zahlVon(v, key) {
@@ -319,8 +319,12 @@ function shotsfiredEvents(body, z = sfZustand(), jetzt = Date.now()) {
     if (!s) continue;
     const alt = z.score;
     // Neues Match: Stand fällt zurück (oder erster Stand 0:0)
-    if (!alt || s.won < alt.won || s.lost < alt.lost) { z.score = s; z.entschieden = false; if (!alt || s.won + s.lost === 0) continue; }
+    // Erster Stand nach genau einer Runde (1:0 oder 0:1): Shots Fired meldet score oft erst, wenn er steigt. Das ist das Ende von Runde 1
+    // und zählt wie ein Anstieg von 0:0, sonst fehlte der Punkt der ersten Runde.
+    const ersteRunde = !alt && s.won + s.lost === 1;
+    if (!alt || s.won < alt.won || s.lost < alt.lost) { z.score = s; z.entschieden = false; if (!ersteRunde && (!alt || s.won + s.lost === 0)) continue; }
     else z.score = s;
+    if (ersteRunde) rundeEnde(s.won ? "eigen" : "gegner");
     if (alt && s.won > alt.won) rundeEnde("eigen");
     if (alt && s.lost > alt.lost) rundeEnde("gegner");
     if (s.won >= SIEG_RUNDEN && s.won - s.lost >= 2) matchSieg("eigen");

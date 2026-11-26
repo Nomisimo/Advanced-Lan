@@ -306,10 +306,18 @@ class BildQuelle {
       global(ev.id, { round: z.runde });
       this.verlaengerung(roh);
     } else if (ev.art === "ende") {
-      if (z.nach === z.runde && now - z.endeT < 15000) return this.ergebnis([], now); // eine Runde endet nur einmal, auch wenn Sieg und Niederlage flackern
+      if (z.nach === z.runde && now - z.endeT < 15000) {
+        // Eine Runde endet nur einmal, auch wenn Sieg und Niederlage flackern. Kam das Ende erst ohne Sieger (Shots Fired: round_phase
+        // „end“ vor dem ersten score), wird der Sieger nachgereicht, ohne die Runde noch einmal zu zählen
+        if (!team || z.endeTeam) return this.ergebnis([], now);
+        z.endeTeam = team;
+        z.siege[team] = (z.siege[team] || 0) + 1;
+        global(ev.id, { team });
+        return this.ergebnis(roh, now);
+      }
       matchStart();
       if (z.runde === 0 || z.nach === z.runde) z.runde++; // ohne erkannten Rundenstart zählt das Rundenende
-      Object.assign(z, { nach: z.runde, endeT: now });
+      Object.assign(z, { nach: z.runde, endeT: now, endeTeam: team });
       if (team) z.siege[team] = (z.siege[team] || 0) + 1;
       global(ev.id, { team });
       this.verlaengerung(roh);

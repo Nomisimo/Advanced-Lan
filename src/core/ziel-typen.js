@@ -74,14 +74,16 @@ const ZIEL_TYPEN = [
     ],
   },
   {
-    id: "ma3", quelle: "Port, Prefix und /cmd aus dem MA3-Handbuch. Die Befehlstexte (Goto Sequence … Cue …, Go+, Off, Flash, Macro) sind aus der Befehlssyntax abgeleitet: vor der Show testen.", name: "grandMA3", hersteller: "MA Lighting", kategorie: "licht", port: 8000, protokoll: "UDP",
+    id: "ma3", quelle: "Port, Prefix und /cmd aus dem MA3-Handbuch. Die Befehlstexte (Goto Sequence … Cue …, Go+ Sequence … [Cue …], Off, Flash, Macro) sind aus der Befehlssyntax abgeleitet: vor der Show testen.", name: "grandMA3", hersteller: "MA Lighting", kategorie: "licht", port: 8000, protokoll: "UDP",
     doku: "https://help.malighting.com/grandMA3/2.3/HTML/remote_inputs_osc.html",
     einrichten: "Menu → In & Out → OSC: Zeile anlegen, Mode UDP, Port 8000, Prefix wie hier beim Ziel (ohne /). „Enable Input“, „Receive“ und „Receive Command“ auf Yes.",
     optionen: [P("prefix", "Prefix", "gma3")],
     test: { address: "/{prefix}/cmd", args: [{ type: "s", value: "Echo \"Advanced LAN\"" }] },
     befehle: [
-      { id: "goto_cue", label: "Sequenz: Cue anfahren", params: [P("seq", "Sequenz", "101", "zahl"), P("cue", "Cue", "1", "zahl")], osc: [{ address: "/{prefix}/cmd", args: [{ type: "s", value: "Goto Sequence {seq} Cue {cue}" }] }] },
-      { id: "go", label: "Sequenz: Go+", params: [P("seq", "Sequenz", "101", "zahl")], osc: [{ address: "/{prefix}/cmd", args: [{ type: "s", value: "Go+ Sequence {seq}" }] }] },
+      { id: "goto_cue", label: "Sequenz: Goto Cue (anfahren)", params: [P("seq", "Sequenz", "101", "zahl"), P("cue", "Cue", "1", "zahl")], osc: [{ address: "/{prefix}/cmd", args: [{ type: "s", value: "Goto Sequence {seq} Cue {cue}" }] }] },
+      { id: "go", label: "Sequenz: Go+ (nächster Cue)", params: [P("seq", "Sequenz", "101", "zahl")], osc: [{ address: "/{prefix}/cmd", args: [{ type: "s", value: "Go+ Sequence {seq}" }] }] },
+      // Go+ auf einen bestimmten Cue: wie ein normales Go (Cue-Zeiten, Follow-Cues laufen weiter). Goto springt nur hin.
+      { id: "go_cue", label: "Sequenz: Go+ auf Cue", params: [P("seq", "Sequenz", "101", "zahl"), P("cue", "Cue", "1", "zahl")], osc: [{ address: "/{prefix}/cmd", args: [{ type: "s", value: "Go+ Sequence {seq} Cue {cue}" }] }] },
       { id: "off", label: "Sequenz: Off", params: [P("seq", "Sequenz", "101", "zahl")], osc: [{ address: "/{prefix}/cmd", args: [{ type: "s", value: "Off Sequence {seq}" }] }] },
       { id: "flash", label: "Sequenz: Flash", params: [P("seq", "Sequenz", "101", "zahl")], osc: [{ address: "/{prefix}/cmd", args: [{ type: "s", value: "Flash Sequence {seq}" }] }] },
       { id: "macro", label: "Makro starten", params: [P("macro", "Makro", "1", "zahl")], osc: [{ address: "/{prefix}/cmd", args: [{ type: "s", value: "Go+ Macro {macro}" }] }] },

@@ -5,24 +5,36 @@ import { api } from "../api.js";
 import { soundAktion, zielEinstellung } from "../../core/sound.js";
 
 const laufend = new Set();
+const gestoppt = new WeakSet(); // von stoppen() angehalten: ein abgebrochenes play() ist dann kein Fehler
+// „Neuer Sound beendet laufenden“ gilt je Event: Sounds desselben Events (gleiche Log-ID) laufen zusammen,
+// ein Sound aus einem neueren Event beendet sie. auftrag zählt die Events, damit ein älterer Sound,
+// der noch auf sein Ausgabegerät wartet, nach einem neueren nicht doch noch startet.
+let aktuell = null, auftrag = 0;
 
-// Eine Datei abspielen. sound: Einstellungen (Gerät, Lautstärke, abbrechen). → Promise, lehnt mit Fehlertext ab
-export async function abspielen(datei, sound = {}) {
+// Eine Datei abspielen. sound: Einstellungen (Gerät, Lautstärke, abbrechen). ereignis: ID des auslösenden Events (ohne: eigener Start).
+// → Promise mit dem Audio-Element (null, wenn schon ein neuerer Sound dran ist), lehnt mit Fehlertext ab
+export async function abspielen(datei, sound = {}, ereignis = null) {
   if (!datei?.url) throw new Error("Datei fehlt");
-  if (sound.abbrechen !== false) stoppen();
+  const abbrechen = sound.abbrechen !== false;
+  if (abbrechen && (ereignis == null || ereignis !== aktuell)) { aktuell = ereignis; auftrag++; stoppen(); }
+  const nr = auftrag;
   const a = new Audio(datei.url);
   a.volume = Math.max(0, Math.min(1, Number(sound.lautstaerke ?? 1)));
   if (sound.geraet && typeof a.setSinkId === "function") {
     try { await a.setSinkId(sound.geraet); } catch (e) { throw new Error(`Ausgabegerät nicht verfügbar (${e.message})`); }
   }
+  if (abbrechen && nr !== auftrag) return null; // während des Wartens auf das Gerät kam ein neueres Event
   laufend.add(a);
   a.onended = a.onerror = () => laufend.delete(a);
-  try { await a.play(); } catch (e) { laufend.delete(a); throw new Error(`Datei lässt sich nicht abspielen: ${datei.name} (${e.message})`); }
+  try { await a.play(); } catch (e) {
+    if (gestoppt.has(a)) return null; // schon wieder gestoppt (neueres Event oder Stopp): kein Fehler
+    laufend.delete(a); throw new Error(`Datei lässt sich nicht abspielen: ${datei.name} (${e.message})`);
+  }
   return a;
 }
 
 export function stoppen() {
-  for (const a of laufend) { try { a.pause(); a.currentTime = 0; } catch {} }
+  for (const a of laufend) { gestoppt.add(a); try { a.pause(); a.currentTime = 0; } catch {} }
   laufend.clear();
 }
 
@@ -58,6 +70,6 @@ export function useLocalSound(bibliothek, notify) {
     if (a.art === "stopp") return stoppen();
     if (a.art === "fehler") return notify?.(`Sound: ${a.text}`, "err");
     const datei = a.art === "test" ? { url: testton(), name: "Testton" } : a.datei;
-    abspielen(datei, e).catch((f) => notify?.(`Sound: ${f.message}`, "err"));
+    abspielen(datei, e, a.art === "test" ? null : m?.ereignis ?? null).catch((f) => notify?.(`Sound: ${f.message}`, "err"));
   }), []);
 }

@@ -235,7 +235,7 @@ class Regie {
     const ziel = b.ziel;
     for (const n of b.nachrichten) {
       this.zaehler.gesendet++;
-      Promise.resolve(this.send({ ziel, address: n.address, args: n.args })).catch((e) => {
+      Promise.resolve(this.send({ ziel, address: n.address, args: n.args, ...(k.id ? { ereignis: k.id } : {}) })).catch((e) => {
         if (k.id) this.fehlerZaehlen(k);
         k.fehler.push(`${ziel.name || ziel.host}: ${e.message}`);
         this.emit("fehler", `${ziel.name || ziel.host}: ${e.message}`);

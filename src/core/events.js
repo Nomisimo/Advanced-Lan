@@ -96,8 +96,9 @@ class Dedupe {
     if (e.einmal) return `${e.type}:${e.einmal}`;
     return e.steamid ? `${e.type}:${e.steamid}:${e.round ?? ""}:${e.kills ?? ""}` : `${e.type}:${e.team || ""}`;
   }
-  accept(e, now) {
-    const k = this.key(e), fenster = e.steamid ? this.fensterSpieler : this.fensterGlobal;
+  // proPc: nur Meldungen desselben PCs gelten als doppelt (Einstellung „Mehrfach“ in Regie → Setup)
+  accept(e, now, { proPc = false } = {}) {
+    const k = this.key(e) + (proPc ? `@${e.pcId || e.pc || ""}` : ""), fenster = e.steamid ? this.fensterSpieler : this.fensterGlobal;
     const t = this.seen.get(k);
     if (t !== undefined && now - t < fenster) return false;
     this.seen.set(k, now);
@@ -106,4 +107,22 @@ class Dedupe {
   }
 }
 
-module.exports = { EVENT_TYPES, detectEvents, spielerListe, Dedupe };
+// Regie → Setup → „Mehrfach gemeldete Events“: was die Regie mit derselben Meldung von mehreren PCs macht
+// standard = einmal zählen (Dedupe oben), pc = einmal je PC, alle = nie verwerfen
+const MEHRFACH = ["standard", "pc", "alle"];
+const mehrfachModus = (cfg, spiel, type) => {
+  const m = cfg?.mehrfach?.[spiel]?.[type];
+  return MEHRFACH.includes(m) ? m : "standard";
+};
+function migrateMehrfach(r) {
+  const out = {};
+  if (!r || typeof r !== "object") return out;
+  for (const [spiel, evs] of Object.entries(r)) {
+    if (!evs || typeof evs !== "object") continue;
+    const x = Object.fromEntries(Object.entries(evs).filter(([, v]) => v === "pc" || v === "alle"));
+    if (Object.keys(x).length) out[spiel] = x;
+  }
+  return out;
+}
+
+module.exports = { EVENT_TYPES, detectEvents, spielerListe, Dedupe, MEHRFACH, mehrfachModus, migrateMehrfach };

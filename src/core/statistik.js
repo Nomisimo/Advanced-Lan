@@ -45,7 +45,7 @@ class Statistik {
         break;
       }
       case "round_end":
-        if (r.vorbei) break;
+        if (r.vorbei) { if (!r.sieger && m.siege[ev.team] != null) { r.sieger = ev.team; m.siege[ev.team]++; } break; } // erst ohne Sieger gemeldet: Sieger nachtragen
         Object.assign(r, { vorbei: true, phase: "over", sieger: ev.team || "" });
         m.runden++;
         if (m.siege[ev.team] != null) m.siege[ev.team]++;
@@ -91,7 +91,8 @@ class Statistik {
     switch (ev.type) {
       case "round_start": if (r.vorbei || r.nr != null) { this.letzteRunde = r; this.runde = neueRunde((r.nr ?? 0) + 1); } else r.nr = ev.round || 1; this.runde.phase = "live"; break;
       case "round_end":
-        if (r.vorbei) break;
+        // Ein PC ohne erkanntes Team (oder ohne Spielstand) meldet das Rundenende ohne Sieger: der nächste PC mit Team trägt ihn nach
+        if (r.vorbei) { if (!r.sieger && ev.team) { r.sieger = ev.team; m.siege[ev.team] = (m.siege[ev.team] || 0) + 1; } break; }
         Object.assign(r, { vorbei: true, phase: "over", sieger: ev.team || "" });
         m.runden++;
         if (ev.team) m.siege[ev.team] = (m.siege[ev.team] || 0) + 1;

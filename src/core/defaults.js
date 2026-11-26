@@ -9,6 +9,7 @@ const { standardNamensAbfrage, migrateNamensAbfrage } = require("./namen");
 const { leseSpieler } = require("./protokoll");
 const { standardPlan, migratePlan } = require("./plan");
 const { migrateErsetzt } = require("./aktionen");
+const { migrateMehrfach } = require("./events");
 
 const PORTS = { session: 47801, gsi: 3000, rl: 49124 };
 
@@ -34,6 +35,8 @@ function standardRegie() {
     targets: [], // [{ id, typ, name, host, port, optionen: {}, netz }]  netz: eigene Netzwerkkarte, leer = wie „Senden“
     // Tab „Signale“: welches Event welchen Befehl an welches Ziel sendet
     signale: {}, // { [spiel | "allgemein"]: { [event | aktion]: [{ id, ziel, befehl, werte, pc, team }] } }
+    // Tab „Setup“: was mit demselben Event von mehreren PCs passiert. Fehlt ein Event, gilt „standard“ (einmal zählen)
+    mehrfach: {}, // { [spiel]: { [event]: "pc" | "alle" } }
     ersetzt: {}, // { [spiel]: [event] } hier gelten die allgemeinen Befehle nicht (core/aktionen.js)
     // Tab „Plan“: Plätze der Game-PCs, je Ziel eine Spalte, Game-PC-Vorlage (core/plan.js)
     plan: standardPlan(),
@@ -140,6 +143,7 @@ function migrateKonfig(k) {
       targets: Array.isArray(r.targets) ? r.targets.map(migrateZiel) : d.regie.targets,
       signale: migrateSignale(r.signale),
       ersetzt: migrateErsetzt(r.ersetzt),
+      mehrfach: migrateMehrfach(r.mehrfach),
       mvpNach: Object.fromEntries(Object.entries(r.mvpNach && typeof r.mvpNach === "object" ? r.mvpNach : {}).filter(([, v]) => typeof v === "string" && v)),
       plan: migratePlan(r.plan),
       spiele: genutzteSpiele(r.spiele, d.regie.spiele),

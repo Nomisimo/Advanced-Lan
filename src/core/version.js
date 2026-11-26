@@ -6,6 +6,10 @@ const REPO = "Nomisimo/Advanced-Lan";
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 const CHANGELOG = {
+  "1.0.12": [
+    "Setup: neuer Bereich „Mehrfach gemeldete Events“. Je Spiel und Event einstellbar, was mit derselben Meldung von mehreren PCs passiert: „Einmal (Standard)“ wie bisher, „Einmal je PC“ oder „Alle durchlassen“ (nie als doppelt verwerfen). Wird in der Regie-Show gespeichert",
+    "Stats-Screen: meldet ein PC das Rundenende ohne Sieger (Team nicht erkannt, kein Spielstand), trägt der nächste PC mit Team den Punkt nach. Vorher fehlte der Punkt, Runden und Punkte passten nicht zusammen",
+  ],
   "1.0.11": [
     "Local Sound: mehrere Sounds im selben Event spielen zusammen. „Neuer Sound beendet laufenden“ stoppt nur noch Sounds aus früheren Events (auch bei „Alle testen“)",
     "grandMA3: neuer Befehl „Sequenz: Go+ auf Cue“ (Go+ Sequence X Cue Y)",

@@ -38,6 +38,8 @@ const Panel = ({ children, style }) => {
       boxShadow: k > 0 || rahmen ? `0 0 30px rgba(157,92,255,${0.12 * k}), inset 0 1px 0 rgba(255,255,255,${0.04 * k})` : "none", ...style, ...(rahmen ? {} : { borderColor: "transparent" }) }}>{children}</div>
   );
 };
+// Trennlinien in Listen und Tabellen werden mit dem Kachel-Hintergrund durchsichtig (0 % = keine Linien)
+const useLinie = () => `rgba(58,54,71,${useContext(StilKontext).kachel / 100})`;
 const Titel = ({ children }) => <div style={{ fontSize: 22, fontWeight: 700, color: SUB, textTransform: "uppercase", letterSpacing: 2, marginBottom: 14 }}>{children}</div>;
 
 // Zeichenkette der Anzeige (Option) oder ihr Standard; leer = nichts anzeigen
@@ -77,8 +79,9 @@ const Chip = ({ children, farbe }) => (
 );
 
 function Bestenliste({ d, mitTeam, titel, zeilen, o, tx }) {
-  const zelle = { padding: "8px 14px", fontSize: 28, borderBottom: `1px solid ${LINE}` };
-  const kopf = { ...zelle, fontSize: 20, color: SUB, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", borderBottom: `2px solid ${LINE}` };
+  const linie = useLinie();
+  const zelle = { padding: "8px 14px", fontSize: 28, borderBottom: `1px solid ${linie}` };
+  const kopf = { ...zelle, fontSize: 20, color: SUB, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", borderBottom: `2px solid ${linie}` };
   return (
     <Panel style={{ height: "100%", boxSizing: "border-box", padding: "26px 32px", minWidth: 0, overflow: "hidden" }}>
       {titel && <Titel>{titel}</Titel>}
@@ -107,13 +110,14 @@ function Bestenliste({ d, mitTeam, titel, zeilen, o, tx }) {
 
 function LetzteEvents({ events, titel, o, tx }) {
   const neueste = events[0]?.id;
+  const linie = useLinie();
   return (
     <Panel style={{ height: "100%", boxSizing: "border-box", padding: "26px 32px", overflow: "hidden" }}>
       {titel && <Titel>{titel}</Titel>}
       {events.length === 0 ? <div style={{ fontSize: 26, color: MUTED, fontStyle: "italic" }}>{tx(opt(o, "textLeer", "Noch keine Events."))}</div> : events.map((e) => {
         const f = e.ev.team ? teamFarbe(e.ev.team) : AKZ;
         return (
-          <div key={e.id} className={e.id === neueste ? "neu" : ""} style={{ display: "flex", alignItems: "center", gap: 18, padding: "7px 12px", borderBottom: `1px solid ${LINE}`, borderRadius: 8 }}>
+          <div key={e.id} className={e.id === neueste ? "neu" : ""} style={{ display: "flex", alignItems: "center", gap: 18, padding: "7px 12px", borderBottom: `1px solid ${linie}`, borderRadius: 8 }}>
             <span style={{ color: f, display: "inline-flex", filter: `drop-shadow(0 0 6px ${f})` }}><EventIcon type={e.ev.type} spiel={e.ev.spiel} size={34} /></span>
             <span style={{ fontSize: 28, fontWeight: 700, whiteSpace: "nowrap" }}>{eventLabel(e.ev.type, e.ev.spiel)}</span>
             <span style={{ fontSize: 26, color: f, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.spieler !== false ? e.ev.player || e.ev.team || "" : ""}</span>
@@ -168,7 +172,8 @@ function TextElement({ el, werte }) {
 
 // Teams mit ihren Spielern (Valorant mit Shots Fired: Namen aus ui_team_order beider Teams)
 function TeamsAnzeige({ teams, spiel, seiten, titel, o, tx }) {
-  const zelle = { padding: "6px 12px", fontSize: 26, borderBottom: `1px solid ${LINE}` };
+  const linie = useLinie();
+  const zelle = { padding: "6px 12px", fontSize: 26, borderBottom: `1px solid ${linie}` };
   const leer = teams.every((t) => !t.spieler.length);
   return (
     <Panel style={{ height: "100%", boxSizing: "border-box", padding: "26px 32px", overflow: "hidden", display: "flex", flexDirection: "column" }}>
@@ -202,6 +207,7 @@ function TeamsAnzeige({ teams, spiel, seiten, titel, o, tx }) {
 // MVP-Endscreen: der beste Spieler groß, darunter das Ranking aller Spieler (Punkte, K/D, Headshots).
 // nurEnde: erst zeigen, wenn das Match vorbei ist
 function MvpAnzeige({ el, liste, d, spiel, tx, h }) {
+  const linie = useLinie();
   if (el.nurEnde && !d.vorbei) return null;
   const titel = tx(el.titel || "");
   if (!liste.length) return <Panel style={{ height: "100%", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 34, color: MUTED, fontStyle: "italic" }}>{tx(opt(el, "textLeer", "Noch keine Spielerdaten."))}</Panel>;
@@ -214,8 +220,8 @@ function MvpAnzeige({ el, liste, d, spiel, tx, h }) {
   if (el.punkte !== false) spalten.push(["punkte", "Punkte"]);
   const mvpH = Math.min(320, h * 0.36);
   const zeilen = el.zeilen || Math.max(1, Math.floor((h - mvpH - 150) / 54));
-  const zelle = { padding: "8px 14px", fontSize: 28, borderBottom: `1px solid ${LINE}`, fontVariantNumeric: "tabular-nums" };
-  const kopf = { ...zelle, fontSize: 20, color: SUB, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", borderBottom: `2px solid ${LINE}` };
+  const zelle = { padding: "8px 14px", fontSize: 28, borderBottom: `1px solid ${linie}`, fontVariantNumeric: "tabular-nums" };
+  const kopf = { ...zelle, fontSize: 20, color: SUB, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", borderBottom: `2px solid ${linie}` };
   const wert = (p, k) => (k === "hsQuote" ? `${p.hsQuote}%` : p[k] ?? 0);
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", gap: 22 }}>

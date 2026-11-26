@@ -8,6 +8,7 @@ const RELEASES_URL = `https://github.com/${REPO}/releases`;
 const CHANGELOG = {
   "1.0.10": [
     "Stats-Screen-Editor: jede Anzeige, Spieler-Karte und jeder Bild-Block hat jetzt ein Feld „Überschrift“ (auch Spielstand, Zahlen, Aktives Spiel, Session, LIVE). Frei ändern oder leer lassen = keine Überschrift, Platzhalter wie {spiel} gehen auch. Bestehende Layouts bleiben unverändert",
+    "Stats-Screen: Trennlinien in Letzte Events, Beste Spieler, Teams und MVP-Ranking werden mit dem Kachel-Hintergrund durchsichtig, bei 0 % sind sie weg",
   ],
   "1.0.9": [
     "Valorant: neues Event „Kampf beginnt (Barriere fällt)“ aus Shots Fired (round_phase „combat“), einmal je Runde nach der Kaufphase. Eigener Cue für Licht und Sound, Sound-Ordner „combat“ oder „barrier“",

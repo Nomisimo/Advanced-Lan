@@ -538,7 +538,7 @@ function SpielerWahl({ e, pcs, aendern }) {
   );
 }
 
-const SPIELER_INFO = { team: "Team zeigen", seite: "Seite zeigen (Valorant: Angriff/Verteidigung)", kills: "Kills", tode: "Tode", headshots: "Headshots", kd: "K/D" };
+const SPIELER_INFO = { agent: "Agent zeigen (Valorant)", waffe: "Waffe des letzten Kills (Valorant)", team: "Team zeigen", seite: "Seite zeigen (Valorant: Angriff/Verteidigung)", kills: "Kills", tode: "Tode", headshots: "Headshots", kd: "K/D" };
 
 function Eigenschaften({ e, F, pcs = [], bilder, aendern, tippen, fokus, duplizieren, entfernen, ebene, bildErsetzen, originalFormat, stilAlle }) {
   const { b: B, h: H } = F;

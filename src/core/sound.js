@@ -20,7 +20,7 @@ const norm = (s) => String(s ?? "").trim().toLowerCase().replace(/[\s\-.]+/g, "_
 
 // Ordnernamen, die nicht genau eine Event-ID sind → Event-ID (je Spiel, sonst für alle)
 const ORDNER_ALIAS = {
-  valorant: { spike_planted: "spike_planted", plant: "spike_planted", defuse: "spike_defused", detonate: "spike_detonated", explode: "spike_detonated", spike_exploded: "spike_detonated", round_start: "round_start", buy: "round_start", victory: "match_won", win: "match_won" },
+  valorant: { spike_planted: "spike_planted", plant: "spike_planted", defuse: "spike_defused", detonate: "spike_detonated", explode: "spike_detonated", spike_exploded: "spike_detonated", round_start: "round_start", buy: "round_start", combat: "round_combat", barrier: "round_combat", round_combat: "round_combat", victory: "match_won", win: "match_won" },
   "*": { kills: "kill", deaths: "death", death: "death", headshots: "headshot", aces: "ace", match_end: "match_end", matchstart: "match_start", matchend: "match_end", round_win: "round_end" },
 };
 

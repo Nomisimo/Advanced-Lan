@@ -29,6 +29,8 @@ const BILD_SPIELE = [
       M("team", "Team steht fest", { team: true, auto: true }), M("match_start", "Match startet"), M("overtime", "Verlängerung (12:12)", { auto: true }), M("match_won", "Match gewonnen", { team: true, art: "matchende" }),
       R("round_start", "Kaufphase (Runde startet)", { art: "start" }), R("round_end", "Runde gewonnen", { team: true, art: "ende" }),
       R("spike_planted", "Spike gelegt"), R("spike_defused", "Spike entschärft"), R("spike_detonated", "Spike explodiert"),
+      // Nur aus Shots Fired (round_phase „combat“): Ende der Kaufphase, die Barriere fällt
+      R("round_combat", "Kampf beginnt (Barriere fällt)"),
       P("kill", "Kill"), P("death", "Spieler stirbt"), P("ace", "Ace"), P("clutch", "Clutch"), P("thrifty", "Thrifty"),
       // Liefert auch Shots Fired (shotsfired.js) und Automation Overdrive (overdrive.js): Match vorbei ohne Sieger, Assist, Headshot
       M("match_end", "Match vorbei", { art: "matchende" }), P("assist", "Assist"), P("headshot", "Headshot"),

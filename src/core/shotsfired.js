@@ -14,7 +14,7 @@
 // ui_team_order_allies / _enemies, map und game_mode. Die Zähler werden zu Kill (mit Ace), Tod und Headshot, eine neue
 // round_number zum Rundenstart. team und ui_team_order zeigt das Setup an, aus team folgt notfalls das Team dieses PCs.
 // - Events: match_start, match_end, kill, death, assist, headshot, spike_planted, spike_defused, spike_detonated
-// - Info-Updates: round_phase (shopping, combat, end), score / match_score ({ won, lost } aus Sicht dieses Spielers)
+// - Info-Updates: round_phase (shopping, combat = Barriere fällt, end), agent und player_name (me), kill_feed (Waffe), score / match_score ({ won, lost } aus Sicht dieses Spielers)
 // Rundenstart, Rundenende, Rundengewinner und Matchgewinner gibt es für Valorant nicht als Event (anders als bei R6 oder OW2):
 // Rundenstart = round_phase wechselt auf „shopping“, Rundenende mit Sieger = score steigt. Ohne score zählt round_phase „end“
 // als Rundenende ohne Sieger. Kommen trotzdem round_start oder round_end als Event, werden sie übernommen.
@@ -54,7 +54,45 @@ const ZAEHLER_KEYS = Object.keys(ZAEHLER);
 const TEAM_KEYS = ["team", "ui_team_order_allies", "ui_team_order_enemies"];
 // Match-ID aus GEP match_info: gleiche ID = gleiches Match, damit die Regie die PCs nach Match trennt (ohne Riot Client)
 const MATCH_KEYS = ["match_id", "pseudo_match_id"];
-const VAL = { events: SF_EVENTS, infos: [...SCORE_KEYS, "round_phase", "kill_feed", ...ZAEHLER_KEYS, "round_number", ...TEAM_KEYS, ...MATCH_KEYS] };
+// Eigener Agent und Spielername (GEP „me“): Agent für den Stats-Screen, Name, um die eigenen Kills im kill_feed zu erkennen
+const ME_KEYS = ["agent", "player_name"];
+const VAL = { events: SF_EVENTS, infos: [...SCORE_KEYS, "round_phase", "kill_feed", ...ZAEHLER_KEYS, "round_number", ...TEAM_KEYS, ...MATCH_KEYS, ...ME_KEYS] };
+// Interne Agent-Namen von Overwolf (OW-Electron-Doku, supported-games/valorant, agent) → Name im Spiel
+const AGENTEN = {
+  clay: "Raze", pandemic: "Viper", wraith: "Omen", hunter: "Sova", thorne: "Sage", phoenix: "Phoenix", wushu: "Jett", gumshoe: "Cypher",
+  sarge: "Brimstone", breach: "Breach", vampire: "Reyna", killjoy: "Killjoy", guide: "Skye", stealth: "Yoru", rift: "Astra", grenadier: "KAY/O",
+  deadeye: "Chamber", sprinter: "Neon", bountyhunter: "Fade", mage: "Harbor", aggrobot: "Gekko", cable: "Deadlock", sequoia: "Iso", smonk: "Clove",
+  nox: "Vyse", cashew: "Tejo", terra: "Waylay",
+};
+// "Clay_PC_C" → "Raze". Unbekannte IDs ohne „_PC_C“, damit neue Agenten wenigstens lesbar erscheinen. Drohnen u. Ä. (anderer Blickwinkel) ändern die ID nicht.
+function agentVon(v) {
+  let x = json(v);
+  if (x && typeof x === "object") x = x.agent ?? x.value;
+  const roh = String(x ?? "").trim();
+  if (!roh || roh === "null") return "";
+  const id = roh.replace(/_PC_C$/i, "").replace(/_C$/i, "");
+  return AGENTEN[id.toLowerCase()] || (/_PC_C$/i.test(roh) ? id : roh);
+}
+// Waffen und Fähigkeiten im kill_feed (OW-Electron-Doku, kill_feed) → Name im Spiel
+const WAFFEN = {
+  tx_hud_pistol_glock_s: "Classic", tx_hud_pistol_sawedoff_s: "Shorty", tx_hud_autopistol: "Frenzy", tx_hud_pistol_luger_s: "Ghost", tx_hud_pistol_revolver_s: "Sheriff",
+  tx_hud_pump: "Bucky", tx_hud_shotguns_spas12_s: "Judge", tx_hud_vector: "Stinger", tx_hud_smg_mp5_s: "Spectre",
+  tx_hud_burst: "Bulldog", tx_hud_dmr: "Guardian", tx_hud_assault_ar10a2_s: "Phantom", tx_hud_volcano: "Vandal",
+  tx_hud_sniper_boltaction_s: "Marshal", tx_hud_operator: "Operator", tx_hud_doublesniper: "Outlaw", tx_hud_lmg: "Ares", tx_hud_hmg: "Odin",
+  tx_hud_knife_standard_s: "Messer", tx_breach_fusionblast: "Aftershock", tx_sarge_molotovlauncher: "Incendiary", tx_sarge_orbitalstrike: "Orbital Strike",
+  tx_pheonix_firewall: "Blaze", tx_pheonix_molotov: "Hot Hands", tx_hunter_shockarrow: "Shock Bolt", tx_hunter_bowblast: "Hunter's Fury",
+  tx_hud_deadeye_q_pistol: "Headhunter", tx_hud_deadeye_x_giantslayer: "Tour de Force", tx_cable_fishinghook: "Annihilation", tx_hud_wushu_x_dagger: "Blade Storm",
+  tx_neon_ult: "Overdrive", tx_gumshoe_tripwire: "Trapwire", tx_gren_icon: "Fragment", tx_aggrobot_bubbles: "Mosh Pit", tx_kj_bees: "Nanoswarm", tx_kj_turret: "Turret",
+  tx_clay_boomba: "Boom Bot", tx_clay_clusterbomb: "Paint Shells", tx_clay_rocketlauncher: "Showstopper", tx_guide4: "Trailblazer", tx_pandemic_acidlauncher: "Snake Bite",
+  tx_ui_cashew_e: "Guided Salvo", tx_ui_cashew_x: "Armageddon",
+};
+// "TX_Hud_Volcano" → "Vandal". Unbekannt: ohne „TX_Hud_“ und mit Leerzeichen, z. B. „Spike“ oder „Fall“.
+function waffeVon(v) {
+  const roh = String(v ?? "").trim();
+  if (!roh || roh === "null") return "";
+  return WAFFEN[roh.toLowerCase()] || roh.replace(/^tx_(hud_|ui_)?/i, "").replace(/_s$/i, "").replace(/_/g, " ").trim();
+}
+const gleicherName = (a, b) => !!a && !!b && String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
 const SIEG_RUNDEN = 13;
 
 const norm = (s) => String(s ?? "").trim().toLowerCase().replace(/[\s\-.]+/g, "_");
@@ -130,7 +168,8 @@ const ZAEHLER_FENSTER = 3000;
 const neueZaehler = () => ({ kills: null, deaths: null, headshots: null, runde: null });
 const neueEcht = () => ({ kill: false, death: false, headshot: false });
 // info: Seite und Spieler aus team und ui_team_order (nur zur Anzeige und für das Team dieses PCs)
-const neueInfo = (match = "", pseudo = "") => ({ seite: "", verbuendete: [], gegner: [], match, pseudo });
+// agent und name bleiben bei match_start (kommen schon in der Agentenwahl), waffe: Waffe des letzten eigenen Kills (aus kill_feed)
+const neueInfo = (match = "", pseudo = "", agent = "", name = "") => ({ seite: "", verbuendete: [], gegner: [], match, pseudo, agent, name, waffe: "", letzterKill: null });
 const sfZustand = () => ({ score: null, entschieden: false, phase: "", r: neueRunde(), z: neueZaehler(), echt: neueEcht(), info: neueInfo() });
 
 // team → "Angriff", "Verteidigung" oder "" (Overwolf schreibt attack/attacker/defense/defender, sicherheitshalber auch Deutsch)
@@ -165,7 +204,7 @@ function teamAusSeite(seite, runde) {
 // Was Shots Fired über die Teams weiß: { seite, team, verbuendete, gegner }
 function sfInfo(z) {
   const i = z?.info || neueInfo();
-  return { seite: i.seite, team: teamAusSeite(i.seite, z?.z?.runde), verbuendete: [...i.verbuendete], gegner: [...i.gegner], match: i.match || i.pseudo || "" };
+  return { seite: i.seite, team: teamAusSeite(i.seite, z?.z?.runde), verbuendete: [...i.verbuendete], gegner: [...i.gegner], match: i.match || i.pseudo || "", agent: i.agent || "", waffe: i.waffe || "", letzterKill: i.letzterKill ? { ...i.letzterKill } : null };
 }
 // Zahl aus einem Wert: 3, "3", { kills: 3 } oder JSON-Text
 function zahlVon(v, key) {
@@ -229,6 +268,8 @@ function shotsfiredEvents(body, z = sfZustand(), jetzt = Date.now()) {
       }
       continue;
     }
+    if (key === "agent") { const a = agentVon(value); if (a) z.info.agent = a; continue; }
+    if (key === "player_name") { const v = json(value), nm = String((v && typeof v === "object" ? v.player_name : v) ?? "").trim(); if (nm && nm !== "null") z.info.name = nm.slice(0, 60); continue; }
     if (key === "team") { const s = seiteVon(value); if (s) z.info.seite = s; continue; }
     if (MATCH_KEYS.includes(key)) {
       const v = json(value), id = String((v && typeof v === "object" ? v[key] : v) ?? "").trim().slice(0, 100);
@@ -256,6 +297,8 @@ function shotsfiredEvents(body, z = sfZustand(), jetzt = Date.now()) {
         if (z.r.perNummer && !z.r.perPhase) z.r.perPhase = true;
         else { rundeStart(); z.r.perPhase = true; }
       }
+      // Barriere fällt: Kampf beginnt (einmal je Runde, nur nach der Kaufphase)
+      if (p === "combat" && z.phase === "shopping") raus.push({ event: "round_combat", seite: "eigen" });
       // Ohne Spielstand: Rundenende ohne Sieger. Mit Spielstand kommt das Rundenende mit Sieger, wenn score steigt.
       if (p === "end" && z.phase !== "end" && !z.score) rundeEnde("keins");
       z.phase = p;
@@ -263,7 +306,13 @@ function shotsfiredEvents(body, z = sfZustand(), jetzt = Date.now()) {
     }
     if (key === "kill_feed") {
       const k = json(value);
-      if (k && typeof k === "object" && wahr(k.is_victim_teammate)) z.r.mitspielerTot++;
+      if (!k || typeof k !== "object") continue;
+      if (wahr(k.is_victim_teammate)) z.r.mitspielerTot++;
+      // Waffe für den Stats-Screen: letzter Kill im Feed, und der letzte eigene (Angreifer = eigener Name, bei versteckten Namen „Me“).
+      // Nicht über den Agent: der Gegner kann denselben spielen.
+      const waffe = waffeVon(k.weapon);
+      if (waffe || k.attacker) z.info.letzterKill = { angreifer: String(k.attacker ?? "").slice(0, 60), opfer: String(k.victim ?? "").slice(0, 60), waffe, headshot: wahr(k.headshot) };
+      if (waffe && (gleicherName(k.attacker, z.info.name) || gleicherName(k.attacker, "me"))) z.info.waffe = waffe;
       continue;
     }
     const s = scoreVon(value);
@@ -280,7 +329,7 @@ function shotsfiredEvents(body, z = sfZustand(), jetzt = Date.now()) {
   for (const { name: n } of events) {
     const id = eventName(n);
     if (schlucken[id]) { schlucken[id]--; continue; }
-    if (id === "match_start") { z.score = null; z.entschieden = false; z.phase = ""; z.r = neueRunde(); z.z = neueZaehler(); z.info = neueInfo(z.info?.match, z.info?.pseudo); raus.push({ event: id, seite: "eigen" }); }
+    if (id === "match_start") { z.score = null; z.entschieden = false; z.phase = ""; z.r = neueRunde(); z.z = neueZaehler(); z.info = neueInfo(z.info?.match, z.info?.pseudo, z.info?.agent, z.info?.name); raus.push({ event: id, seite: "eigen" }); }
     else if (id === "kill") kill();
     else if (id === "death") tod();
     else if (id === "match_end") {
@@ -350,7 +399,8 @@ const SF_EINRICHTEN = {
     ["kill, death, assist, headshot", "Kill, Tod, Assist, Headshot, dazu Ace (5 Kills in einer Runde)"], ["kill_feed", "für Clutch (letzter Überlebender gewinnt)"],
     ["kills, deaths, headshots, round_number", "wenn Shots Fired nur diese anbietet: Kill und Ace, Tod, Headshot, Rundenstart"],
     ["team, ui_team_order_allies, ui_team_order_enemies", "Seite und Spieler beider Teams; Team dieses PCs, wenn der Riot Client keins liefert"],
-    ["round_phase", "Rundenstart (Kaufphase) und Rundenende"], ["score", "Rundengewinner und Matchgewinner (13 Runden, 2 Vorsprung)"]],
+    ["round_phase", "Rundenstart (Kaufphase), Kampf beginnt (Barriere fällt) und Rundenende"],
+    ["agent, player_name", "eigener Agent für den Stats-Screen; mit kill_feed die Waffe des letzten eigenen Kills"], ["score", "Rundengewinner und Matchgewinner (13 Runden, 2 Vorsprung)"]],
   fortnite: [["matchStart, matchEnd", "Match startet, Match vorbei"], ["kill, knockout, assist", "Eliminierung, Gegner niedergeschlagen, Assist"],
     ["death, knockedout, revived", "Ausgeschieden, selbst niedergeschlagen, wiederbelebt"], ["phase", "Battle Bus startet, gelandet"], ["rank", "Top 10, Top 5, Victory Royale (Platz 1)"]],
   lol: [["kill, death, assist", "Kill, Tod, Assist"], ["matchStart, matchEnd", "Spiel startet, Spiel vorbei"], ["Multikills der Ansage", "Double bis Pentakill"]],
@@ -381,4 +431,4 @@ function shotsfiredNachrichten(body, pfad = "/", z = sfZustaende()) {
 
 module.exports = { SF_EINRICHTEN, ACE_KILLS, SHOTSFIRED_PORT, SHOTSFIRED_URL, SHOTSFIRED_BASIS, SHOTSFIRED_STORE_URL, SF_SPIELE, SF_GAME_IDS, sfUrl, SF_EVENTS,
   shotsfiredEvents, fortniteEvents, finalsEvents, lolEvents, shotsfiredNachrichten, sfSpiel, sfZustand, fnZustand, sfZustaende, zerlegen, scoreVon, eventName,
-  sfInfo, seiteVon, spielerVon, teamAusSeite };
+  sfInfo, seiteVon, spielerVon, teamAusSeite, agentVon, waffeVon };

@@ -110,13 +110,13 @@ function spielerDaten(status, spielId) {
     const sf = pc.stand?.sf || {}, ps = pc.status || {};
     const z = (a, b, c) => (a != null ? n(a) : b != null ? n(b) : c != null ? n(c) : 0);
     out.push({
-      id: pc.pcId, pcId: pc.pcId, name, team: sf.team || ps.team || s?.team || "", seite: sf.seite || "",
+      id: pc.pcId, pcId: pc.pcId, name, team: sf.team || ps.team || s?.team || "", seite: sf.seite || "", agent: sf.agent || "", waffe: sf.waffe || "",
       kills: z(s?.kills, sf.kills, ps.kills), tode: z(s?.tode, sf.deaths, ps.deaths), headshots: z(s?.headshots, sf.headshots, null), assists: z(s?.assists, null, null),
       verbunden: pc.verbunden !== false,
     });
   }
   // Spieler ohne eigenen PC (z. B. CS2: ein PC meldet alle Spieler, Beispieldaten)
-  for (const s of alle) if (!gesehen.has(s) && !out.some((o) => o.name === s.name)) out.push({ id: s.id || s.name, pcId: "", name: s.name, team: s.team || "", seite: "", kills: n(s.kills), tode: n(s.tode), headshots: n(s.headshots), assists: n(s.assists), verbunden: true });
+  for (const s of alle) if (!gesehen.has(s) && !out.some((o) => o.name === s.name)) out.push({ id: s.id || s.name, pcId: "", name: s.name, team: s.team || "", seite: "", agent: s.agent || "", waffe: s.waffe || "", kills: n(s.kills), tode: n(s.tode), headshots: n(s.headshots), assists: n(s.assists), verbunden: true });
   return out.sort((a, b) => b.kills - a.kills || a.tode - b.tode || a.name.localeCompare(b.name));
 }
 
@@ -132,7 +132,7 @@ function teamListen(status, spiel) {
   const liste = spielerDaten(status, spiel?.id);
   const [t1, t2] = spiel?.teams?.length >= 2 ? spiel.teams : ["TEAM A", "TEAM B"];
   const andere = (t) => (t === t1 ? t2 : t === t2 ? t1 : "");
-  const zahlen = (name) => liste.find((p) => p.name === name || p.pcId === name) || { name, kills: null, tode: null, headshots: null };
+  const zahlen = (name) => liste.find((p) => p.name === name || p.pcId === name) || { name, kills: null, tode: null, headshots: null, agent: "", waffe: "" };
   // Shots Fired: Listen der PCs zusammenführen
   const sf = { [t1]: [], [t2]: [] };
   let ohneTeam = null;
@@ -207,10 +207,11 @@ const WERTE = [
   ["kills", "Kills (Match)"], ["tode", "Tode (Match)"], ["headshots", "Headshots (Match)"], ["aces", "Aces (Match)"],
   ["sp.name", "Name", true], ["sp.kills", "Kills", true], ["sp.tode", "Tode", true], ["sp.headshots", "Headshots", true], ["sp.kd", "K/D", true],
   ["sp.team", "Team", true], ["sp.seite", "Seite (Angriff/Verteidigung)", true],
+  ["sp.agent", "Agent (Valorant)", true], ["sp.waffe", "Waffe des letzten Kills (Valorant)", true],
 ];
 const WERT = Object.fromEntries(WERTE.map(([k, l, sp]) => [k, { label: l, spieler: !!sp }]));
 // Kurze Beschriftung unter dem Wert
-const WERT_KURZ = { score1: "", score2: "", team1: "", team2: "", runde: "Runde", kills: "Kills", tode: "Tode", headshots: "Headshots", aces: "Aces", "sp.name": "", "sp.kills": "Kills", "sp.tode": "Tode", "sp.headshots": "Headshots", "sp.kd": "K/D", "sp.team": "Team", "sp.seite": "Seite" };
+const WERT_KURZ = { score1: "", score2: "", team1: "", team2: "", runde: "Runde", kills: "Kills", tode: "Tode", headshots: "Headshots", aces: "Aces", "sp.name": "", "sp.kills": "Kills", "sp.tode": "Tode", "sp.headshots": "Headshots", "sp.kd": "K/D", "sp.team": "Team", "sp.seite": "Seite", "sp.agent": "Agent", "sp.waffe": "Waffe" };
 
 const kd = (p) => (p.tode ? (p.kills / p.tode).toFixed(2) : String(p.kills));
 // Wert eines Blocks: d = statsDaten, statistik, sp = gewählter Spieler → Text ("–" ohne Wert)

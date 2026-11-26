@@ -25,7 +25,7 @@ test("Shots Fired: Runden- und Matchgewinner aus dem Spielstand", () => {
   assert.deepEqual(ev(score(0, 0), z), []);
   assert.deepEqual(ev({ feature: "match_info", key: "round_phase", value: "shopping" }, z), ["round_start"]);
   assert.deepEqual(ev({ feature: "match_info", key: "round_phase", value: "shopping" }, z), [], "Kaufphase nur einmal");
-  assert.deepEqual(ev({ key: "round_phase", value: "combat" }, z), []);
+  assert.deepEqual(ev({ key: "round_phase", value: "combat" }, z), ["round_combat"]);
   assert.deepEqual(ev(score(1, 0), z), ["round_end"]);
   assert.deepEqual(ev(score(1, 0), z), [], "gleicher Stand zählt nicht");
   assert.deepEqual(ev({ key: "score", value: { won: 1, lost: 1 } }, z), ["round_end:gegner"]);
@@ -64,7 +64,7 @@ test("Shots Fired: Rundenstart und Rundenende, auch ohne Spielstand", () => {
   const z = sfZustand();
   assert.deepEqual(ev({ name: "match_start" }, z), ["match_start"]);
   assert.deepEqual(ev({ key: "round_phase", value: "shopping" }, z), ["round_start"]);
-  assert.deepEqual(ev({ key: "round_phase", value: "combat" }, z), []);
+  assert.deepEqual(ev({ key: "round_phase", value: "combat" }, z), ["round_combat"]);
   assert.deepEqual(ev({ key: "round_phase", value: "end" }, z), ["round_end:keins"], "ohne score: Ende ohne Sieger");
   assert.deepEqual(ev({ key: "round_phase", value: "end" }, z), [], "nur einmal");
   assert.deepEqual(ev({ name: "round_start" }, z), ["round_start"], "falls als Event: übernommen");
@@ -204,7 +204,7 @@ test("Shots Fired: round_number vor der Kaufphase startet die Runde nur einmal",
   const phase = (p) => ({ info: { match_info: { round_phase: p } } });
   assert.deepEqual(ev({ event: "round_number", data: 1 }, z), ["round_start"]);
   assert.deepEqual(ev(phase("shopping"), z), []);
-  assert.deepEqual(ev(phase("combat"), z), []);
+  assert.deepEqual(ev(phase("combat"), z), ["round_combat"]);
   assert.deepEqual(ev(phase("shopping"), z), ["round_start"]);
   assert.deepEqual(ev({ event: "round_number", data: 2 }, z), []);
   assert.deepEqual(ev({ event: "round_number", data: 3 }, z), ["round_start"]);
@@ -218,7 +218,7 @@ test("Shots Fired: headshots-Zähler, team und ui_team_order", () => {
   assert.deepEqual(ev({ event: "round_number", data: 3 }, z), ["round_start"]);
   assert.deepEqual(ev({ event: "ui_team_order_allies", data: JSON.stringify([{ name: "Momo" }, { name: "Ben" }]) }, z), []);
   assert.deepEqual(ev({ event: "ui team order enemies", data: "Ana, Tom" }, z), []);
-  assert.deepEqual(sfInfo(z), { seite: "Angriff", team: "TEAM A", verbuendete: ["Momo", "Ben"], gegner: ["Ana", "Tom"], match: "" });
+  assert.deepEqual(sfInfo(z), { seite: "Angriff", team: "TEAM A", verbuendete: ["Momo", "Ben"], gegner: ["Ana", "Tom"], match: "", agent: "", waffe: "", letzterKill: null });
   ev({ event: "round_number", data: 13 }, z);
   assert.equal(sfInfo(z).team, "TEAM B", "Seitenwechsel nach Runde 12: im Angriff ist jetzt Blau");
   ev({ event: "team", data: "defense" }, z);
@@ -227,7 +227,7 @@ test("Shots Fired: headshots-Zähler, team und ui_team_order", () => {
   assert.equal(sfInfo(z).team, "", "Verlängerung: zu unsicher");
   // match_start setzt alles zurück
   ev({ event: "match_start" }, z);
-  assert.deepEqual(sfInfo(z), { seite: "", team: "", verbuendete: [], gegner: [], match: "" });
+  assert.deepEqual(sfInfo(z), { seite: "", team: "", verbuendete: [], gegner: [], match: "", agent: "", waffe: "", letzterKill: null });
 });
 
 test("Shots Fired: Formen von team und ui_team_order", () => {
@@ -289,4 +289,44 @@ test("Shots Fired: match_id und pseudo_match_id ergeben das Match des PCs", () =
   assert.equal(sfInfo(z).match, "riot-9"); // match_start löscht die ID nicht (kann kurz davor kommen)
   shotsfiredEvents({ event: "match_id", value: "null" }, z);
   assert.equal(sfInfo(z).match, "riot-9");
+});
+
+test("Valorant: round_phase combat nach der Kaufphase = Kampf beginnt, einmal je Runde", () => {
+  const z = sfZustand();
+  const phase = (p) => ({ info: { match_info: { round_phase: p } } });
+  assert.deepEqual(ev(phase("shopping"), z), ["round_start"]);
+  assert.deepEqual(ev(phase("combat"), z), ["round_combat"]);
+  assert.deepEqual(ev(phase("combat"), z), []);
+  assert.deepEqual(ev(phase("end"), z), ["round_end:keins"]);
+  // combat ohne Kaufphase davor (App mitten in der Runde gestartet): kein Cue
+  assert.deepEqual(ev(phase("combat"), sfZustand()), []);
+});
+
+test("Valorant: agent und Waffe des letzten eigenen Kills aus kill_feed", () => {
+  const { agentVon, waffeVon } = require("../src/core/shotsfired");
+  assert.equal(agentVon("Clay_PC_C"), "Raze");
+  assert.equal(agentVon("Wushu_PC_C"), "Jett");
+  assert.equal(agentVon("Neu_PC_C"), "Neu");
+  assert.equal(agentVon(null), "");
+  assert.equal(waffeVon("TX_Hud_Volcano"), "Vandal");
+  assert.equal(waffeVon("TX_Hud_Knife_Standard_S"), "Messer");
+  assert.equal(waffeVon("TX_Hud_Something_New"), "Something New");
+  const z = sfZustand();
+  ev({ info: { me: { agent: "Wushu_PC_C", player_name: "Momo" } } }, z);
+  assert.equal(sfInfo(z).agent, "Jett");
+  const feed = (attacker, weapon, extra = {}) => ({ info: { match_info: { kill_feed: JSON.stringify({ attacker, victim: "X", weapon, headshot: true, ...extra }) } } });
+  ev(feed("Gegner", "TX_Hud_Operator"), z);
+  assert.equal(sfInfo(z).waffe, "");
+  assert.deepEqual(sfInfo(z).letzterKill, { angreifer: "Gegner", opfer: "X", waffe: "Operator", headshot: true });
+  ev(feed("momo", "TX_Hud_Volcano"), z);
+  assert.equal(sfInfo(z).waffe, "Vandal");
+  // Versteckte Namen: der eigene Spieler heißt „Me“, ein Gegner mit demselben Agent zählt nicht
+  ev(feed("Jett", "TX_Hud_Operator"), z);
+  assert.equal(sfInfo(z).waffe, "Vandal");
+  ev(feed("Me", "TX_Hud_Wushu_X_Dagger"), z);
+  assert.equal(sfInfo(z).waffe, "Blade Storm");
+  // Neues Match: Agent bleibt (kommt schon in der Agentenwahl), Waffe zurück
+  ev({ events: [{ name: "match_start" }] }, z);
+  assert.equal(sfInfo(z).agent, "Jett");
+  assert.equal(sfInfo(z).waffe, "");
 });

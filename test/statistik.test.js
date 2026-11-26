@@ -62,3 +62,18 @@ test("CS2: Rundenende ohne Sieger, Sieger kommt nach", () => {
   assert.deepEqual(s.json().match.siege, { CT: 1, T: 0 });
   assert.equal(s.json().match.runden, 1);
 });
+
+test("Valorant: Rundenstart mehrfach (mehrere PCs, doppelt) zählt die Runde nicht hoch, Nummer vom PC gilt", () => {
+  const s = new Statistik();
+  const ev = (type, extra = {}) => s.add({ spiel: "valorant", type, ...extra });
+  ev("round_start", { round: 1 });
+  ev("round_start", { round: 1 });
+  ev("round_start"); // ohne Nummer, Runde läuft noch
+  assert.equal(s.json().runde.nr, 1);
+  ev("round_end", { team: "TEAM B", round: 1 });
+  ev("round_start", { round: 2 });
+  assert.equal(s.json().runde.nr, 2);
+  ev("round_start", { round: 5 }); // PC weiß es besser (z. B. Regie später gestartet)
+  assert.equal(s.json().runde.nr, 5);
+  assert.equal(s.json().match.siege["TEAM B"], 1);
+});

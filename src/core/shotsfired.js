@@ -246,7 +246,12 @@ function shotsfiredEvents(body, z = sfZustand(), jetzt = Date.now()) {
     if (!z.echt[id] && z.zaehlerZeit[id] != null && gleich) schlucken[id] = 1;
     z.echt[id] = true;
   }
-  const rundeStart = () => { z.r = neueRunde(); raus.push({ event: "round_start", seite: "eigen" }); };
+  // Rundennummer aus dem Spiel: round_number, sonst aus dem Spielstand (gespielte Runden + 1). Die Quelle zählt dann nicht selbst hoch.
+  const rundeStart = () => {
+    z.r = neueRunde();
+    const nr = z.z.runde ?? (z.score ? z.score.won + z.score.lost + 1 : null);
+    raus.push({ event: "round_start", seite: "eigen", ...(nr > 0 ? { runde: nr } : {}) });
+  };
   // Rundenende: bei Sieg des eigenen Teams Clutch prüfen, danach zählt die nächste Runde neu
   const rundeEnde = (seite) => {
     raus.push({ event: "round_end", seite });

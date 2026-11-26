@@ -349,3 +349,34 @@ test("Shots Fired: score kommt erst nach Runde 1 (ohne 0:0), der Punkt der erste
   const z2 = sfZustand();
   assert.deepEqual(ev(score(5, 3), z2), []);
 });
+
+test("Valorant: Runde 1 startet nur einmal (round_number, match_start in der Kaufphase, Kaufphase)", () => {
+  const q = new BildQuelle("valorant", { team: "TEAM A", name: "Momo" });
+  const z = sfZustand();
+  const typen = (body, t) => shotsfiredEvents(body, z).flatMap((n) => q.ingest({ bild: true, ...n }, t).events).map((e) => `${e.type}:${e.round}`);
+  assert.deepEqual(typen({ key: "round_number", value: 1 }, 0), ["match_start:0", "round_start:1"]);
+  typen({ name: "match_start" }, 2000);
+  assert.deepEqual(typen({ key: "round_phase", value: "shopping" }, 3000), [], "dieselbe Runde, nicht Runde 2");
+  assert.equal(q.stand().runde, 1);
+  typen(score(1, 0), 90000);
+  assert.deepEqual(typen({ key: "round_number", value: 2 }, 100000), ["round_start:2"]);
+  assert.deepEqual(typen({ key: "round_phase", value: "shopping" }, 100500), []);
+  assert.equal(q.stand().runde, 2);
+  assert.deepEqual(q.stand().score, { "TEAM A": 1 });
+});
+
+test("Valorant ohne round_number: Rundennummer aus dem Spielstand, doppelter Start zählt nicht", () => {
+  const q = new BildQuelle("valorant", { team: "TEAM A", name: "Momo" });
+  const z = sfZustand();
+  const typen = (body, t) => shotsfiredEvents(body, z).flatMap((n) => q.ingest({ bild: true, ...n }, t).events).map((e) => `${e.type}:${e.round}`);
+  typen({ key: "round_phase", value: "shopping" }, 0);
+  typen({ key: "round_phase", value: "end" }, 60000);
+  typen(score(0, 1), 61000);
+  assert.deepEqual(typen({ key: "round_phase", value: "shopping" }, 70000), ["round_start:2"]);
+  assert.equal(q.stand().runde, 2);
+  // Bilderkennung ohne Nummer: zweiter Start kurz danach ohne Rundenende = dieselbe Runde
+  const b = new BildQuelle("valorant", { team: "TEAM A" });
+  b.ingest({ bild: true, event: "round_start", seite: "eigen" }, 0);
+  assert.deepEqual(b.ingest({ bild: true, event: "round_start", seite: "eigen" }, 5000).events, []);
+  assert.equal(b.stand().runde, 1);
+});

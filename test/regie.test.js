@@ -261,3 +261,16 @@ test("Match-MVP: kommt nach dem Auslöser-Event mit dem besten Spieler, Auslöse
   regie.pcEvent("PC 1", "valorant", { type: "match_end" });
   assert.equal(events.slice(vorher).filter((e) => e.ev.type === "match_mvp").length, 1);
 });
+
+test("Test-Knopf mit Seiten-Filter: Verteidigung sendet genauso wie Angriff", () => {
+  const cfg = { ...standardRegie(), aktivesSpiel: "valorant", targets: ZIELE };
+  const gesendet = [];
+  const regie = new Regie({ getConfig: () => cfg, send: (s) => gesendet.push(s) });
+  for (const seite of ["Angriff", "Verteidigung"]) {
+    const k = regie.testeZuweisung("valorant", "round_end", { id: "s", ziel: "ql", befehl: "start", werte: { cue: "{seite}" }, pc: "", team: "", seite });
+    assert.deepEqual(k.fehler, []);
+    assert.equal(k.nachrichten.length, 1);
+    assert.match(k.nachrichten[0], new RegExp(seite));
+  }
+  assert.equal(gesendet.length, 2);
+});
